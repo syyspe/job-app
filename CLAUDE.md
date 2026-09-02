@@ -12,7 +12,10 @@
   itself).
 - Lint: `npm run lint` (oxlint)
 - Format: none configured — oxlint covers lint only. Match surrounding style.
-- Dev server: `npm run dev` (http://localhost:5173)
+- Dev server: `npm run dev` (http://localhost:5173). This only starts the
+  frontend — the API proxies `/api` to `http://localhost:3001`, so also run
+  `npm run dev:server` in a second terminal or requests fail with
+  `ECONNREFUSED 127.0.0.1:3001`.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
