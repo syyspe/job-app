@@ -1,8 +1,38 @@
 import { render, screen } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import App from './App'
+import type { Application } from './types'
 
-test('renders the get-started heading', () => {
+const sampleApplications: Application[] = [
+  {
+    id: 1,
+    company: 'Acme',
+    role: 'Engineer',
+    dateApplied: '2026-01-15',
+    status: 'applied',
+    link: '',
+    notes: '',
+    attachments: [],
+  },
+]
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify(sampleApplications), { status: 200 }),
+    ),
+  )
+})
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+test('loads and renders applications from the API', async () => {
   render(<App />)
-  expect(screen.getByRole('heading', { name: 'Get started' })).toBeVisible()
+  expect(
+    await screen.findByRole('button', { name: /Acme/ }),
+  ).toBeVisible()
 })
