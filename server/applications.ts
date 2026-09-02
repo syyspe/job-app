@@ -1,11 +1,12 @@
 import { Router } from 'express'
+import type { Request, Response } from 'express'
 import type Database from 'better-sqlite3'
 import { unlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { STATUSES } from './types.ts'
 import type { Application, Attachment } from './types.ts'
 
-interface ApplicationRow {
+export interface ApplicationRow {
   id: number
   company: string
   role: string
@@ -15,7 +16,7 @@ interface ApplicationRow {
   notes: string
 }
 
-interface AttachmentRow {
+export interface AttachmentRow {
   id: number
   application_id: number
   stored_name: string
@@ -23,7 +24,7 @@ interface AttachmentRow {
   mime_type: string
 }
 
-function toAttachment(row: AttachmentRow): Attachment {
+export function toAttachment(row: AttachmentRow): Attachment {
   return {
     id: row.id,
     applicationId: row.application_id,
@@ -33,7 +34,10 @@ function toAttachment(row: AttachmentRow): Attachment {
   }
 }
 
-function toApplication(row: ApplicationRow, attachmentRows: AttachmentRow[]): Application {
+function toApplication(
+  row: ApplicationRow,
+  attachmentRows: AttachmentRow[],
+): Application {
   return {
     id: row.id,
     company: row.company,
@@ -71,19 +75,29 @@ function validateInput(body: unknown): ApplicationInput | null {
   return { company, role, dateApplied, status, link, notes }
 }
 
-export function createApplicationsRouter(db: Database.Database, dataDir: string): Router {
-  const router = Router()
-  const attachmentsForApplication = db.prepare('SELECT * FROM attachments WHERE application_id = ?')
+/** Ignores a missing file: the plan accepts that the DB and uploads/ can drift. */
+export function unlinkIfExists(path: string): void {
+  try {
+    unlinkSync(path)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  }
+}
 
-  router.get('/applications', (_req, res) => {
+type AttachmentsForApplication = Database.Statement<[number], AttachmentRow>
+
+function listHandler(db: Database.Database, attachments: AttachmentsForApplication) {
+  return (_req: Request, res: Response) => {
     const rows = db.prepare('SELECT * FROM applications').all() as ApplicationRow[]
     const applications = rows.map((row) =>
-      toApplication(row, attachmentsForApplication.all(row.id) as AttachmentRow[]),
+      toApplication(row, attachments.all(row.id)),
     )
     res.json(applications)
-  })
+  }
+}
 
-  router.post('/applications', (req, res) => {
+function createHandler(db: Database.Database) {
+  return (req: Request, res: Response) => {
     const input = validateInput(req.body)
     if (!input) {
       res.status(400).json({ error: 'invalid application' })
@@ -101,9 +115,11 @@ export function createApplicationsRouter(db: Database.Database, dataDir: string)
       .prepare('SELECT * FROM applications WHERE id = ?')
       .get(result.lastInsertRowid) as ApplicationRow
     res.status(201).json(toApplication(row, []))
-  })
+  }
+}
 
-  router.put('/applications/:id', (req, res) => {
+function updateHandler(db: Database.Database, attachments: AttachmentsForApplication) {
+  return (req: Request, res: Response) => {
     const id = Number(req.params.id)
     const input = validateInput(req.body)
     if (!input) {
@@ -125,22 +141,42 @@ export function createApplicationsRouter(db: Database.Database, dataDir: string)
     }
 
     const row = db.prepare('SELECT * FROM applications WHERE id = ?').get(id) as ApplicationRow
-    const attachmentRows = attachmentsForApplication.all(id) as AttachmentRow[]
-    res.json(toApplication(row, attachmentRows))
-  })
+    res.json(toApplication(row, attachments.all(id)))
+  }
+}
 
-  router.delete('/applications/:id', (req, res) => {
+function deleteHandler(
+  db: Database.Database,
+  dataDir: string,
+  attachments: AttachmentsForApplication,
+) {
+  return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    const attachmentRows = attachmentsForApplication.all(id) as AttachmentRow[]
+    const attachmentRows = attachments.all(id)
 
     db.prepare('DELETE FROM applications WHERE id = ?').run(id)
 
     for (const attachment of attachmentRows) {
-      unlinkSync(join(dataDir, 'uploads', attachment.stored_name))
+      unlinkIfExists(join(dataDir, 'uploads', attachment.stored_name))
     }
 
     res.status(204).end()
-  })
+  }
+}
+
+export function createApplicationsRouter(
+  db: Database.Database,
+  dataDir: string,
+): Router {
+  const router = Router()
+  const attachments: AttachmentsForApplication = db.prepare(
+    'SELECT * FROM attachments WHERE application_id = ?',
+  )
+
+  router.get('/applications', listHandler(db, attachments))
+  router.post('/applications', createHandler(db))
+  router.put('/applications/:id', updateHandler(db, attachments))
+  router.delete('/applications/:id', deleteHandler(db, dataDir, attachments))
 
   return router
 }

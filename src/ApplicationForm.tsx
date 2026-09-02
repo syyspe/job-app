@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { FormEvent } from 'react'
+import { useEffect, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import { STATUSES } from './types.ts'
 import type { ApplicationInput, Status } from './types.ts'
 
@@ -10,6 +10,28 @@ const emptyInput: ApplicationInput = {
   status: 'applied',
   link: '',
   notes: '',
+}
+
+interface TextFieldProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  type?: string
+  required?: boolean
+}
+
+function TextField({ label, value, onChange, type, required }: TextFieldProps) {
+  return (
+    <label>
+      {label}
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        required={required}
+      />
+    </label>
+  )
 }
 
 interface ApplicationFormProps {
@@ -27,46 +49,53 @@ export function ApplicationForm({
 }: ApplicationFormProps) {
   const [input, setInput] = useState<ApplicationInput>(initial ?? emptyInput)
 
+  useEffect(() => {
+    setInput(initial ?? emptyInput)
+  }, [initial])
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     onSubmit(input)
   }
 
+  function handleDateChange(event: ChangeEvent<HTMLInputElement>) {
+    setInput({ ...input, dateApplied: event.target.value })
+  }
+
+  function handleStatusChange(event: ChangeEvent<HTMLSelectElement>) {
+    setInput({ ...input, status: event.target.value as Status })
+  }
+
+  function handleNotesChange(event: ChangeEvent<HTMLTextAreaElement>) {
+    setInput({ ...input, notes: event.target.value })
+  }
+
   return (
     <form onSubmit={handleSubmit}>
-      <label>
-        Company
-        <input
-          value={input.company}
-          onChange={(e) => setInput({ ...input, company: e.target.value })}
-          required
-        />
-      </label>
-      <label>
-        Role
-        <input
-          value={input.role}
-          onChange={(e) => setInput({ ...input, role: e.target.value })}
-          required
-        />
-      </label>
+      <TextField
+        label="Company"
+        value={input.company}
+        onChange={(value) => setInput({ ...input, company: value })}
+        required
+      />
+      <TextField
+        label="Role"
+        value={input.role}
+        onChange={(value) => setInput({ ...input, role: value })}
+        required
+      />
       <label>
         Date applied
         <input
           type="date"
           value={input.dateApplied}
-          onChange={(e) => setInput({ ...input, dateApplied: e.target.value })}
+          onChange={handleDateChange}
           required
         />
       </label>
       <label>
         Status
-        <select
-          value={input.status}
-          onChange={(e) =>
-            setInput({ ...input, status: e.target.value as Status })
-          }
-        >
+        <select value={input.status} onChange={handleStatusChange}>
           {STATUSES.map((status) => (
             <option key={status} value={status}>
               {status}
@@ -74,20 +103,15 @@ export function ApplicationForm({
           ))}
         </select>
       </label>
-      <label>
-        Link
-        <input
-          type="url"
-          value={input.link}
-          onChange={(e) => setInput({ ...input, link: e.target.value })}
-        />
-      </label>
+      <TextField
+        label="Link"
+        type="url"
+        value={input.link}
+        onChange={(value) => setInput({ ...input, link: value })}
+      />
       <label>
         Notes
-        <textarea
-          value={input.notes}
-          onChange={(e) => setInput({ ...input, notes: e.target.value })}
-        />
+        <textarea value={input.notes} onChange={handleNotesChange} />
       </label>
       <div>
         <button type="submit">{submitLabel}</button>

@@ -1,7 +1,19 @@
 import type { Application, ApplicationInput, Attachment } from './types.ts'
 
+async function checkOk(response: Response): Promise<Response> {
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null)
+    const message =
+      body && typeof body === 'object' && 'error' in body
+        ? String((body as { error: unknown }).error)
+        : response.statusText
+    throw new Error(message)
+  }
+  return response
+}
+
 async function parseJson<T>(response: Response): Promise<T> {
-  return (await response.json()) as T
+  return (await checkOk(response)).json() as Promise<T>
 }
 
 export async function listApplications(): Promise<Application[]> {
@@ -33,7 +45,7 @@ export async function updateApplication(
 }
 
 export async function deleteApplication(id: number): Promise<void> {
-  await fetch(`/api/applications/${id}`, { method: 'DELETE' })
+  await checkOk(await fetch(`/api/applications/${id}`, { method: 'DELETE' }))
 }
 
 export async function uploadAttachment(
@@ -50,7 +62,7 @@ export async function uploadAttachment(
 }
 
 export async function deleteAttachment(id: number): Promise<void> {
-  await fetch(`/api/attachments/${id}`, { method: 'DELETE' })
+  await checkOk(await fetch(`/api/attachments/${id}`, { method: 'DELETE' }))
 }
 
 export function attachmentUrl(id: number): string {

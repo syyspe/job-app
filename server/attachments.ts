@@ -1,37 +1,27 @@
 import { Router } from 'express'
 import multer from 'multer'
+import type { NextFunction, Request, Response } from 'express'
 import type Database from 'better-sqlite3'
-import { mkdirSync, unlinkSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import type { Attachment } from './types.ts'
+import { toAttachment, unlinkIfExists } from './applications.ts'
+import type { AttachmentRow } from './applications.ts'
 
-interface AttachmentRow {
-  id: number
-  application_id: number
-  stored_name: string
-  original_name: string
-  mime_type: string
-}
-
-function toAttachment(row: AttachmentRow): Attachment {
-  return {
-    id: row.id,
-    applicationId: row.application_id,
-    storedName: row.stored_name,
-    originalName: row.original_name,
-    mimeType: row.mime_type,
+function checkApplicationExists(db: Database.Database) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const id = Number(req.params.id)
+    const exists = db.prepare('SELECT 1 FROM applications WHERE id = ?').get(id)
+    if (!exists) {
+      res.status(404).json({ error: 'application not found' })
+      return
+    }
+    next()
   }
 }
 
-export function createAttachmentsRouter(
-  db: Database.Database,
-  dataDir: string,
-): Router {
-  const router = Router()
-  const uploadsDir = join(dataDir, 'uploads')
-
-  const upload = multer({
+function buildUpload(uploadsDir: string) {
+  return multer({
     storage: multer.diskStorage({
       destination: (_req, _file, callback) => {
         mkdirSync(uploadsDir, { recursive: true })
@@ -43,37 +33,32 @@ export function createAttachmentsRouter(
     }),
     limits: { fileSize: 10 * 1024 * 1024 },
   })
+}
 
-  router.post(
-    '/applications/:id/attachments',
-    upload.single('file'),
-    (req, res) => {
-      const applicationId = Number(req.params.id)
-      if (!req.file) {
-        res.status(400).json({ error: 'file is required' })
-        return
-      }
+function uploadHandler(db: Database.Database) {
+  return (req: Request, res: Response) => {
+    const applicationId = Number(req.params.id)
+    if (!req.file) {
+      res.status(400).json({ error: 'file is required' })
+      return
+    }
 
-      const result = db
-        .prepare(
-          `INSERT INTO attachments (application_id, stored_name, original_name, mime_type)
-           VALUES (?, ?, ?, ?)`,
-        )
-        .run(
-          applicationId,
-          req.file.filename,
-          req.file.originalname,
-          req.file.mimetype,
-        )
+    const result = db
+      .prepare(
+        `INSERT INTO attachments (application_id, stored_name, original_name, mime_type)
+         VALUES (?, ?, ?, ?)`,
+      )
+      .run(applicationId, req.file.filename, req.file.originalname, req.file.mimetype)
 
-      const row = db
-        .prepare('SELECT * FROM attachments WHERE id = ?')
-        .get(result.lastInsertRowid) as AttachmentRow
-      res.status(201).json(toAttachment(row))
-    },
-  )
+    const row = db
+      .prepare('SELECT * FROM attachments WHERE id = ?')
+      .get(result.lastInsertRowid) as AttachmentRow
+    res.status(201).json(toAttachment(row))
+  }
+}
 
-  router.get('/attachments/:id', (req, res) => {
+function downloadHandler(db: Database.Database, uploadsDir: string) {
+  return (req: Request, res: Response) => {
     const id = Number(req.params.id)
     const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as
       | AttachmentRow
@@ -84,9 +69,11 @@ export function createAttachmentsRouter(
     }
 
     res.download(join(uploadsDir, row.stored_name), row.original_name)
-  })
+  }
+}
 
-  router.delete('/attachments/:id', (req, res) => {
+function removeHandler(db: Database.Database, uploadsDir: string) {
+  return (req: Request, res: Response) => {
     const id = Number(req.params.id)
     const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as
       | AttachmentRow
@@ -96,10 +83,28 @@ export function createAttachmentsRouter(
       return
     }
 
+    unlinkIfExists(join(uploadsDir, row.stored_name))
     db.prepare('DELETE FROM attachments WHERE id = ?').run(id)
-    unlinkSync(join(uploadsDir, row.stored_name))
     res.status(204).end()
-  })
+  }
+}
+
+export function createAttachmentsRouter(
+  db: Database.Database,
+  dataDir: string,
+): Router {
+  const router = Router()
+  const uploadsDir = join(dataDir, 'uploads')
+  const upload = buildUpload(uploadsDir)
+
+  router.post(
+    '/applications/:id/attachments',
+    checkApplicationExists(db),
+    upload.single('file'),
+    uploadHandler(db),
+  )
+  router.get('/attachments/:id', downloadHandler(db, uploadsDir))
+  router.delete('/attachments/:id', removeHandler(db, uploadsDir))
 
   return router
 }

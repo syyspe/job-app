@@ -119,3 +119,12 @@ test('deleting the application removes its attachment files from disk', async ()
   expect(deleteRes.status).toBe(204)
   expect(existsSync(storedPath)).toBe(false)
 })
+
+test('uploading to an unknown application is rejected and leaves no file behind', async () => {
+  const uploadRes = await fetch(`${baseUrl}/api/applications/999999/attachments`, {
+    method: 'POST',
+    body: resumeFile(),
+  })
+  expect(uploadRes.status).toBe(404)
+  expect(existsSync(join(dataDir, 'uploads'))).toBe(false)
+})
