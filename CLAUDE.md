@@ -1,50 +1,54 @@
 # Project Instructions for Claude
 
-> Template: replace every `<placeholder>` before use. This file is read by
-> Claude at the start of every session in this repo — it's the highest
-> leverage file in the whole skeleton. Keep it accurate; stale instructions
-> are worse than none.
-
-## Setup
-
-If `.claude/.bootstrapped` does not exist in this repo, this project
-hasn't been configured yet. Before doing anything else this session —
-before answering unrelated questions — start the guided setup: open
-`.claude/skills/bootstrap/SKILL.md` and follow it exactly, one question at
-a time, beginning with the project's name and purpose. Give a one-line
-intro and the first question in your very first message; don't wait to be
-asked and don't ask permission to begin.
+> Read by Claude at the start of every session in this repo — the highest
+> leverage file here. Keep it accurate; stale instructions are worse than
+> none.
 
 ## Commands
 
-- Build: `<build command>`
-- Test: `<test command>`
-- Lint: `<lint command>`
-- Format: `<format command>`
+- Build: `npm run build` (runs `tsc -b` then `vite build`)
+- Test: `npm test` — this is the gate that must pass before a PR. End-to-end
+  tests are separate: `npm run test:e2e` (Playwright, boots the dev server
+  itself).
+- Lint: `npm run lint` (oxlint)
+- Format: none configured — oxlint covers lint only. Match surrounding style.
+- Dev server: `npm run dev` (http://localhost:5173)
 
-Expected healthy output for tests: `<e.g. "N passed, 0 failed">`
+Expected healthy output for tests: `Test Files N passed / Tests N passed`,
+with no `failed` line. Playwright: `N passed`.
 
 ## Conventions
 
-- Language/runtime: `<language + version>`
-- Framework: `<framework + version>`
-- Dependency policy: `<e.g. "no new dependencies without approval">`
-- `<other hard rules — e.g. "money is always Decimal, never float">`
-- `<testing convention — e.g. "every endpoint needs an integration test">`
+- Language/runtime: TypeScript 6.0.3 on Node 24.20.0 LTS (pinned in `.nvmrc`
+  and `package.json`'s `engines.node`). ESM only — `"type": "module"`.
+- Framework: React 19.2.8 + React DOM 19.2.8, built by Vite 8.2.2.
+- Testing: Vitest 4.1.11 with Testing Library (jsdom) for unit/component
+  tests, Playwright 1.62.1 for end-to-end.
+- Dependency policy: no new dependencies without approval.
+- Unit tests live beside the code they test as `src/**/*.test.tsx?`; that
+  glob is what Vitest picks up. E2E specs go in `e2e/*.spec.ts`.
+- Import `test`/`expect` from `vitest` explicitly — globals are off, so an
+  undeclared `test` is a type error at build time, not a runtime surprise.
+- Query by accessible role/name in tests (`getByRole`), not by CSS class or
+  test id, unless there's no accessible handle.
 
 ## Architecture
 
-- `<top-level dir>/` — `<what lives here>`
-- `<top-level dir>/` — `<what lives here>`
-- `<note on generated code, if any — e.g. "schemas/ is generated, never edit by hand">`
+- `src/` — the React app. `main.tsx` mounts, `App.tsx` is the root component;
+  `src/assets/` holds bundled images/SVGs.
+- `public/` — served verbatim at the site root, not processed by Vite.
+- `e2e/` — Playwright specs, configured by `playwright.config.ts`.
+- `server/` — **not created yet.** When the app needs a backend, the Node API
+  goes here. Until then this is a frontend-only project.
+- `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are
+  generated — never edit by hand, never commit.
 
 ## Things Claude gets wrong here
 
 > Add to this list the second time Claude makes the same mistake — see
 > `REVIEW.md` for the review-feedback loop that feeds this section.
 
-- `<example: "don't bump dependency versions without being asked">`
-- `<example: "package X is frozen, changes go in package Y">`
+_(empty — fills in from real mistakes.)_
 
 ## Working agreement
 

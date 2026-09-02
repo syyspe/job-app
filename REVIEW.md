@@ -38,9 +38,14 @@ Every PR gets four passes, in this order:
 
 Do not review, or review at reduced strictness:
 
-- Generated code: `<e.g. "schemas/", "*.generated.*">`
-- Already caught by lint/format in CI: `<list>`
-- `<other excluded paths>`
+- Generated / vendored: `dist/`, `node_modules/`, `test-results/`,
+  `playwright-report/`, `package-lock.json`.
+- Already caught by tooling: TypeScript errors (`npm run build` runs `tsc
+  -b`) and anything oxlint flags (`npm run lint`) — don't re-report those as
+  review findings.
+- Scaffold leftovers in `src/App.tsx`, `src/App.css`, `src/assets/` and
+  `public/` are Vite's starter template, not written code. Review them only
+  once real code starts replacing them.
 
 ## Response loop
 
