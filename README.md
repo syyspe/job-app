@@ -1,16 +1,11 @@
-# AI-Native SDLC Skeleton (personal scale)
+# job-applications
 
-A starter repo for running your own projects with Claude embedded at every
-stage. Adapted from the [AI-Native SDLC
-Playbook](https://claude.com/blog/the-ai-native-sdlc-playbook), with the
-organizational scaffolding taken out: no product owners, no policy owners, no
-sign-off chain, no SLO control bands, no on-call routing. One person, working
-on their own things, with an agent that has enough structure to stay honest.
+Manages job applications.
 
-The core idea survives the shrink: **every stage produces a version-controlled
-artifact the next stage reads.** You stay accountable for judgment calls
-(what to build, whether the plan is right, whether it merges); Claude does the
-work in between.
+Built on a personal-scale AI-native SDLC: **every stage produces a
+version-controlled artifact the next stage reads.** You stay accountable for
+judgment calls (what to build, whether the plan is right, whether it merges);
+Claude does the work in between.
 
 ```
 brief.md  →  plan.md  →  code + tests  →  PR
@@ -33,6 +28,7 @@ and what's next; **`/sdlc`** re-answers that any time you ask.
 
 - **git**
 - **[Claude Code](https://claude.com/claude-code)** (the `claude` CLI)
+- **Node 24.20.0 LTS** (see `.nvmrc`), then `npm install`
 - **python3** — the hooks in `.claude/hooks/` parse tool-call data with it,
   unconditionally, regardless of your project's stack. Without it, every
   Edit/Write/Bash call gets blocked by a raw shell error instead of the
@@ -41,6 +37,11 @@ and what's next; **`/sdlc`** re-answers that any time you ask.
   PR-only, so opening PRs is part of the normal flow, starting with
   bootstrap's own setup PR. Without it nothing breaks; you just open each PR
   in a browser from a compare URL instead.
+
+*(Optional)* set the `ANTHROPIC_API_KEY` secret on the GitHub repo (Settings
+→ Secrets → Actions) so `.github/workflows/claude-review.yml` reviews PRs
+automatically. Without it the workflow skips cleanly and PRs stay green;
+`/code-review` in a local session does the same job with no key.
 
 ## The default branch is PR-only
 
@@ -54,49 +55,6 @@ to take that on).
 
 If this rule stops paying for itself on some project, delete the hook from
 `.claude/settings.json`. It's a default, not a law.
-
-## Getting started with a new project
-
-1. On GitHub, click **Use this template** on this repo → create your new
-   repo (clean history, no link back to this skeleton).
-2. Clone it locally.
-3. Run `claude` in it, then run **`/bootstrap`**. Setup starts right away,
-   one question at a time (project name, purpose, tech stack, commands).
-   For a known stack (Next.js, Django, React+Vite, plain Node/TS) it
-   offers to scaffold the project too, then fills in every `<placeholder>`
-   across `CLAUDE.md`, `README.md`, `REVIEW.md`, and `.claude/hooks/`. If
-   you forget, any first message will still trigger it — an unconfigured
-   clone is detected automatically — but `/bootstrap` is the reliable way
-   to kick it off. Re-run any time (e.g. if the stack changes later). It
-   ends by putting the setup on a `bootstrap-setup` branch and opening a
-   PR — the default branch is PR-only here, and setup is no exception.
-4. **Merge that setup PR**, then tell Claude. It pulls the default branch
-   and walks you into Stage 1. The merge has to happen first: the
-   `.claude/.bootstrapped` marker must be tracked and reachable from the
-   default branch, or parallel worktrees look unconfigured and re-bootstrap
-   themselves, and any branch you fork before the merge carries the whole
-   scaffold in its diff.
-5. **You're in the loop.** Bootstrap shows the four-stage map, asks what you
-   want to build first, and writes your first `brief/<slug>.md` with you on
-   a new branch.
-6. *(Optional)* set the `ANTHROPIC_API_KEY` secret on the new GitHub repo
-   (Settings → Secrets → Actions) so `.github/workflows/claude-review.yml`
-   can review your PRs automatically. Without it the workflow skips cleanly
-   and explains itself in the run summary — your PRs stay green, they just
-   don't get automated review until you opt in. `/code-review` in a local
-   session does the same job with no key and no CI minutes.
-7. *(Optional)* **Trim or extend `.claude/skills/`** with anything specific
-   to this project that `CLAUDE.md` is the wrong place for.
-
-Bootstrap deliberately leaves the `brief/` and `plans/` templates alone —
-those fill in from real use, not initial setup.
-
-### Maintaining this skeleton itself
-
-This repo needs to be marked as a **GitHub template repository** for step 1
-above to work: `gh repo edit <owner>/<repo> --template`, or Settings →
-General → check "Template repository". One-time setup, done once this repo
-is pushed.
 
 ## Starting a piece of work
 
@@ -163,10 +121,8 @@ then `REVIEW.md`'s passes via `/code-review` or the CI workflow, then a PR
 you actually read before merging. Hooks gate anything hard to reverse —
 production deploys, protected-path edits.
 
-## What this skeleton deliberately leaves out
+## What this process deliberately leaves out
 
-- No language/stack is assumed — commands in `CLAUDE.md` and hook scripts are
-  placeholders you fill in.
 - **No approval workflow.** No `status: draft|approved`, no sign-off lines,
   no roles. You approve things by committing them.
 - **No monitoring loop.** The upstream playbook closes Stage 6 back to Stage
