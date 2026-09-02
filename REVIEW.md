@@ -1,0 +1,64 @@
+# Review Policy
+
+This file defines the review passes Claude runs on every pull request (Stage
+4). It's read by whatever review automation you wire up — an interactive
+`/code-review`, or `.github/workflows/claude-review.yml` — so keep it
+authoritative and specific rather than generic.
+
+## Passes
+
+Every PR gets four passes, in this order:
+
+1. **Bugs** — logic errors, regressions, edge cases, off-by-ones, unhandled
+   error paths. Cross-reference against `plans/<branch>.plan.md` if one
+   exists: does the diff match what was planned?
+2. **Security** — injection risks, auth gaps, secrets or credentials
+   committed, unsafe deserialization, missing validation on anything that
+   crosses a real boundary (user input, external APIs, file/network I/O).
+   Scale the depth to what the project actually is; a local CLI tool and a
+   public web app do not deserve the same paragraph.
+3. **Scope** — alignment with `brief/<slug>.md` and `plans/<slug>.plan.md`.
+   Flag anything in the diff that neither document asked for. Unplanned
+   work isn't automatically wrong, but it should be a decision, not a
+   surprise.
+4. **Simplicity** — function/file length, parameter count, nesting depth,
+   and complexity within the limits in
+   `.claude/skills/simple-code/SKILL.md`; flag defensive code handling
+   cases that can't occur, and cleverness where a simpler version would
+   read just as fast.
+
+## Severity
+
+- **Important** — fix before merge. Bugs, security issues, and unexplained
+  scope deviations are always Important.
+- **Nit** — style/preference, safe to defer. Cap: **5 nits per review**. If
+  there are more than 5, only surface the 5 highest-value ones.
+
+## Excluded paths
+
+Do not review, or review at reduced strictness:
+
+- Generated code: `<e.g. "schemas/", "*.generated.*">`
+- Already caught by lint/format in CI: `<list>`
+- `<other excluded paths>`
+
+## Response loop
+
+- On a PR, tag `@claude` on a review comment to request a fix; Claude
+  addresses it and pushes a correction (needs the CI workflow enabled).
+- If a review catches the **same class of mistake** for the second time
+  across different PRs, add it to the "Things Claude gets wrong here"
+  section of `CLAUDE.md` so it's caught during implementation instead of
+  review. This is the feedback loop that replaces an eval suite here — it
+  costs one line and it works.
+
+## Who decides
+
+Claude's review findings are advisory. You approve the merge, and the default
+branch only moves by merged PR — `default-branch-guard.sh` blocks a direct
+push, so these passes can't be skipped by pushing past them. On anything
+touching a protected path or a production deploy, the hooks in
+`.claude/hooks/` stop the session and ask — see `production-gate.sh`.
+
+Reviewing your own PR is not theatre as long as you actually read the diff.
+The failure mode to watch for is merging a green check you didn't look at.
