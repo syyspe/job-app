@@ -35,6 +35,8 @@ test('renders a row for each application', () => {
       onToggle={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
     />,
   )
 
@@ -50,6 +52,8 @@ test('the collapsed list shows no detail panel', () => {
       onToggle={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
     />,
   )
 
@@ -68,6 +72,8 @@ test('the expanded row shows its detail panel and reports a delete', async () =>
       onToggle={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={onDelete}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
     />,
   )
 

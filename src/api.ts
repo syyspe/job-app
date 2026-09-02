@@ -1,4 +1,4 @@
-import type { Application, ApplicationInput } from './types.ts'
+import type { Application, ApplicationInput, Attachment } from './types.ts'
 
 async function parseJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T
@@ -34,4 +34,25 @@ export async function updateApplication(
 
 export async function deleteApplication(id: number): Promise<void> {
   await fetch(`/api/applications/${id}`, { method: 'DELETE' })
+}
+
+export async function uploadAttachment(
+  applicationId: number,
+  file: File,
+): Promise<Attachment> {
+  const body = new FormData()
+  body.append('file', file)
+  const response = await fetch(
+    `/api/applications/${applicationId}/attachments`,
+    { method: 'POST', body },
+  )
+  return parseJson(response)
+}
+
+export async function deleteAttachment(id: number): Promise<void> {
+  await fetch(`/api/attachments/${id}`, { method: 'DELETE' })
+}
+
+export function attachmentUrl(id: number): string {
+  return `/api/attachments/${id}`
 }

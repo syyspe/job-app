@@ -4,8 +4,10 @@ import { ApplicationList } from './ApplicationList.tsx'
 import {
   createApplication,
   deleteApplication,
+  deleteAttachment,
   listApplications,
   updateApplication,
+  uploadAttachment,
 } from './api.ts'
 import type { Application, ApplicationInput } from './types.ts'
 import './App.css'
@@ -38,6 +40,16 @@ function App() {
     await reload()
   }
 
+  async function handleUploadAttachment(applicationId: number, file: File) {
+    await uploadAttachment(applicationId, file)
+    await reload()
+  }
+
+  async function handleRemoveAttachment(attachmentId: number) {
+    await deleteAttachment(attachmentId)
+    await reload()
+  }
+
   return (
     <main>
       <h1>Job applications</h1>
@@ -50,6 +62,8 @@ function App() {
         }
         onUpdate={handleUpdate}
         onDelete={handleDelete}
+        onUploadAttachment={handleUploadAttachment}
+        onRemoveAttachment={handleRemoveAttachment}
       />
     </main>
   )

@@ -7,6 +7,8 @@ interface ApplicationListProps {
   onToggle: (id: number) => void
   onUpdate: (id: number, input: ApplicationInput) => void
   onDelete: (id: number) => void
+  onUploadAttachment: (applicationId: number, file: File) => void
+  onRemoveAttachment: (attachmentId: number) => void
 }
 
 export function ApplicationList({
@@ -15,6 +17,8 @@ export function ApplicationList({
   onToggle,
   onUpdate,
   onDelete,
+  onUploadAttachment,
+  onRemoveAttachment,
 }: ApplicationListProps) {
   if (applications.length === 0) {
     return <p>No applications yet.</p>
@@ -32,6 +36,10 @@ export function ApplicationList({
               application={application}
               onUpdate={(input) => onUpdate(application.id, input)}
               onDelete={() => onDelete(application.id)}
+              onUploadAttachment={(file) =>
+                onUploadAttachment(application.id, file)
+              }
+              onRemoveAttachment={onRemoveAttachment}
             />
           )}
         </li>
