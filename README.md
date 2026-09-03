@@ -43,6 +43,20 @@ and what's next; **`/sdlc`** re-answers that any time you ask.
 automatically. Without it the workflow skips cleanly and PRs stay green;
 `/code-review` in a local session does the same job with no key.
 
+## Running the server
+
+The API reads its storage locations from two required env vars — there is no
+default, so it fails fast at startup if either is missing:
+
+- `DB_PATH` — full path to the sqlite database file
+- `UPLOADS_DIR` — full path to the uploads directory
+
+Copy `.env.example` to `.env` and fill in real paths, then:
+
+```
+npm run dev:server
+```
+
 ## The default branch is PR-only
 
 Nothing lands on the default branch except by merged pull request. On a solo

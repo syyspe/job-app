@@ -1,10 +1,10 @@
 import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname } from 'node:path'
 
-export function openDatabase(dataDir: string): Database.Database {
-  mkdirSync(dataDir, { recursive: true })
-  const db = new Database(join(dataDir, 'app.db'))
+export function openDatabase(dbPath: string): Database.Database {
+  mkdirSync(dirname(dbPath), { recursive: true })
+  const db = new Database(dbPath)
   db.pragma('foreign_keys = ON')
 
   db.exec(`

@@ -8,14 +8,17 @@ import { openDatabase } from './db.ts'
 import { createApp } from './app.ts'
 import type { Application, Attachment } from './types.ts'
 
-let dataDir: string
+let root: string
+let uploadsDir: string
 let server: Server
 let baseUrl: string
 
 beforeEach(async () => {
-  dataDir = mkdtempSync(join(tmpdir(), 'job-app-test-'))
-  const db = openDatabase(dataDir)
-  const app = createApp(db, dataDir)
+  root = mkdtempSync(join(tmpdir(), 'job-app-test-'))
+  const dbPath = join(root, 'app.db')
+  uploadsDir = join(root, 'uploads')
+  const db = openDatabase(dbPath)
+  const app = createApp(db, uploadsDir)
   server = app.listen(0)
   await new Promise<void>((resolve) => server.once('listening', resolve))
   const address = server.address()
@@ -25,7 +28,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()))
-  rmSync(dataDir, { recursive: true, force: true })
+  rmSync(root, { recursive: true, force: true })
 })
 
 async function createApplication(): Promise<Application> {
@@ -64,7 +67,7 @@ test('uploading a file attaches it to the application and can be downloaded back
   expect(uploadRes.status).toBe(201)
   const attachment = (await uploadRes.json()) as Attachment
   expect(attachment.originalName).toBe('resume.txt')
-  expect(existsSync(join(dataDir, 'uploads', attachment.storedName))).toBe(
+  expect(existsSync(join(uploadsDir, attachment.storedName))).toBe(
     true,
   )
 
@@ -88,7 +91,7 @@ test('removing an attachment clears its row and its file', async () => {
     { method: 'POST', body: resumeFile() },
   )
   const attachment = (await uploadRes.json()) as Attachment
-  const storedPath = join(dataDir, 'uploads', attachment.storedName)
+  const storedPath = join(uploadsDir, attachment.storedName)
   expect(existsSync(storedPath)).toBe(true)
 
   const deleteRes = await fetch(`${baseUrl}/api/attachments/${attachment.id}`, {
@@ -109,7 +112,7 @@ test('deleting the application removes its attachment files from disk', async ()
     { method: 'POST', body: resumeFile() },
   )
   const attachment = (await uploadRes.json()) as Attachment
-  const storedPath = join(dataDir, 'uploads', attachment.storedName)
+  const storedPath = join(uploadsDir, attachment.storedName)
   expect(existsSync(storedPath)).toBe(true)
 
   const deleteRes = await fetch(
@@ -126,5 +129,5 @@ test('uploading to an unknown application is rejected and leaves no file behind'
     body: resumeFile(),
   })
   expect(uploadRes.status).toBe(404)
-  expect(existsSync(join(dataDir, 'uploads'))).toBe(false)
+  expect(existsSync(uploadsDir)).toBe(false)
 })

@@ -91,10 +91,9 @@ function removeHandler(db: Database.Database, uploadsDir: string) {
 
 export function createAttachmentsRouter(
   db: Database.Database,
-  dataDir: string,
+  uploadsDir: string,
 ): Router {
   const router = Router()
-  const uploadsDir = join(dataDir, 'uploads')
   const upload = buildUpload(uploadsDir)
 
   router.post(
