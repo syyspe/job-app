@@ -147,7 +147,7 @@ function updateHandler(db: Database.Database, attachments: AttachmentsForApplica
 
 function deleteHandler(
   db: Database.Database,
-  dataDir: string,
+  uploadsDir: string,
   attachments: AttachmentsForApplication,
 ) {
   return (req: Request, res: Response) => {
@@ -157,7 +157,7 @@ function deleteHandler(
     db.prepare('DELETE FROM applications WHERE id = ?').run(id)
 
     for (const attachment of attachmentRows) {
-      unlinkIfExists(join(dataDir, 'uploads', attachment.stored_name))
+      unlinkIfExists(join(uploadsDir, attachment.stored_name))
     }
 
     res.status(204).end()
@@ -166,7 +166,7 @@ function deleteHandler(
 
 export function createApplicationsRouter(
   db: Database.Database,
-  dataDir: string,
+  uploadsDir: string,
 ): Router {
   const router = Router()
   const attachments: AttachmentsForApplication = db.prepare(
@@ -176,7 +176,7 @@ export function createApplicationsRouter(
   router.get('/applications', listHandler(db, attachments))
   router.post('/applications', createHandler(db))
   router.put('/applications/:id', updateHandler(db, attachments))
-  router.delete('/applications/:id', deleteHandler(db, dataDir, attachments))
+  router.delete('/applications/:id', deleteHandler(db, uploadsDir, attachments))
 
   return router
 }

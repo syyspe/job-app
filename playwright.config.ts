@@ -18,7 +18,7 @@ export default defineConfig({
       command: 'node server/index.ts',
       url: 'http://localhost:3001/api/applications',
       reuseExistingServer: !process.env.CI,
-      env: { DATA_DIR: dataDir },
+      env: { DB_PATH: join(dataDir, 'app.db'), UPLOADS_DIR: join(dataDir, 'uploads') },
     },
   ],
 })

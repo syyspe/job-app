@@ -15,7 +15,9 @@
 - Dev server: `npm run dev` (http://localhost:5173). This only starts the
   frontend — the API proxies `/api` to `http://localhost:3001`, so also run
   `npm run dev:server` in a second terminal or requests fail with
-  `ECONNREFUSED 127.0.0.1:3001`.
+  `ECONNREFUSED 127.0.0.1:3001`. `dev:server` requires `.env` (copy from
+  `.env.example` and set `DB_PATH`/`UPLOADS_DIR`) — see README's "Running
+  the server" section.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
@@ -106,8 +108,13 @@ seams; use them.
   natural clear point. `session-start-check.sh` re-derives the stage from
   what's on disk, so a fresh session re-orients for almost nothing, while
   carrying a finished stage's context forward is paid for on every turn that
-  follows. When a stage's artifact lands, say so and suggest starting the
-  next one fresh.
+  follows. Three boundaries — brief committed, plan committed, and build
+  committed with verification green and `verifier` PASS. At each one, say the
+  stage is done, name the next action, suggest a fresh session, and stop
+  there: don't take the next stage's first action in the same message, and
+  don't offer to. A committed plan is not a go-ahead to start building in the
+  planning session, and a verified build is not a go-ahead to run
+  `/code-review` in the build session.
 - **Match the model to the stage.** Stages 1–2 are where the judgment is and
   are worth the Opus rate. Stage 3 executes a work order that is already
   written down, and it's the most turn-dense stage — suggest `/model sonnet`

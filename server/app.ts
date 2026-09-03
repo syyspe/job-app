@@ -21,11 +21,11 @@ function jsonErrorHandler(
   res.status(status).json({ error: message })
 }
 
-export function createApp(db: Database.Database, dataDir: string): ExpressApp {
+export function createApp(db: Database.Database, uploadsDir: string): ExpressApp {
   const app = express()
   app.use(express.json())
-  app.use('/api', createApplicationsRouter(db, dataDir))
-  app.use('/api', createAttachmentsRouter(db, dataDir))
+  app.use('/api', createApplicationsRouter(db, uploadsDir))
+  app.use('/api', createAttachmentsRouter(db, uploadsDir))
   app.use(jsonErrorHandler)
   return app
 }

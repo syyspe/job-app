@@ -59,5 +59,3 @@ playwright-report/
 blob-report/
 playwright/.cache/
 
-# Server data (SQLite db + uploaded files)
-server/data/

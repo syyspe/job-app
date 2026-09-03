@@ -19,6 +19,7 @@ delete the section.
 field — you're the only reviewer, and flipping a flag against yourself is
 ceremony, not a gate.
 
-**Next:** Stage 2 (Plan). Open a session in plan mode against this brief and
-commit `plans/<slug>.plan.md` before any code gets written. Run `/sdlc` if
+**Next:** Stage 2 (Plan), in a fresh session. Open it in plan mode against
+this brief and commit `plans/<slug>.plan.md` before any code gets written —
+that commit ends Stage 2, and Build is a session after that. Run `/sdlc` if
 you're unsure where a branch stands.

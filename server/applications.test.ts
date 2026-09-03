@@ -8,14 +8,16 @@ import { openDatabase } from './db.ts'
 import { createApp } from './app.ts'
 import type { Application } from './types.ts'
 
-let dataDir: string
+let root: string
 let server: Server
 let baseUrl: string
 
 beforeEach(async () => {
-  dataDir = mkdtempSync(join(tmpdir(), 'job-app-test-'))
-  const db = openDatabase(dataDir)
-  const app = createApp(db, dataDir)
+  root = mkdtempSync(join(tmpdir(), 'job-app-test-'))
+  const dbPath = join(root, 'app.db')
+  const uploadsDir = join(root, 'uploads')
+  const db = openDatabase(dbPath)
+  const app = createApp(db, uploadsDir)
   server = app.listen(0)
   await new Promise<void>((resolve) => server.once('listening', resolve))
   const address = server.address()
@@ -25,7 +27,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()))
-  rmSync(dataDir, { recursive: true, force: true })
+  rmSync(root, { recursive: true, force: true })
 })
 
 test('create, list, update, delete round trip', async () => {
