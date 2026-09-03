@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { openDatabase } from './db.ts'
 import { createApp } from './app.ts'
 
@@ -7,9 +8,12 @@ if (!dbPath || !uploadsDir) {
   throw new Error('DB_PATH and UPLOADS_DIR must both be set (see .env.example)')
 }
 
-const db = openDatabase(dbPath)
-const app = createApp(db, uploadsDir)
+const staticDir = join(import.meta.dirname, '../dist')
+const port = Number(process.env.PORT) || 3001
 
-app.listen(3001, () => {
-  console.log(`API listening on http://localhost:3001 (db: ${dbPath}, uploads: ${uploadsDir})`)
+const db = openDatabase(dbPath)
+const app = createApp(db, uploadsDir, { staticDir })
+
+app.listen(port, () => {
+  console.log(`API listening on http://localhost:${port} (db: ${dbPath}, uploads: ${uploadsDir})`)
 })

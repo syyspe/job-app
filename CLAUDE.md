@@ -9,7 +9,8 @@
 - Build: `npm run build` (runs `tsc -b` then `vite build`)
 - Test: `npm test` — this is the gate that must pass before a PR. End-to-end
   tests are separate: `npm run test:e2e` (Playwright, boots the dev server
-  itself).
+  itself). `npm run test:e2e:prod` runs the same specs against `npm start`
+  (the production build) instead.
 - Lint: `npm run lint` (oxlint)
 - Format: none configured — oxlint covers lint only. Match surrounding style.
 - Dev server: `npm run dev` (http://localhost:5173). This only starts the
