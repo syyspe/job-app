@@ -27,7 +27,9 @@ form textarea {
   border-radius: 4px;
 }
 
-form button {
+.form-actions {
+  display: flex;
+  gap: 8px;
   align-self: flex-start;
 }
 
@@ -40,14 +42,14 @@ ul {
   gap: 8px;
 }
 
-li {
+.application-item {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px;
   text-align: left;
 }
 
-li > button {
+.row-button {
   width: 100%;
   text-align: left;
   background: none;
@@ -56,6 +58,13 @@ li > button {
   color: inherit;
   cursor: pointer;
   padding: 4px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 li form {
