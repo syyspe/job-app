@@ -72,17 +72,24 @@ never receives `initial` and clears itself in `handleSubmit`.
    Match the surrounding file's style (`initial` spelled out as a local, roles
    queried by accessible name). Confirm it fails against the current effect
    before deleting it, if convenient — otherwise just confirm it passes after.
-3. In `src/App.tsx`, add above line 24:
+3. In `src/App.tsx`, add inside the effect body, immediately above the
+   `void reload()` call:
 
    ```tsx
-   // oxlint-disable-next-line react/set-state-in-effect -- reload() sets state after an await, not synchronously
+   // eslint-disable-next-line react/set-state-in-effect -- reload() sets state after an await, not synchronously
    ```
 
-   Verify the directive actually silences the warning by re-running lint; if
-   oxlint 1.81 rejects that spelling, fall back to
-   `// eslint-disable-next-line react/set-state-in-effect`, which oxlint also
-   honors. Do **not** disable the rule in `.oxlintrc.json` — it must stay live
-   for the rest of the codebase.
+   **Deviation from the original plan:** `oxlint-disable-next-line` is not a
+   directive oxlint 1.81 recognizes, so the `eslint-disable-next-line`
+   spelling is required (confirmed via `--report-unused-disable-directives`,
+   which parses `eslint-disable` comments but reports `oxlint-disable` ones
+   as unrecognized). Placement also matters more than the plan assumed: the
+   warning anchors to the `void reload()` line, not the `useEffect(` line, so
+   a comment placed above line 24 (as originally written) is reported as an
+   unused disable directive. It must sit on the line directly above the
+   statement that triggers the warning, inside the callback. Do **not**
+   disable the rule in `.oxlintrc.json` — it must stay live for the rest of
+   the codebase.
 4. Run `npm run lint` and confirm it prints no warnings at all.
 
 ## Tests

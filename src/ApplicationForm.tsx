@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { STATUSES } from './types.ts'
 import type { ApplicationInput, Status } from './types.ts'
@@ -48,10 +48,6 @@ export function ApplicationForm({
   onCancel,
 }: ApplicationFormProps) {
   const [input, setInput] = useState<ApplicationInput>(initial ?? emptyInput)
-
-  useEffect(() => {
-    setInput(initial ?? emptyInput)
-  }, [initial])
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault()

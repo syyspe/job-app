@@ -85,6 +85,29 @@ test('keeps the edit form values after save', async () => {
   )
 })
 
+test('keeps in-progress edits when the parent rerenders', async () => {
+  const user = userEvent.setup()
+  const initial = {
+    company: 'Acme',
+    role: 'Engineer',
+    dateApplied: '2026-01-15',
+    status: 'interview' as const,
+    link: '',
+    notes: '',
+  }
+  const { rerender } = render(
+    <ApplicationForm initial={initial} submitLabel="Save" onSubmit={vi.fn()} />,
+  )
+
+  await user.clear(screen.getByRole('textbox', { name: 'Role' }))
+  await user.type(screen.getByRole('textbox', { name: 'Role' }), 'Staff Engineer')
+  rerender(
+    <ApplicationForm initial={{ ...initial }} submitLabel="Save" onSubmit={vi.fn()} />,
+  )
+
+  expect(screen.getByRole('textbox', { name: 'Role' })).toHaveValue('Staff Engineer')
+})
+
 test('setting a date on a draft switches its status to applied', () => {
   const onSubmit = vi.fn()
   render(<ApplicationForm submitLabel="Add application" onSubmit={onSubmit} />)
