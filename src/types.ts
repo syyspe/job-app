@@ -1,4 +1,5 @@
 export const STATUSES = [
+  'draft',
   'applied',
   'screening',
   'interview',
