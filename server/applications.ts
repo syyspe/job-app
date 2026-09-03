@@ -69,8 +69,9 @@ function validateInput(body: unknown): ApplicationInput | null {
   const link = typeof b.link === 'string' ? b.link : ''
   const notes = typeof b.notes === 'string' ? b.notes : ''
 
-  if (!company || !role || !dateApplied) return null
+  if (!company || !role) return null
   if (!STATUSES.includes(status as (typeof STATUSES)[number])) return null
+  if (status !== 'draft' && !dateApplied) return null
 
   return { company, role, dateApplied, status, link, notes }
 }

@@ -7,7 +7,7 @@ const emptyInput: ApplicationInput = {
   company: '',
   role: '',
   dateApplied: '',
-  status: 'applied',
+  status: 'draft',
   link: '',
   notes: '',
 }
@@ -56,10 +56,17 @@ export function ApplicationForm({
   function handleSubmit(event: FormEvent) {
     event.preventDefault()
     onSubmit(input)
+    if (!initial) setInput(emptyInput)
   }
 
   function handleDateChange(event: ChangeEvent<HTMLInputElement>) {
-    setInput({ ...input, dateApplied: event.target.value })
+    const dateApplied = event.target.value
+    const applyingDraft = input.status === 'draft' && dateApplied !== ''
+    setInput({
+      ...input,
+      dateApplied,
+      status: applyingDraft ? 'applied' : input.status,
+    })
   }
 
   function handleStatusChange(event: ChangeEvent<HTMLSelectElement>) {
@@ -90,7 +97,7 @@ export function ApplicationForm({
           type="date"
           value={input.dateApplied}
           onChange={handleDateChange}
-          required
+          required={input.status !== 'draft'}
         />
       </label>
       <label>

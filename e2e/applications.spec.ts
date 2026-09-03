@@ -10,6 +10,8 @@ test('add, edit, attach a file, and delete an application', async ({
   await page.getByLabel('Date applied').fill('2026-01-15')
   await page.getByRole('button', { name: 'Add application' }).click()
 
+  await expect(page.getByRole('textbox', { name: 'Company' })).toHaveValue('')
+
   const row = page.getByRole('button', { name: /Acme/ })
   await expect(row).toBeVisible()
   await row.click()

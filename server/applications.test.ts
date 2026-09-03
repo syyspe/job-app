@@ -110,6 +110,36 @@ test('rejects an empty required field with 400', async () => {
   expect(res.status).toBe(400)
 })
 
+test('accepts a draft with no date', async () => {
+  const res = await fetch(`${baseUrl}/api/applications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      company: 'Acme',
+      role: 'Engineer',
+      dateApplied: '',
+      status: 'draft',
+    }),
+  })
+  expect(res.status).toBe(201)
+  const created = (await res.json()) as Application
+  expect(created.dateApplied).toBe('')
+})
+
+test('rejects a non-draft with no date', async () => {
+  const res = await fetch(`${baseUrl}/api/applications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      company: 'Acme',
+      role: 'Engineer',
+      dateApplied: '',
+      status: 'applied',
+    }),
+  })
+  expect(res.status).toBe(400)
+})
+
 test('returns 404 when updating an unknown id', async () => {
   const res = await fetch(`${baseUrl}/api/applications/999999`, {
     method: 'PUT',
