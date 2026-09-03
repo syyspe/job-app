@@ -287,8 +287,8 @@ map `CLAUDE.md` and the `sdlc` skill carry):
 ```
 1. Brief  brief/<slug>.md         problem, done-looks-like, out of scope
 2. Plan   plans/<slug>.plan.md    committed BEFORE any code
-3. Build  code + tests            implement the work order
-4. Ship   verifier → PR → merge   you read the diff, you merge it
+3. Build  code + tests            implement the work order, commit it
+4. Ship   verify → review → PR    checked with fresh eyes, then you merge
 ```
 
 Say the three things that make it make sense: one kebab-case slug names the

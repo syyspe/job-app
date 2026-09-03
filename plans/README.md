@@ -17,8 +17,8 @@ Workflow:
    so and stop, not roll on into the work order.
 5. Start a fresh session (auto mode, `/model sonnet`) and implement. The plan
    is the handoff, so the build session doesn't need the planning one's
-   context. The merged diff should match this plan — Stage 4 review checks
-   that.
+   context. The merged diff should match this plan — Stage 4's `verifier` and
+   review check exactly that, with fresh context.
 
 Copy `TEMPLATE.plan.md` to get started. For independent parallel streams, use
 the `worktree` skill (`.claude/skills/worktree/SKILL.md`) instead of switching
@@ -29,7 +29,5 @@ alone, without the conversation that produced it. If the implementation
 departs from the plan, update the plan in the same commit — a plan that
 silently drifts from the code is worse than no plan.
 
-**Next:** Stage 3 (Build) in a fresh session — implement, then the
-verification command from `CLAUDE.md` and the `verifier` subagent. Stage 4
-(Ship) is a fresh session again: `/code-review`, push, PR. Run `/sdlc` if
-you're unsure where a branch stands.
+**Next:** Stage 3 (Build), in a fresh session — implement and commit, and
+that's the whole stage. Run `/sdlc` for what follows it.

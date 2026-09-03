@@ -5,9 +5,11 @@
 #      the bootstrap skill.
 #   2. Configured repo — report where the current branch stands in the loop
 #      and what the next action is. The stage is derived from the artifact
-#      chain itself (which of brief/plans exist for the branch slug), never
-#      from separate state and never from an approval flag: an artifact
-#      exists or it doesn't.
+#      chain itself — which of brief/plan exist for the branch slug, and
+#      whether code has landed since the plan commit — never from separate
+#      state and never from an approval flag. Every boundary is computable
+#      here; CLAUDE.md's "The loop" says why that constraint drives where
+#      verification sits.
 #
 # Both paths only inject context — this hook never blocks anything, and any
 # probe that can't run (no git, missing dirs) falls back to silence.
@@ -25,7 +27,9 @@ fi
 HOWTO="Orientation, not a script to recite: if the user opens with something \
 open-ended (what next, let's continue, hi), lead with the stage and next \
 action in at most two lines. Otherwise hold this as context and answer what \
-was asked. The sdlc skill has the full loop map and the exact commands."
+was asked. The line above is the imperative only — the sdlc skill has the full \
+loop map, the exact commands, and the reasoning behind each stage. Read it \
+before departing from the next action named here."
 
 emit() {
   MSG="$1" python3 -c 'import json, os
@@ -66,43 +70,57 @@ if [ ! -f "$brief" ] && [ ! -f "$plan" ] && [ ! -d brief ]; then
   exit 0  # not a skeleton layout (or the dirs were removed) — say nothing
 fi
 
+# Has code landed since the plan was committed? Dated from the commit that
+# ADDED the plan, not the last one to touch it — a build session is told to
+# amend the plan in the same commit as the code it drifted from, and dating
+# from that would hide the very code it's meant to detect.
+code=""
+if [ -f "$plan" ]; then
+  plan_commit=$(git log --diff-filter=A --format=%H -1 -- "$plan" 2>/dev/null)
+  if [ -n "$plan_commit" ]; then
+    code=$(git log --format=%H "$plan_commit"..HEAD -- . \
+      ':(exclude)brief' ':(exclude)plans' 2>/dev/null)
+  fi
+fi
+
 chain=$(
   checklist_line "$brief"
   checklist_line "$plan"
+  if [ -n "$code" ]; then
+    printf '  [x] code committed\n'
+  else
+    printf '  [ ] code committed\n'
+  fi
 )
 
+# One imperative per state. The reasoning behind each lives in the sdlc skill,
+# which HOWTO points at — repeating it here is what let the two drift apart.
 if [ ! -f "$brief" ]; then
   stage="Stage 1 (Brief) — not started."
-  next="write $brief from brief/TEMPLATE.md with the user (Problem, What done
-looks like, Approach, Out of scope, Open questions), then commit it. Keep it
-thin — a short honest brief beats a padded one. There's no approval step; the
-commit is the handoff to Stage 2."
+  next="write $brief from brief/TEMPLATE.md, interviewing the user one question
+at a time, then commit it. That commit ends the stage."
 elif [ ! -f "$plan" ]; then
   stage="Stage 2 (Plan) — brief committed, no plan yet."
-  next="call the EnterPlanMode tool now, as your first action — don't wait to
-be asked and don't assume the user started the session in plan mode. Then read
-$brief and iterate on the approach until it could be implemented from the file
-alone. Once ExitPlanMode is approved, write the plan to $plan from
-plans/TEMPLATE.plan.md and commit it BEFORE any code — that commit is the audit
-trail Stage 4 review checks the diff against. Then stop: the commit ends the
-stage. Approving ExitPlanMode approves the plan, not a go-ahead to build now —
-don't start the work order in this session. Say the plan is committed, name its
-first step, and suggest picking Build up in a fresh session with /model
-sonnet."
+  next="call the EnterPlanMode tool now, as your first action. Read $brief and
+iterate, then write $plan from plans/TEMPLATE.plan.md and commit it BEFORE any
+code. Stop there — approving ExitPlanMode approves the plan, it is not a
+go-ahead to build in this session."
 elif [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   stage="Stage 3 (Build) — plan committed, work in progress."
-  next="finish the plan's work order, then run the verification command from
-CLAUDE.md and hand the change to the verifier subagent. If implementation
-departed from the plan, update $plan in the same commit. Once the code is
-committed, verification is green and the verifier reports PASS, the stage is
-over — /code-review, push and the PR are Stage 4, in a fresh session."
+  next="finish $plan's work order and commit it; if the implementation departed
+from the plan, update $plan in the same commit. That commit ends the stage.
+Verification, verifier, /code-review and the PR are Stage 4 — don't run them
+here."
+elif [ -z "$code" ]; then
+  stage="Stage 3 (Build) — plan committed, no code yet."
+  next="implement $plan's work order and commit it — simple-code applies from
+the first line. That commit is this session's whole job and ends the stage."
 else
-  stage="Stage 3 (Build) → Stage 4 (Ship) — plan committed, working tree clean."
-  next="implement $plan's work order, or if it's already committed and verified,
-run Stage 4 here: /code-review (REVIEW.md's passes), push, and open a PR. Check
-git log against the plan's work order rather than assuming which of the two it
-is. If it's the build that's still to do, that's this session's whole job —
-end it once the verifier reports PASS and leave Stage 4 to a fresh one."
+  stage="Stage 4 (Ship) — code committed since the plan."
+  next="run these four in order, as one continuous sequence, without stopping
+to ask in between: (1) the verification command from CLAUDE.md, reporting its
+real output; (2) the verifier subagent, against $plan; (3) /code-review; (4)
+git push -u origin $slug && gh pr create. The user reviews and merges."
 fi
 
 emit "Loop status — branch: $slug
