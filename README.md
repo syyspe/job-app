@@ -51,11 +51,31 @@ default, so it fails fast at startup if either is missing:
 - `DB_PATH` — full path to the sqlite database file
 - `UPLOADS_DIR` — full path to the uploads directory
 
-Copy `.env.example` to `.env` and fill in real paths, then:
+Copy `.env.example` to `.env` and fill in real paths first, for either mode
+below.
+
+### Development
+
+Two processes: Vite serves the React app on `:5173` with HMR and proxies
+`/api` to Express on `:3001`.
 
 ```
-npm run dev:server
+npm run dev         # frontend, :5173
+npm run dev:server  # API, :3001
 ```
+
+### Production
+
+One process: `npm start` builds the app and runs a single Express server that
+serves the built frontend and the API together.
+
+```
+npm start
+```
+
+Listens on `PORT` (default `3001`). `npm run test:e2e:prod` runs the same e2e
+specs as `npm run test:e2e`, but against `npm start` instead of the two dev
+servers — useful for confirming the built app actually works end to end.
 
 ## The default branch is PR-only
 

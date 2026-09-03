@@ -13,8 +13,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:prod": "playwright test --config=playwright.prod.config.ts",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "npm run build && node --env-file-if-exists=.env server/index.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
