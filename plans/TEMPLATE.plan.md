@@ -28,6 +28,5 @@ here is hard to reverse — most changes aren't.
 
 ---
 
-**Next stage:** commit this plan *before* writing code. Then implement the
-work order, run the verification command above, and hand the change to the
-`verifier` subagent (Stage 4) before opening a PR.
+**Next stage:** commit this plan *before* writing code. Run `/sdlc` for what
+follows it.

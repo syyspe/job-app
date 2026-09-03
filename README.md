@@ -16,8 +16,8 @@ brief.md  →  plan.md  →  code + tests  →  PR
 |---|---|---|---|
 | 1. Brief | `brief/<slug>.md` | problem, requirements, approach, out-of-scope are written down | Plan |
 | 2. Plan | `plans/<slug>.plan.md` | plan committed **before** any code | Build |
-| 3. Build | code + tests | the work order is done | Ship |
-| 4. Ship | PR reviewed per `REVIEW.md` | verification passes, `verifier` says PASS, you merge | Brief, again |
+| 3. Build | code + tests | the work order is committed | Ship |
+| 4. Ship | verification, review, PR | verification passes, `verifier` says PASS, you merge | Brief, again |
 
 There is no `status:` frontmatter and nothing to approve. **An artifact exists
 or it doesn't** — that's the entire state machine, and it's readable with
@@ -88,12 +88,13 @@ One slug threads through everything — pick a short kebab-case name (e.g.
    brief and iterate until the plan's right — see `plans/README.md` — then
    commit it as `plans/<slug>.plan.md`.
    *Unlock:* the plan is committed. Nothing gets implemented before that.
-4. **Stage 3.** Fresh session, auto mode: implement the work order.
-   `simple-code` applies from the first line. Then `CLAUDE.md`'s verification
-   command and the `verifier` subagent, which re-checks the diff against the
-   plan with fresh context.
-5. **Stage 4.** Fresh session again: `/code-review` (it runs `REVIEW.md`'s
-   passes), push, open a PR, read it, merge it.
+4. **Stage 3.** Fresh session, auto mode: implement the work order and commit
+   it. `simple-code` applies from the first line. The commit ends the stage —
+   nothing gets verified or reviewed here.
+5. **Stage 4.** Fresh session again, in order: `CLAUDE.md`'s verification
+   command, the `verifier` subagent (re-checks the diff against the plan with
+   fresh context), `/code-review` for `REVIEW.md`'s passes, then push, open a
+   PR, read it, merge it.
 
 Each of those is a **separate session**. A stage ends at a commit, that commit
 is the whole handoff, and the session-start hook re-derives where you are from
@@ -132,13 +133,16 @@ rather than letting them drift.
 
 **3. Build.** Run independent streams in separate git worktrees. For bug
 fixes, write and commit the failing test *before* the fix, and don't let the
-agent edit that test while fixing it.
+agent edit that test while fixing it. The stage ends at the commit; checking
+the work is the next session's job, because the session that wrote the code
+knows what it was *meant* to do — which is the assumption verification exists
+to break.
 
 **4. Ship.** Wrap verification in one command (`make test`, `npm test`, …)
-documented in `CLAUDE.md` with its expected healthy output. Then `verifier`,
-then `REVIEW.md`'s passes via `/code-review` or the CI workflow, then a PR
-you actually read before merging. Hooks gate anything hard to reverse —
-production deploys, protected-path edits.
+documented in `CLAUDE.md` with its expected healthy output. That command, then
+`verifier`, then `REVIEW.md`'s passes via `/code-review` or the CI workflow,
+then a PR you actually read before merging. Hooks gate anything hard to
+reverse — production deploys, protected-path edits.
 
 ## What this process deliberately leaves out
 

@@ -1,6 +1,6 @@
 ---
 name: verifier
-description: Use after implementation to independently verify a change against its plan.md before it goes to human review. Fresh context, no assumptions carried over from the implementing session — runs the verification command from CLAUDE.md, checks the diff matches the plan's work order, and reports pass/fail with specifics. Use PROACTIVELY at the end of any build, before opening a PR.
+description: Use at the start of Stage 4 (Ship) to independently verify a committed build against its plan.md before it goes to review and a PR. Fresh context, no assumptions carried over from the implementing session — runs the verification command from CLAUDE.md, checks the diff matches the plan's work order, and reports pass/fail with specifics. Use PROACTIVELY once code is committed, before /code-review and before opening a PR.
 tools: Read, Bash, Grep, Glob
 model: sonnet
 ---
@@ -23,8 +23,9 @@ session missed or rationalized away, not to rubber-stamp it.
    git diff --stat "$base"
    ```
 
-   Diff against the merge-base, not `HEAD` — by Stage 4 the work is usually
-   already committed and the tree is clean, so `git diff HEAD` shows nothing.
+   Diff against the merge-base, not `HEAD` — you run at the head of Stage 4,
+   where the build is already committed and the tree is clean, so `git diff
+   HEAD` shows nothing.
 
    If the calling session named a plan file, use that rather than deriving
    it. If the branch has no matching plan and it isn't obvious which one
