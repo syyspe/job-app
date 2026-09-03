@@ -21,3 +21,12 @@ the conventions of an API you keep integrating with.
 Prefer `CLAUDE.md` for anything that's always true, and a skill for anything
 that's true only in a specific situation — a skill that always triggers is
 just `CLAUDE.md` with extra steps.
+
+The same split works *inside* a skill once its `SKILL.md` covers several
+situations at once. `sdlc/` is the worked example: the `SKILL.md` works out
+which stage the branch is in, and the four `stages/*.md` files hold the
+instructions for one stage each, so a session reads the one it's in and never
+pays for the other three. Split a skill this way only when something can name
+the right file without reading them all — here the `SKILL.md` and the
+SessionStart hook both do. Without that, you've hidden the instructions rather
+than deferred them.

@@ -8,7 +8,7 @@
 #      chain itself — which of brief/plan exist for the branch slug, and
 #      whether code has landed since the plan commit — never from separate
 #      state and never from an approval flag. Every boundary is computable
-#      here; CLAUDE.md's "The loop" says why that constraint drives where
+#      here; the sdlc skill says why that constraint drives where
 #      verification sits.
 #
 # Both paths only inject context — this hook never blocks anything, and any
@@ -98,29 +98,33 @@ chain=$(
 if [ ! -f "$brief" ]; then
   stage="Stage 1 (Brief) — not started."
   next="write $brief from brief/TEMPLATE.md, interviewing the user one question
-at a time, then commit it. That commit ends the stage."
+at a time, then commit it. That commit ends the stage. Full instructions:
+.claude/skills/sdlc/stages/1-brief.md"
 elif [ ! -f "$plan" ]; then
   stage="Stage 2 (Plan) — brief committed, no plan yet."
   next="call the EnterPlanMode tool now, as your first action. Read $brief and
 iterate, then write $plan from plans/TEMPLATE.plan.md and commit it BEFORE any
 code. Stop there — approving ExitPlanMode approves the plan, it is not a
-go-ahead to build in this session."
+go-ahead to build in this session. Full instructions:
+.claude/skills/sdlc/stages/2-plan.md"
 elif [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   stage="Stage 3 (Build) — plan committed, work in progress."
   next="finish $plan's work order and commit it; if the implementation departed
 from the plan, update $plan in the same commit. That commit ends the stage.
 Verification, verifier, /code-review and the PR are Stage 4 — don't run them
-here."
+here. Full instructions: .claude/skills/sdlc/stages/3-build.md"
 elif [ -z "$code" ]; then
   stage="Stage 3 (Build) — plan committed, no code yet."
   next="implement $plan's work order and commit it — simple-code applies from
-the first line. That commit is this session's whole job and ends the stage."
+the first line. That commit is this session's whole job and ends the stage.
+Full instructions: .claude/skills/sdlc/stages/3-build.md"
 else
   stage="Stage 4 (Ship) — code committed since the plan."
-  next="run these four in order, as one continuous sequence, without stopping
-to ask in between: (1) the verification command from CLAUDE.md, reporting its
-real output; (2) the verifier subagent, against $plan; (3) /code-review; (4)
-git push -u origin $slug && gh pr create. The user reviews and merges."
+  next="read .claude/skills/sdlc/stages/4-ship.md and run its steps in order,
+as one continuous sequence, without stopping to ask in between: the
+verification command from CLAUDE.md, the verifier subagent against $plan,
+/code-review, /security-review if the diff touches a real boundary, then git
+push -u origin $slug && gh pr create. The user reviews and merges."
 fi
 
 emit "Loop status — branch: $slug
