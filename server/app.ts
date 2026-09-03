@@ -17,9 +17,11 @@ function jsonErrorHandler(
   res: Response,
   _next: NextFunction,
 ) {
-  const status = err instanceof multer.MulterError ? 400 : 500
-  const message = err instanceof Error ? err.message : 'unexpected error'
-  res.status(status).json({ error: message })
+  if (err instanceof multer.MulterError) {
+    res.status(400).json({ error: err.message })
+    return
+  }
+  res.status(500).json({ error: 'internal server error' })
 }
 
 type CreateAppOptions = { staticDir?: string }

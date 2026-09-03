@@ -9,7 +9,7 @@ if (!dbPath || !uploadsDir) {
 }
 
 const staticDir = join(import.meta.dirname, '../dist')
-const port = Number(process.env.PORT) || 3001
+const port = process.env.PORT === undefined ? 3001 : Number(process.env.PORT)
 
 const db = openDatabase(dbPath)
 const app = createApp(db, uploadsDir, { staticDir })
