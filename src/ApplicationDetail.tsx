@@ -29,20 +29,21 @@ export function ApplicationDetail({
   onRemoveAttachment,
 }: ApplicationDetailProps) {
   return (
-    <div>
-      <ApplicationForm
-        initial={toInput(application)}
-        submitLabel="Save"
-        onSubmit={onUpdate}
-      />
+    <ApplicationForm
+      initial={toInput(application)}
+      submitLabel="Save"
+      onSubmit={onUpdate}
+      actions={
+        <button type="button" className="button" onClick={onDelete}>
+          Delete
+        </button>
+      }
+    >
       <AttachmentList
         attachments={application.attachments}
         onUpload={onUploadAttachment}
         onRemove={onRemoveAttachment}
       />
-      <button type="button" onClick={onDelete}>
-        Delete
-      </button>
-    </div>
+    </ApplicationForm>
   )
 }

@@ -23,21 +23,29 @@ export function AttachmentList({
 
   return (
     <div>
-      <ul>
+      <ul className="attachment-list">
         {attachments.map((attachment) => (
-          <li key={attachment.id}>
+          <li key={attachment.id} className="attachment-item">
             <a href={attachmentUrl(attachment.id)}>
               {attachment.originalName}
             </a>
-            <button type="button" onClick={() => onRemove(attachment.id)}>
+            <button
+              type="button"
+              className="button"
+              onClick={() => onRemove(attachment.id)}
+            >
               Remove
             </button>
           </li>
         ))}
       </ul>
-      <label>
+      <label className="button">
         Attach a file
-        <input type="file" onChange={handleFileChange} />
+        <input
+          type="file"
+          className="visually-hidden"
+          onChange={handleFileChange}
+        />
       </label>
     </div>
   )

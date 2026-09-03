@@ -25,10 +25,14 @@ export function ApplicationList({
   }
 
   return (
-    <ul>
+    <ul className="application-list">
       {applications.map((application) => (
-        <li key={application.id}>
-          <button type="button" onClick={() => onToggle(application.id)}>
+        <li key={application.id} className="application-item">
+          <button
+            type="button"
+            className="row-button"
+            onClick={() => onToggle(application.id)}
+          >
             {application.company} — {application.role} ({application.status})
           </button>
           {expandedId === application.id && (

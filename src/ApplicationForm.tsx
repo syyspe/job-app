@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import type { ChangeEvent, FormEvent, ReactNode } from 'react'
 import { STATUSES } from './types.ts'
 import type { ApplicationInput, Status } from './types.ts'
 
@@ -38,14 +38,16 @@ interface ApplicationFormProps {
   initial?: ApplicationInput
   submitLabel: string
   onSubmit: (input: ApplicationInput) => void
-  onCancel?: () => void
+  children?: ReactNode
+  actions?: ReactNode
 }
 
 export function ApplicationForm({
   initial,
   submitLabel,
   onSubmit,
-  onCancel,
+  children,
+  actions,
 }: ApplicationFormProps) {
   const [input, setInput] = useState<ApplicationInput>(initial ?? emptyInput)
 
@@ -116,13 +118,12 @@ export function ApplicationForm({
         Notes
         <textarea value={input.notes} onChange={handleNotesChange} />
       </label>
-      <div>
-        <button type="submit">{submitLabel}</button>
-        {onCancel && (
-          <button type="button" onClick={onCancel}>
-            Cancel
-          </button>
-        )}
+      {children}
+      <div className="form-actions">
+        <button type="submit" className="button button-primary">
+          {submitLabel}
+        </button>
+        {actions}
       </div>
     </form>
   )

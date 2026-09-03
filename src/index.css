@@ -45,10 +45,37 @@ button {
   cursor: pointer;
 }
 
-button[type='submit'] {
+.button {
+  display: inline-flex;
+  align-items: center;
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.button-primary {
   color: var(--accent);
   background: var(--accent-bg);
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 6px 12px;
+  border-color: transparent;
+}
+
+.button:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
