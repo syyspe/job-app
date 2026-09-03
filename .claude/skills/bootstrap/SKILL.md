@@ -1,6 +1,6 @@
 ---
 name: bootstrap
-description: Use at the start of a session in a freshly cloned/templated copy of this skeleton that hasn't been configured yet (no .claude/.bootstrapped file — CLAUDE.md's Setup section names this explicitly). Also user-invocable any time as /bootstrap to redo setup. Walks through project name, purpose, tech stack, and real current versions one question at a time, optionally scaffolds the project for the chosen stack, then fills in every current placeholder across CLAUDE.md, README.md, REVIEW.md, and .claude/hooks/, and finishes by walking the user into Stage 1 — their first brief/<slug>.md.
+description: Use at the start of a session in a freshly cloned/templated copy of this skeleton that hasn't been configured yet (no .claude/.bootstrapped file — session-start-check.sh detects this and pushes the session here). Also user-invocable any time as /bootstrap to redo setup. Walks through project name, purpose, tech stack, and real current versions one question at a time, optionally scaffolds the project for the chosen stack, then fills in every current placeholder across CLAUDE.md, README.md, REVIEW.md, and .claude/hooks/, and finishes by walking the user into Stage 1 — their first brief/<slug>.md.
 ---
 
 # Bootstrap a new project from this skeleton
@@ -190,10 +190,8 @@ Edit:
 - **`CLAUDE.md`** — Commands, Conventions (including `Language/runtime`
   and `Framework`, using the *verified actual* versions from Step 4, not
   just what was requested), Architecture. Leave "Things Claude gets wrong
-  here" empty. **Remove the `## Setup` section entirely** — it's a
-  one-time trigger and `.claude/.bootstrapped` (written below) makes it
-  moot from here on. Leave `## The loop` exactly as it is — its `<slug>` is
-  a variable that gets filled in per piece of work, not a setup placeholder.
+  here" empty. Leave `## The loop` exactly as it is — its `<slug>` is a
+  variable that gets filled in per piece of work, not a setup placeholder.
 - **`README.md`** — replace the title and opening framing with the real
   project name/purpose. Leave the stage-map table and process notes as-is.
 - **`REVIEW.md`** — fill "Excluded paths" with the stack's known
@@ -223,8 +221,8 @@ content for these to seem thorough:
 
 1. Write `.claude/.bootstrapped` with the captured project name, stack,
    verified versions, and today's date (plain text — a marker
-   `session-start-check.sh` and `CLAUDE.md`'s Setup section look for, not
-   a config file other tooling reads).
+   `session-start-check.sh` looks for, not a config file other tooling
+   reads).
 2. Report a short summary *before* committing, so they can object while
    it's cheap: what was scaffolded/installed (with the verified actual
    versions), what was filled in, and what's still deferred (any

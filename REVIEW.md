@@ -1,9 +1,24 @@
 # Review Policy
 
 This file defines the review passes Claude runs on every pull request (Stage
-4). It's read by whatever review automation you wire up — an interactive
-`/code-review`, or `.github/workflows/claude-review.yml` — so keep it
-authoritative and specific rather than generic.
+4). Keep it authoritative and specific rather than generic.
+
+**What actually reads it.** `.github/workflows/claude-review.yml` does — its
+prompt names this file, so the CI review on a PR runs the four passes below.
+The local `/code-review` command does **not**: it is a built-in with fixed
+passes of its own (correctness bugs, plus cleanup for reuse, simplification
+and efficiency, plus one conventions angle that checks the diff against
+`CLAUDE.md`). It also reviews only the diff — `git diff @{upstream}...HEAD`
+plus uncommitted changes — unless you hand it a path, a branch, or a PR
+number.
+
+So in a local Stage 4, three of the four passes below arrive by other routes:
+`verifier` covers the plan half of **Scope**, `/code-review` covers **Bugs**
+and most of **Simplicity**, and **Security** needs `/security-review` run
+explicitly. The brief half of **Scope** has no automation at all — that one is
+yours, when you read the PR. Anything here you need to bind a local session
+(an exclusion, a hard limit) has to be restated in `CLAUDE.md`, which is the
+only policy file the built-in review sees.
 
 ## Passes
 
