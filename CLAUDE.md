@@ -15,7 +15,9 @@
 - Dev server: `npm run dev` (http://localhost:5173). This only starts the
   frontend — the API proxies `/api` to `http://localhost:3001`, so also run
   `npm run dev:server` in a second terminal or requests fail with
-  `ECONNREFUSED 127.0.0.1:3001`.
+  `ECONNREFUSED 127.0.0.1:3001`. `dev:server` requires `.env` (copy from
+  `.env.example` and set `DB_PATH`/`UPLOADS_DIR`) — see README's "Running
+  the server" section.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
