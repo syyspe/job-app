@@ -35,7 +35,7 @@ export function ApplicationDetail({
       onSubmit={onUpdate}
       actions={
         <button type="button" className="button" onClick={onDelete}>
-          Delete
+          Delete application
         </button>
       }
     >

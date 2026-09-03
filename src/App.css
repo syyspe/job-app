@@ -1,14 +1,25 @@
 main {
-  max-width: 720px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 32px 20px;
+}
+
+.layout {
+  display: grid;
+  gap: 32px;
+  align-items: start;
+}
+
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+  }
 }
 
 form {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 32px;
 }
 
 form label {
