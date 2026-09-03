@@ -13,9 +13,12 @@ Workflow:
 2. Claude proposes a plan: affected files, work order, tests to add/update.
 3. Iterate on it before any code is generated. This is the cheap place to
    change your mind.
-4. Commit it here as `<slug>.plan.md`.
-5. Switch to auto mode and implement. The merged diff should match this plan
-   — Stage 4 review checks that.
+4. Commit it here as `<slug>.plan.md`. That ends Stage 2 — Claude should say
+   so and stop, not roll on into the work order.
+5. Start a fresh session (auto mode, `/model sonnet`) and implement. The plan
+   is the handoff, so the build session doesn't need the planning one's
+   context. The merged diff should match this plan — Stage 4 review checks
+   that.
 
 Copy `TEMPLATE.plan.md` to get started. For independent parallel streams, use
 the `worktree` skill (`.claude/skills/worktree/SKILL.md`) instead of switching
@@ -26,6 +29,7 @@ alone, without the conversation that produced it. If the implementation
 departs from the plan, update the plan in the same commit — a plan that
 silently drifts from the code is worse than no plan.
 
-**Next:** Stage 3 (Build), then Stage 4 (Ship) — run the verification command
-from `CLAUDE.md`, hand the change to the `verifier` subagent, then
-`/code-review`, push, PR. Run `/sdlc` if you're unsure where a branch stands.
+**Next:** Stage 3 (Build) in a fresh session — implement, then the
+verification command from `CLAUDE.md` and the `verifier` subagent. Stage 4
+(Ship) is a fresh session again: `/code-review`, push, PR. Run `/sdlc` if
+you're unsure where a branch stands.

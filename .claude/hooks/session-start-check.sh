@@ -84,18 +84,25 @@ be asked and don't assume the user started the session in plan mode. Then read
 $brief and iterate on the approach until it could be implemented from the file
 alone. Once ExitPlanMode is approved, write the plan to $plan from
 plans/TEMPLATE.plan.md and commit it BEFORE any code — that commit is the audit
-trail Stage 4 review checks the diff against."
+trail Stage 4 review checks the diff against. Then stop: the commit ends the
+stage. Approving ExitPlanMode approves the plan, not a go-ahead to build now —
+don't start the work order in this session. Say the plan is committed, name its
+first step, and suggest picking Build up in a fresh session with /model
+sonnet."
 elif [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   stage="Stage 3 (Build) — plan committed, work in progress."
   next="finish the plan's work order, then run the verification command from
 CLAUDE.md and hand the change to the verifier subagent. If implementation
-departed from the plan, update $plan in the same commit."
+departed from the plan, update $plan in the same commit. Once the code is
+committed, verification is green and the verifier reports PASS, the stage is
+over — /code-review, push and the PR are Stage 4, in a fresh session."
 else
   stage="Stage 3 (Build) → Stage 4 (Ship) — plan committed, working tree clean."
-  next="implement $plan's work order, or if it's already committed, move to
-Stage 4: verification command, verifier subagent, /code-review (REVIEW.md's
-passes), push, and open a PR. Check git log against the plan's work order
-rather than assuming which of the two it is."
+  next="implement $plan's work order, or if it's already committed and verified,
+run Stage 4 here: /code-review (REVIEW.md's passes), push, and open a PR. Check
+git log against the plan's work order rather than assuming which of the two it
+is. If it's the build that's still to do, that's this session's whole job —
+end it once the verifier reports PASS and leave Stage 4 to a fresh one."
 fi
 
 emit "Loop status — branch: $slug

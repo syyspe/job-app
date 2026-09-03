@@ -88,12 +88,17 @@ One slug threads through everything — pick a short kebab-case name (e.g.
    brief and iterate until the plan's right — see `plans/README.md` — then
    commit it as `plans/<slug>.plan.md`.
    *Unlock:* the plan is committed. Nothing gets implemented before that.
-4. **Stage 3.** Switch to auto mode and implement the work order.
-   `simple-code` applies from the first line.
-5. **Stage 4.** Run `CLAUDE.md`'s verification command, then hand the change
-   to the `verifier` subagent, which re-checks the diff against the plan with
-   fresh context. Then `/code-review` (it runs `REVIEW.md`'s passes), push,
-   open a PR, read it, merge it.
+4. **Stage 3.** Fresh session, auto mode: implement the work order.
+   `simple-code` applies from the first line. Then `CLAUDE.md`'s verification
+   command and the `verifier` subagent, which re-checks the diff against the
+   plan with fresh context.
+5. **Stage 4.** Fresh session again: `/code-review` (it runs `REVIEW.md`'s
+   passes), push, open a PR, read it, merge it.
+
+Each of those is a **separate session**. A stage ends at a commit, that commit
+is the whole handoff, and the session-start hook re-derives where you are from
+disk — so the next stage starts for almost nothing, while dragging a finished
+stage's context along is paid for on every turn after it.
 
 Working on more than one of these at a time? See the `worktree` skill
 (`.claude/skills/worktree/SKILL.md`) instead of switching branches in place.
