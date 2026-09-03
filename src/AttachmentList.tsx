@@ -34,7 +34,7 @@ export function AttachmentList({
               className="button"
               onClick={() => onRemove(attachment.id)}
             >
-              Remove
+              Remove file
             </button>
           </li>
         ))}

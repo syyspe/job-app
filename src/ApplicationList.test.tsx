@@ -58,7 +58,7 @@ test('the collapsed list shows no detail panel', () => {
   )
 
   expect(
-    screen.queryByRole('button', { name: 'Delete' }),
+    screen.queryByRole('button', { name: 'Delete application' }),
   ).not.toBeInTheDocument()
 })
 
@@ -77,7 +77,9 @@ test('the expanded row shows its detail panel and reports a delete', async () =>
     />,
   )
 
-  expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1)
-  await user.click(screen.getByRole('button', { name: 'Delete' }))
+  expect(
+    screen.getAllByRole('button', { name: 'Delete application' }),
+  ).toHaveLength(1)
+  await user.click(screen.getByRole('button', { name: 'Delete application' }))
   expect(onDelete).toHaveBeenCalledWith(1)
 })

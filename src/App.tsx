@@ -54,18 +54,20 @@ function App() {
   return (
     <main>
       <h1>Job applications</h1>
-      <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
-      <ApplicationList
-        applications={applications}
-        expandedId={expandedId}
-        onToggle={(id) =>
-          setExpandedId((current) => (current === id ? null : id))
-        }
-        onUpdate={handleUpdate}
-        onDelete={handleDelete}
-        onUploadAttachment={handleUploadAttachment}
-        onRemoveAttachment={handleRemoveAttachment}
-      />
+      <div className="layout">
+        <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
+        <ApplicationList
+          applications={applications}
+          expandedId={expandedId}
+          onToggle={(id) =>
+            setExpandedId((current) => (current === id ? null : id))
+          }
+          onUpdate={handleUpdate}
+          onDelete={handleDelete}
+          onUploadAttachment={handleUploadAttachment}
+          onRemoveAttachment={handleRemoveAttachment}
+        />
+      </div>
     </main>
   )
 }

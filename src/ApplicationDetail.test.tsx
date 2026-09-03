@@ -22,7 +22,7 @@ const application: Application = {
   ],
 }
 
-test('buttons appear in order: Remove, Save, Delete', () => {
+test('buttons appear in order: Remove file, Save, Delete application', () => {
   render(
     <ApplicationDetail
       application={application}
@@ -34,7 +34,7 @@ test('buttons appear in order: Remove, Save, Delete', () => {
   )
 
   const buttons = screen.getAllByRole('button').map((button) => button.textContent)
-  expect(buttons).toEqual(['Remove', 'Save', 'Delete'])
+  expect(buttons).toEqual(['Remove file', 'Save', 'Delete application'])
 })
 
 test('Save and Delete share a parent element', () => {
@@ -49,7 +49,7 @@ test('Save and Delete share a parent element', () => {
   )
 
   const save = screen.getByRole('button', { name: 'Save' })
-  const remove = screen.getByRole('button', { name: 'Delete' })
+  const remove = screen.getByRole('button', { name: 'Delete application' })
   expect(save.parentElement).toBe(remove.parentElement)
 })
 
