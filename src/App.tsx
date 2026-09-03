@@ -21,6 +21,7 @@ function App() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react/set-state-in-effect -- reload() sets state after an await, not synchronously
     void reload()
   }, [])
 
