@@ -31,6 +31,11 @@ test('add, edit, attach a file, and delete an application', async ({
   })
   await expect(detail.getByRole('link', { name: 'resume.txt' })).toBeVisible()
 
+  await detail.getByRole('button', { name: 'Remove file' }).click()
+  await expect(
+    detail.getByRole('link', { name: 'resume.txt' }),
+  ).not.toBeVisible()
+
   await detail.getByRole('button', { name: 'Delete application' }).click()
   await expect(row).not.toBeVisible()
 })
