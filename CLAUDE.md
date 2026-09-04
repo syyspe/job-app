@@ -43,14 +43,16 @@ with no `failed` line. Playwright: `N passed`.
 - `src/` — the React app. `main.tsx` mounts, `App.tsx` is the root component
   and owns the application state; `types.ts` and the two CSS files sit beside
   them.
-  - `src/components/` — the four presentational components and their tests.
+  - `src/components/` — the four presentational components; three have a test
+    beside them (`AttachmentList` has none yet).
   - `src/lib/api.ts` — every `fetch` against `/api`. Components don't call
     `fetch` themselves.
   - `src/test/setupTests.ts` — Vitest setup, named by `vite.config.ts`.
 - `server/` — the Express API. `index.ts` reads the env and listens, `app.ts`
   is wiring only (routers, static files, error handler), `types.ts` is the
   server's copy of the domain types (`src/types.ts` is the client's — the two
-  are kept in step by hand).
+  are kept in step by hand). `ApplicationInput` is the exception: the server's
+  copy lives in `lib/validation.ts`, beside the check that enforces it.
   - `server/routes/` — one router factory per resource, plus its tests.
   - `server/models/` — sqlite row shapes and the row→domain mappers.
   - `server/lib/` — helpers with no Express dependency (`validation.ts`,
