@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 import { ApplicationList } from './ApplicationList'
-import type { Application } from './types'
+import type { Application } from '../types'
 
 const applications: Application[] = [
   {

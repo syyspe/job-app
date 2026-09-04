@@ -1,6 +1,6 @@
 import { ApplicationForm } from './ApplicationForm.tsx'
 import { AttachmentList } from './AttachmentList.tsx'
-import type { Application, ApplicationInput } from './types.ts'
+import type { Application, ApplicationInput } from '../types.ts'
 
 interface ApplicationDetailProps {
   application: Application

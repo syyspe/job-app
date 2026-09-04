@@ -4,9 +4,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Server } from 'node:http'
-import { openDatabase } from './db.ts'
-import { createApp } from './app.ts'
-import type { Application } from './types.ts'
+import { openDatabase } from '../db/index.ts'
+import { createApp } from '../app.ts'
+import type { Application } from '../types.ts'
 
 let root: string
 let server: Server

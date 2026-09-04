@@ -1,28 +1,10 @@
 import express from 'express'
-import type {
-  Application as ExpressApp,
-  NextFunction,
-  Request,
-  Response,
-} from 'express'
-import multer from 'multer'
+import type { Application as ExpressApp } from 'express'
 import type Database from 'better-sqlite3'
 import { join } from 'node:path'
-import { createApplicationsRouter } from './applications.ts'
-import { createAttachmentsRouter } from './attachments.ts'
-
-function jsonErrorHandler(
-  err: unknown,
-  _req: Request,
-  res: Response,
-  _next: NextFunction,
-) {
-  if (err instanceof multer.MulterError) {
-    res.status(400).json({ error: err.message })
-    return
-  }
-  res.status(500).json({ error: 'internal server error' })
-}
+import { createApplicationsRouter } from './routes/applications.ts'
+import { createAttachmentsRouter } from './routes/attachments.ts'
+import { jsonErrorHandler } from './middleware/errors.ts'
 
 type CreateAppOptions = { staticDir?: string }
 

@@ -1,89 +1,12 @@
 import { Router } from 'express'
 import type { Request, Response } from 'express'
 import type Database from 'better-sqlite3'
-import { unlinkSync } from 'node:fs'
 import { join } from 'node:path'
-import { STATUSES } from './types.ts'
-import type { Application, Attachment } from './types.ts'
-
-export interface ApplicationRow {
-  id: number
-  company: string
-  role: string
-  date_applied: string
-  status: string
-  link: string
-  notes: string
-}
-
-export interface AttachmentRow {
-  id: number
-  application_id: number
-  stored_name: string
-  original_name: string
-  mime_type: string
-}
-
-export function toAttachment(row: AttachmentRow): Attachment {
-  return {
-    id: row.id,
-    applicationId: row.application_id,
-    storedName: row.stored_name,
-    originalName: row.original_name,
-    mimeType: row.mime_type,
-  }
-}
-
-function toApplication(
-  row: ApplicationRow,
-  attachmentRows: AttachmentRow[],
-): Application {
-  return {
-    id: row.id,
-    company: row.company,
-    role: row.role,
-    dateApplied: row.date_applied,
-    status: row.status as Application['status'],
-    link: row.link,
-    notes: row.notes,
-    attachments: attachmentRows.map(toAttachment),
-  }
-}
-
-interface ApplicationInput {
-  company: string
-  role: string
-  dateApplied: string
-  status: string
-  link: string
-  notes: string
-}
-
-function validateInput(body: unknown): ApplicationInput | null {
-  if (typeof body !== 'object' || body === null) return null
-  const b = body as Record<string, unknown>
-  const company = typeof b.company === 'string' ? b.company : ''
-  const role = typeof b.role === 'string' ? b.role : ''
-  const dateApplied = typeof b.dateApplied === 'string' ? b.dateApplied : ''
-  const status = typeof b.status === 'string' ? b.status : ''
-  const link = typeof b.link === 'string' ? b.link : ''
-  const notes = typeof b.notes === 'string' ? b.notes : ''
-
-  if (!company || !role) return null
-  if (!STATUSES.includes(status as (typeof STATUSES)[number])) return null
-  if (status !== 'draft' && !dateApplied) return null
-
-  return { company, role, dateApplied, status, link, notes }
-}
-
-/** Ignores a missing file: the plan accepts that the DB and uploads/ can drift. */
-export function unlinkIfExists(path: string): void {
-  try {
-    unlinkSync(path)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-  }
-}
+import { toApplication } from '../models/application.ts'
+import type { ApplicationRow } from '../models/application.ts'
+import type { AttachmentRow } from '../models/attachment.ts'
+import { validateInput } from '../lib/validation.ts'
+import { unlinkIfExists } from '../lib/files.ts'
 
 type AttachmentsForApplication = Database.Statement<[number], AttachmentRow>
 
