@@ -15,6 +15,7 @@ test('does not render username or logout button with no user', () => {
   render(<NavBar user={null} onLogout={vi.fn()} />)
 
   expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument()
+  expect(screen.queryByText('testuser')).not.toBeInTheDocument()
 })
 
 test('renders username and logout button, and calls onLogout when clicked', async () => {
