@@ -36,6 +36,15 @@ test('add, edit, attach a file, and delete an application', async ({
     detail.getByRole('link', { name: 'resume.txt' }),
   ).not.toBeVisible()
 
+  await detail.getByLabel('Attach a file').setInputFiles({
+    name: 'cover-letter.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('hello letter'),
+  })
+  await expect(
+    detail.getByRole('link', { name: 'cover-letter.txt' }),
+  ).toBeVisible()
+
   await detail.getByRole('button', { name: 'Delete application' }).click()
   await expect(row).not.toBeVisible()
 })

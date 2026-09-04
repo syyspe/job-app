@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 import { AttachmentList } from './AttachmentList'
@@ -84,4 +84,21 @@ test('the input is cleared after an upload', async () => {
   await user.upload(input, file)
 
   expect(input).toHaveValue('')
+})
+
+test('a change with no file reports nothing', () => {
+  const onUpload = vi.fn()
+  render(
+    <AttachmentList
+      attachments={attachments}
+      onUpload={onUpload}
+      onRemove={vi.fn()}
+    />,
+  )
+
+  fireEvent.change(screen.getByLabelText('Attach a file'), {
+    target: { files: [] },
+  })
+
+  expect(onUpload).not.toHaveBeenCalled()
 })
