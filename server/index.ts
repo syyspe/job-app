@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { openDatabase } from './db.ts'
+import { openDatabase } from './db/index.ts'
 import { createApp } from './app.ts'
 
 const dbPath = process.env.DB_PATH

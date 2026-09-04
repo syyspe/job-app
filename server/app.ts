@@ -8,8 +8,8 @@ import type {
 import multer from 'multer'
 import type Database from 'better-sqlite3'
 import { join } from 'node:path'
-import { createApplicationsRouter } from './applications.ts'
-import { createAttachmentsRouter } from './attachments.ts'
+import { createApplicationsRouter } from './routes/applications.ts'
+import { createAttachmentsRouter } from './routes/attachments.ts'
 
 function jsonErrorHandler(
   err: unknown,

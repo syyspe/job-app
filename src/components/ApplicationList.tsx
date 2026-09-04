@@ -1,5 +1,5 @@
 import { ApplicationDetail } from './ApplicationDetail.tsx'
-import type { Application, ApplicationInput } from './types.ts'
+import type { Application, ApplicationInput } from '../types.ts'
 
 interface ApplicationListProps {
   applications: Application[]

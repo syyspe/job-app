@@ -3,8 +3,8 @@ import type { Request, Response } from 'express'
 import type Database from 'better-sqlite3'
 import { unlinkSync } from 'node:fs'
 import { join } from 'node:path'
-import { STATUSES } from './types.ts'
-import type { Application, Attachment } from './types.ts'
+import { STATUSES } from '../types.ts'
+import type { Application, Attachment } from '../types.ts'
 
 export interface ApplicationRow {
   id: number

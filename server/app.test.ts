@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Server } from 'node:http'
-import { openDatabase } from './db.ts'
+import { openDatabase } from './db/index.ts'
 import { createApp } from './app.ts'
 
 let root: string

@@ -1,6 +1,6 @@
 import type { ChangeEvent } from 'react'
-import { attachmentUrl } from './api.ts'
-import type { Attachment } from './types.ts'
+import { attachmentUrl } from '../lib/api.ts'
+import type { Attachment } from '../types.ts'
 
 interface AttachmentListProps {
   attachments: Attachment[]

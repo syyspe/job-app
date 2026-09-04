@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { expect, test, vi } from 'vitest'
 import { ApplicationDetail } from './ApplicationDetail'
-import type { Application } from './types'
+import type { Application } from '../types'
 
 const application: Application = {
   id: 1,

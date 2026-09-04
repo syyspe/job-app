@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
-import { STATUSES } from './types.ts'
-import type { ApplicationInput, Status } from './types.ts'
+import { STATUSES } from '../types.ts'
+import type { ApplicationInput, Status } from '../types.ts'
 
 const emptyInput: ApplicationInput = {
   company: '',

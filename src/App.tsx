@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ApplicationForm } from './ApplicationForm.tsx'
-import { ApplicationList } from './ApplicationList.tsx'
+import { ApplicationForm } from './components/ApplicationForm.tsx'
+import { ApplicationList } from './components/ApplicationList.tsx'
 import {
   createApplication,
   deleteApplication,
@@ -8,7 +8,7 @@ import {
   listApplications,
   updateApplication,
   uploadAttachment,
-} from './api.ts'
+} from './lib/api.ts'
 import type { Application, ApplicationInput } from './types.ts'
 import './App.css'
 

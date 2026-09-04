@@ -1,4 +1,4 @@
-import type { Application, ApplicationInput, Attachment } from './types.ts'
+import type { Application, ApplicationInput, Attachment } from '../types.ts'
 
 async function checkOk(response: Response): Promise<Response> {
   if (!response.ok) {
