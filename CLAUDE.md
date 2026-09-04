@@ -43,8 +43,8 @@ with no `failed` line. Playwright: `N passed`.
 - `src/` — the React app. `main.tsx` mounts, `App.tsx` is the root component
   and owns the application state; `types.ts` and the two CSS files sit beside
   them.
-  - `src/components/` — the four presentational components; three have a test
-    beside them (`AttachmentList` has none yet).
+  - `src/components/` — the four presentational components, each with a test
+    beside it.
   - `src/lib/api.ts` — every `fetch` against `/api`. Components don't call
     `fetch` themselves.
   - `src/test/setupTests.ts` — Vitest setup, named by `vite.config.ts`.
