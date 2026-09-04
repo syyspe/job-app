@@ -12,7 +12,9 @@ import type { AttachmentRow } from '../models/attachment.ts'
 function checkApplicationExists(db: Database.Database) {
   return (req: Request, res: Response, next: NextFunction) => {
     const id = Number(req.params.id)
-    const exists = db.prepare('SELECT 1 FROM applications WHERE id = ?').get(id)
+    const exists = db
+      .prepare('SELECT 1 FROM applications WHERE id = ? AND user_id = ?')
+      .get(id, req.userId)
     if (!exists) {
       res.status(404).json({ error: 'application not found' })
       return
@@ -58,12 +60,20 @@ function uploadHandler(db: Database.Database) {
   }
 }
 
+function findOwnedAttachment(db: Database.Database, id: number, userId: number) {
+  return db
+    .prepare(
+      `SELECT a.* FROM attachments a
+         JOIN applications app ON app.id = a.application_id
+        WHERE a.id = ? AND app.user_id = ?`,
+    )
+    .get(id, userId) as AttachmentRow | undefined
+}
+
 function downloadHandler(db: Database.Database, uploadsDir: string) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as
-      | AttachmentRow
-      | undefined
+    const row = findOwnedAttachment(db, id, req.userId)
     if (!row) {
       res.status(404).json({ error: 'not found' })
       return
@@ -76,9 +86,7 @@ function downloadHandler(db: Database.Database, uploadsDir: string) {
 function removeHandler(db: Database.Database, uploadsDir: string) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as
-      | AttachmentRow
-      | undefined
+    const row = findOwnedAttachment(db, id, req.userId)
     if (!row) {
       res.status(404).json({ error: 'not found' })
       return

@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { logIn } from './login.ts'
 
 test('add, edit, attach a file, and delete an application', async ({
   page,
 }) => {
-  await page.goto('/')
+  await logIn(page)
 
   await page.getByRole('textbox', { name: 'Company' }).fill('Acme')
   await page.getByRole('textbox', { name: 'Role' }).fill('Engineer')

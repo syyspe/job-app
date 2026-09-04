@@ -6,23 +6,28 @@ import { join } from 'node:path'
 import type { Server } from 'node:http'
 import { openDatabase } from '../db/index.ts'
 import { createApp } from '../app.ts'
+import { createUser } from '../lib/seed.ts'
+import { loginAs } from '../test/auth.ts'
 import type { Application } from '../types.ts'
 
 let root: string
 let server: Server
 let baseUrl: string
+let cookie: string
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'job-app-test-'))
   const dbPath = join(root, 'app.db')
   const uploadsDir = join(root, 'uploads')
   const db = openDatabase(dbPath)
+  createUser(db, 'testuser', 'test-password')
   const app = createApp(db, uploadsDir)
   server = app.listen(0)
   await new Promise<void>((resolve) => server.once('listening', resolve))
   const address = server.address()
   const port = typeof address === 'object' && address ? address.port : 0
   baseUrl = `http://localhost:${port}`
+  cookie = await loginAs(baseUrl, 'testuser', 'test-password')
 })
 
 afterEach(async () => {
@@ -33,7 +38,7 @@ afterEach(async () => {
 test('create, list, update, delete round trip', async () => {
   const createRes = await fetch(`${baseUrl}/api/applications`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify({
       company: 'Acme',
       role: 'Engineer',
@@ -49,7 +54,7 @@ test('create, list, update, delete round trip', async () => {
   expect(created.company).toBe('Acme')
   expect(created.attachments).toEqual([])
 
-  const listRes = await fetch(`${baseUrl}/api/applications`)
+  const listRes = await fetch(`${baseUrl}/api/applications`, { headers: { Cookie: cookie } })
   expect(listRes.status).toBe(200)
   const list = (await listRes.json()) as Application[]
   expect(list).toHaveLength(1)
@@ -57,7 +62,7 @@ test('create, list, update, delete round trip', async () => {
 
   const updateRes = await fetch(`${baseUrl}/api/applications/${created.id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify({
       company: 'Acme',
       role: 'Senior Engineer',
@@ -74,10 +79,11 @@ test('create, list, update, delete round trip', async () => {
 
   const deleteRes = await fetch(`${baseUrl}/api/applications/${created.id}`, {
     method: 'DELETE',
+    headers: { Cookie: cookie },
   })
   expect(deleteRes.status).toBe(204)
 
-  const afterDeleteRes = await fetch(`${baseUrl}/api/applications`)
+  const afterDeleteRes = await fetch(`${baseUrl}/api/applications`, { headers: { Cookie: cookie } })
   const afterDelete = await afterDeleteRes.json()
   expect(afterDelete).toEqual([])
 })
@@ -85,7 +91,7 @@ test('create, list, update, delete round trip', async () => {
 test('rejects an invalid status with 400', async () => {
   const res = await fetch(`${baseUrl}/api/applications`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify({
       company: 'Acme',
       role: 'Engineer',
@@ -99,7 +105,7 @@ test('rejects an invalid status with 400', async () => {
 test('rejects an empty required field with 400', async () => {
   const res = await fetch(`${baseUrl}/api/applications`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify({
       company: '',
       role: 'Engineer',
@@ -113,7 +119,7 @@ test('rejects an empty required field with 400', async () => {
 test('accepts a draft with no date', async () => {
   const res = await fetch(`${baseUrl}/api/applications`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify({
       company: 'Acme',
       role: 'Engineer',
@@ -129,7 +135,7 @@ test('accepts a draft with no date', async () => {
 test('rejects a non-draft with no date', async () => {
   const res = await fetch(`${baseUrl}/api/applications`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify({
       company: 'Acme',
       role: 'Engineer',
@@ -143,7 +149,7 @@ test('rejects a non-draft with no date', async () => {
 test('returns 404 when updating an unknown id', async () => {
   const res = await fetch(`${baseUrl}/api/applications/999999`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
     body: JSON.stringify({
       company: 'Acme',
       role: 'Engineer',
@@ -152,4 +158,71 @@ test('returns 404 when updating an unknown id', async () => {
     }),
   })
   expect(res.status).toBe(404)
+})
+
+test('every route 401s with no cookie', async () => {
+  const list = await fetch(`${baseUrl}/api/applications`)
+  expect(list.status).toBe(401)
+
+  const create = await fetch(`${baseUrl}/api/applications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ company: 'Acme', role: 'Engineer', dateApplied: '', status: 'draft' }),
+  })
+  expect(create.status).toBe(401)
+
+  const update = await fetch(`${baseUrl}/api/applications/1`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ company: 'Acme', role: 'Engineer', dateApplied: '', status: 'draft' }),
+  })
+  expect(update.status).toBe(401)
+
+  const del = await fetch(`${baseUrl}/api/applications/1`, { method: 'DELETE' })
+  expect(del.status).toBe(401)
+})
+
+test('a second user cannot see, update, or delete the first user\'s application', async () => {
+  const createRes = await fetch(`${baseUrl}/api/applications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({
+      company: 'Acme',
+      role: 'Engineer',
+      dateApplied: '2026-01-01',
+      status: 'applied',
+      link: '',
+      notes: '',
+    }),
+  })
+  const application = (await createRes.json()) as Application
+
+  const db = openDatabase(join(root, 'app.db'))
+  createUser(db, 'other', 'password')
+  const otherCookie = await loginAs(baseUrl, 'other', 'password')
+
+  const listRes = await fetch(`${baseUrl}/api/applications`, {
+    headers: { Cookie: otherCookie },
+  })
+  expect(await listRes.json()).toEqual([])
+
+  const updateRes = await fetch(`${baseUrl}/api/applications/${application.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: otherCookie },
+    body: JSON.stringify({
+      company: 'Hijacked',
+      role: 'Engineer',
+      dateApplied: '2026-01-01',
+      status: 'applied',
+      link: '',
+      notes: '',
+    }),
+  })
+  expect(updateRes.status).toBe(404)
+
+  const deleteRes = await fetch(`${baseUrl}/api/applications/${application.id}`, {
+    method: 'DELETE',
+    headers: { Cookie: otherCookie },
+  })
+  expect(deleteRes.status).toBe(404)
 })

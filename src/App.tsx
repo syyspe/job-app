@@ -1,73 +1,49 @@
 import { useEffect, useState } from 'react'
-import { ApplicationForm } from './components/ApplicationForm.tsx'
-import { ApplicationList } from './components/ApplicationList.tsx'
-import {
-  createApplication,
-  deleteApplication,
-  deleteAttachment,
-  listApplications,
-  updateApplication,
-  uploadAttachment,
-} from './lib/api.ts'
-import type { Application, ApplicationInput } from './types.ts'
+import { ApplicationsView } from './components/ApplicationsView.tsx'
+import { LoginForm } from './components/LoginForm.tsx'
+import { getCurrentUser, login, logout } from './lib/api.ts'
+import type { User } from './types.ts'
 import './App.css'
 
 function App() {
-  const [applications, setApplications] = useState<Application[]>([])
-  const [expandedId, setExpandedId] = useState<number | null>(null)
-
-  async function reload() {
-    setApplications(await listApplications())
-  }
+  const [user, setUser] = useState<User | null>(null)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
-    // eslint-disable-next-line react/set-state-in-effect -- reload() sets state after an await, not synchronously
-    void reload()
+    async function load() {
+      const currentUser = await getCurrentUser()
+      setUser(currentUser)
+      setLoaded(true)
+    }
+    // eslint-disable-next-line react/set-state-in-effect -- load() sets state after an await, not synchronously
+    void load()
   }, [])
 
-  async function handleAdd(input: ApplicationInput) {
-    await createApplication(input)
-    await reload()
+  async function handleLogin(username: string, password: string) {
+    const loggedInUser = await login(username, password)
+    setUser(loggedInUser)
   }
 
-  async function handleUpdate(id: number, input: ApplicationInput) {
-    await updateApplication(id, input)
-    await reload()
-  }
-
-  async function handleDelete(id: number) {
-    await deleteApplication(id)
-    setExpandedId((current) => (current === id ? null : current))
-    await reload()
-  }
-
-  async function handleUploadAttachment(applicationId: number, file: File) {
-    await uploadAttachment(applicationId, file)
-    await reload()
-  }
-
-  async function handleRemoveAttachment(attachmentId: number) {
-    await deleteAttachment(attachmentId)
-    await reload()
+  async function handleLogout() {
+    await logout()
+    setUser(null)
   }
 
   return (
     <main>
       <h1>Job applications</h1>
-      <div className="layout">
-        <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
-        <ApplicationList
-          applications={applications}
-          expandedId={expandedId}
-          onToggle={(id) =>
-            setExpandedId((current) => (current === id ? null : id))
-          }
-          onUpdate={handleUpdate}
-          onDelete={handleDelete}
-          onUploadAttachment={handleUploadAttachment}
-          onRemoveAttachment={handleRemoveAttachment}
-        />
-      </div>
+      {loaded && !user && <LoginForm onLogin={handleLogin} />}
+      {user && (
+        <>
+          <div className="session-bar">
+            <span>{user.username}</span>
+            <button type="button" className="button" onClick={handleLogout}>
+              Log out
+            </button>
+          </div>
+          <ApplicationsView onUnauthorized={() => setUser(null)} />
+        </>
+      )}
     </main>
   )
 }

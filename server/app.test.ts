@@ -6,6 +6,8 @@ import { join } from 'node:path'
 import type { Server } from 'node:http'
 import { openDatabase } from './db/index.ts'
 import { createApp } from './app.ts'
+import { createUser } from './lib/seed.ts'
+import { loginAs } from './test/auth.ts'
 
 let root: string
 let staticDir: string
@@ -23,6 +25,7 @@ beforeEach(async () => {
   writeFileSync(join(staticDir, 'asset.css'), 'body { color: red }')
 
   const db = openDatabase(dbPath)
+  createUser(db, 'testuser', 'test-password')
   const app = createApp(db, uploadsDir, { staticDir })
   server = app.listen(0)
   await new Promise<void>((resolve) => server.once('listening', resolve))
@@ -49,7 +52,8 @@ test('falls back to index.html for an unknown non-api route', async () => {
 })
 
 test('does not swallow an unmatched /api route into the SPA fallback', async () => {
-  const res = await fetch(`${baseUrl}/api/does-not-exist`)
+  const cookie = await loginAs(baseUrl, 'testuser', 'test-password')
+  const res = await fetch(`${baseUrl}/api/does-not-exist`, { headers: { Cookie: cookie } })
   expect(res.status).toBe(404)
   expect(await res.text()).not.toBe('<html>index</html>')
 })

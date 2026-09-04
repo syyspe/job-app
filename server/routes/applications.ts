@@ -8,13 +8,15 @@ import type { AttachmentRow } from '../models/attachment.ts'
 import { validateInput } from '../lib/validation.ts'
 import { unlinkIfExists } from '../lib/files.ts'
 
-type AttachmentsForApplication = Database.Statement<[number], AttachmentRow>
+type AttachmentsForApplication = Database.Statement<[number, number], AttachmentRow>
 
 function listHandler(db: Database.Database, attachments: AttachmentsForApplication) {
-  return (_req: Request, res: Response) => {
-    const rows = db.prepare('SELECT * FROM applications').all() as ApplicationRow[]
+  return (req: Request, res: Response) => {
+    const rows = db
+      .prepare('SELECT * FROM applications WHERE user_id = ?')
+      .all(req.userId) as ApplicationRow[]
     const applications = rows.map((row) =>
-      toApplication(row, attachments.all(row.id)),
+      toApplication(row, attachments.all(row.id, req.userId)),
     )
     res.json(applications)
   }
@@ -30,10 +32,18 @@ function createHandler(db: Database.Database) {
 
     const result = db
       .prepare(
-        `INSERT INTO applications (company, role, date_applied, status, link, notes)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO applications (user_id, company, role, date_applied, status, link, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(input.company, input.role, input.dateApplied, input.status, input.link, input.notes)
+      .run(
+        req.userId,
+        input.company,
+        input.role,
+        input.dateApplied,
+        input.status,
+        input.link,
+        input.notes,
+      )
 
     const row = db
       .prepare('SELECT * FROM applications WHERE id = ?')
@@ -55,9 +65,18 @@ function updateHandler(db: Database.Database, attachments: AttachmentsForApplica
       .prepare(
         `UPDATE applications
          SET company = ?, role = ?, date_applied = ?, status = ?, link = ?, notes = ?
-         WHERE id = ?`,
+         WHERE id = ? AND user_id = ?`,
       )
-      .run(input.company, input.role, input.dateApplied, input.status, input.link, input.notes, id)
+      .run(
+        input.company,
+        input.role,
+        input.dateApplied,
+        input.status,
+        input.link,
+        input.notes,
+        id,
+        req.userId,
+      )
 
     if (result.changes === 0) {
       res.status(404).json({ error: 'not found' })
@@ -65,7 +84,7 @@ function updateHandler(db: Database.Database, attachments: AttachmentsForApplica
     }
 
     const row = db.prepare('SELECT * FROM applications WHERE id = ?').get(id) as ApplicationRow
-    res.json(toApplication(row, attachments.all(id)))
+    res.json(toApplication(row, attachments.all(id, req.userId)))
   }
 }
 
@@ -76,9 +95,16 @@ function deleteHandler(
 ) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    const attachmentRows = attachments.all(id)
+    const attachmentRows = attachments.all(id, req.userId)
 
-    db.prepare('DELETE FROM applications WHERE id = ?').run(id)
+    const result = db
+      .prepare('DELETE FROM applications WHERE id = ? AND user_id = ?')
+      .run(id, req.userId)
+
+    if (result.changes === 0) {
+      res.status(404).json({ error: 'not found' })
+      return
+    }
 
     for (const attachment of attachmentRows) {
       unlinkIfExists(join(uploadsDir, attachment.stored_name))
@@ -94,7 +120,9 @@ export function createApplicationsRouter(
 ): Router {
   const router = Router()
   const attachments: AttachmentsForApplication = db.prepare(
-    'SELECT * FROM attachments WHERE application_id = ?',
+    `SELECT a.* FROM attachments a
+       JOIN applications app ON app.id = a.application_id
+      WHERE a.application_id = ? AND app.user_id = ?`,
   )
 
   router.get('/applications', listHandler(db, attachments))
