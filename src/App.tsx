@@ -11,9 +11,12 @@ function App() {
 
   useEffect(() => {
     async function load() {
-      const currentUser = await getCurrentUser()
-      setUser(currentUser)
-      setLoaded(true)
+      try {
+        const currentUser = await getCurrentUser()
+        setUser(currentUser)
+      } finally {
+        setLoaded(true)
+      }
     }
     // eslint-disable-next-line react/set-state-in-effect -- load() sets state after an await, not synchronously
     void load()

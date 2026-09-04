@@ -22,28 +22,34 @@ export function migrateApplicationsToUser(db: Database.Database, userId: number)
   if (columns.some((column) => column.name === 'user_id')) return
 
   db.pragma('foreign_keys = OFF')
-  db.transaction(() => {
-    db.exec(`
-      CREATE TABLE applications_new (
-        id           INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id      INTEGER NOT NULL REFERENCES users(id),
-        company      TEXT NOT NULL,
-        role         TEXT NOT NULL,
-        date_applied TEXT NOT NULL,
-        status       TEXT NOT NULL,
-        link         TEXT NOT NULL DEFAULT '',
-        notes        TEXT NOT NULL DEFAULT ''
-      );
-    `)
-    db.prepare(
-      `INSERT INTO applications_new
-         (id, user_id, company, role, date_applied, status, link, notes)
-       SELECT id, ?, company, role, date_applied, status, link, notes
-       FROM applications`,
-    ).run(userId)
-    db.exec('DROP TABLE applications')
-    db.exec('ALTER TABLE applications_new RENAME TO applications')
-  })()
-  db.pragma('foreign_key_check')
-  db.pragma('foreign_keys = ON')
+  try {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE applications_new (
+          id           INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id      INTEGER NOT NULL REFERENCES users(id),
+          company      TEXT NOT NULL,
+          role         TEXT NOT NULL,
+          date_applied TEXT NOT NULL,
+          status       TEXT NOT NULL,
+          link         TEXT NOT NULL DEFAULT '',
+          notes        TEXT NOT NULL DEFAULT ''
+        );
+      `)
+      db.prepare(
+        `INSERT INTO applications_new
+           (id, user_id, company, role, date_applied, status, link, notes)
+         SELECT id, ?, company, role, date_applied, status, link, notes
+         FROM applications`,
+      ).run(userId)
+      db.exec('DROP TABLE applications')
+      db.exec('ALTER TABLE applications_new RENAME TO applications')
+    })()
+    const violations = db.pragma('foreign_key_check') as unknown[]
+    if (violations.length > 0) {
+      throw new Error(`foreign key violations after migration: ${JSON.stringify(violations)}`)
+    }
+  } finally {
+    db.pragma('foreign_keys = ON')
+  }
 }

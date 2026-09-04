@@ -93,7 +93,10 @@ function removeHandler(db: Database.Database, uploadsDir: string) {
     }
 
     unlinkIfExists(join(uploadsDir, row.stored_name))
-    db.prepare('DELETE FROM attachments WHERE id = ?').run(id)
+    db.prepare(
+      `DELETE FROM attachments
+        WHERE id = ? AND application_id IN (SELECT id FROM applications WHERE user_id = ?)`,
+    ).run(id, req.userId)
     res.status(204).end()
   }
 }
