@@ -4,6 +4,8 @@ import type Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { createApplicationsRouter } from './routes/applications.ts'
 import { createAttachmentsRouter } from './routes/attachments.ts'
+import { createAuthRouter } from './routes/auth.ts'
+import { requireSession } from './middleware/auth.ts'
 import { jsonErrorHandler } from './middleware/errors.ts'
 
 type CreateAppOptions = { staticDir?: string }
@@ -15,6 +17,8 @@ export function createApp(
 ): ExpressApp {
   const app = express()
   app.use(express.json())
+  app.use('/api', createAuthRouter(db))
+  app.use('/api', requireSession(db))
   app.use('/api', createApplicationsRouter(db, uploadsDir))
   app.use('/api', createAttachmentsRouter(db, uploadsDir))
   if (staticDir) {

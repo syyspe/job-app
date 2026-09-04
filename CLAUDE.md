@@ -19,6 +19,11 @@
   `ECONNREFUSED 127.0.0.1:3001`. `dev:server` requires `.env` (copy from
   `.env.example` and set `DB_PATH`/`UPLOADS_DIR`) — see README's "Running
   the server" section.
+- Seed: `npm run seed` — creates the user named by `.env`'s
+  `SEED_USERNAME`/`SEED_PASSWORD` (if it doesn't already exist) and assigns
+  any pre-auth applications to it. Run once against a fresh or pre-auth
+  database before the server will answer any `/api` route other than
+  `/api/login`.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
@@ -40,25 +45,38 @@ with no `failed` line. Playwright: `N passed`.
 
 ## Architecture
 
-- `src/` — the React app. `main.tsx` mounts, `App.tsx` is the root component
-  and owns the application state; `types.ts` and the two CSS files sit beside
-  them.
-  - `src/components/` — the four presentational components, each with a test
-    beside it.
+- `src/` — the React app. `main.tsx` mounts, `App.tsx` is the auth shell (login
+  state, login/logout, the `<main>`/`<h1>` frame); `types.ts` and the two CSS
+  files sit beside them.
+  - `src/components/` — six presentational components, each with a test
+    beside it: `LoginForm` for the login screen, `ApplicationsView` (with its
+    local `useApplications` hook) for the applications UI, plus the original
+    four.
   - `src/lib/api.ts` — every `fetch` against `/api`. Components don't call
-    `fetch` themselves.
+    `fetch` themselves. Sends `credentials: 'same-origin'` on every call and
+    throws `UnauthorizedError` on a 401.
   - `src/test/setupTests.ts` — Vitest setup, named by `vite.config.ts`.
 - `server/` — the Express API. `index.ts` reads the env and listens, `app.ts`
-  is wiring only (routers, static files, error handler), `types.ts` is the
-  server's copy of the domain types (`src/types.ts` is the client's — the two
-  are kept in step by hand). `ApplicationInput` is the exception: the server's
-  copy lives in `lib/validation.ts`, beside the check that enforces it.
-  - `server/routes/` — one router factory per resource, plus its tests.
-  - `server/models/` — sqlite row shapes and the row→domain mappers.
-  - `server/lib/` — helpers with no Express dependency (`validation.ts`,
-    `files.ts`).
-  - `server/middleware/` — Express middleware (`errors.ts`).
+  is wiring only (routers, static files, error handler) — including the
+  mount order `auth router → requireSession → the rest`, which is what
+  protects everything. `types.ts` is the server's copy of the domain types
+  (`src/types.ts` is the client's — the two are kept in step by hand).
+  `ApplicationInput` is the exception: the server's copy lives in
+  `lib/validation.ts`, beside the check that enforces it.
+  - `server/routes/` — one router factory per resource, plus its tests,
+    including `auth.ts` (`/login`, `/logout`, `/me`).
+  - `server/models/` — sqlite row shapes and the row→domain mappers,
+    including `user.ts`.
+  - `server/lib/` — helpers with no Express dependency: `validation.ts`,
+    `files.ts`, `passwords.ts` (hashing and session tokens), `cookies.ts`
+    (reads the session cookie — Express 5 doesn't parse cookies), `seed.ts`
+    (the seed user and the legacy-database migration).
+  - `server/middleware/` — Express middleware: `errors.ts`, `auth.ts`
+    (`requireSession`).
   - `server/db/index.ts` — `openDatabase`: connection plus schema.
+  - `server/seed.ts` — the `npm run seed` CLI entry point.
+  - `server/test/auth.ts` — `loginAs`, a test helper that logs in and returns
+    a cookie header string for route tests to pass by hand.
 - `public/` — served verbatim at the site root, not processed by Vite.
 - `e2e/` — Playwright specs, configured by `playwright.config.ts`.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are

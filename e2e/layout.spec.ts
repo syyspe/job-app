@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { logIn } from './login.ts'
 
 test('the form and list sit side by side on wide viewports, stacked on narrow ones', async ({
   page,
 }) => {
-  await page.goto('/')
+  await logIn(page)
 
   await page.getByRole('textbox', { name: 'Company' }).fill('Layout Co')
   await page.getByRole('textbox', { name: 'Role' }).fill('Engineer')

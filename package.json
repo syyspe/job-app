@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:prod": "playwright test --config=playwright.prod.config.ts",
+    "seed": "node --env-file-if-exists=.env server/seed.ts",
     "lint": "oxlint",
     "preview": "vite preview",
     "start": "npm run build && node --env-file-if-exists=.env server/index.ts"

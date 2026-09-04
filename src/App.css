@@ -4,6 +4,14 @@ main {
   padding: 32px 20px;
 }
 
+.session-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
 .layout {
   display: grid;
   gap: 32px;

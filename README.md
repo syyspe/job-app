@@ -51,9 +51,25 @@ default, so it fails fast at startup if either is missing:
 
 - `DB_PATH` — full path to the sqlite database file
 - `UPLOADS_DIR` — full path to the uploads directory
+- `SEED_USERNAME` / `SEED_PASSWORD` — the login `npm run seed` creates
 
-Copy `.env.example` to `.env` and fill in real paths first, for either mode
-below.
+Copy `.env.example` to `.env`, fill in real paths, and pick your own
+`SEED_USERNAME`/`SEED_PASSWORD` — do this before either mode below.
+
+The API requires a logged-in session for every route except `/api/login`.
+Run the seed script once against a fresh (or pre-auth) database to create
+that user and, if the database already has applications from before auth
+existed, assign them to it:
+
+```
+npm run seed
+```
+
+There is no signup endpoint and no password-reset flow — accounts come from
+the seed script only, and it only ever creates the user once: if
+`SEED_USERNAME` already exists, re-running `npm run seed` after editing
+`.env` does not change its password. Get `SEED_USERNAME`/`SEED_PASSWORD`
+right in `.env` before the first run against a given database.
 
 ### Development
 
