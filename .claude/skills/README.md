@@ -7,10 +7,11 @@ make correct behavior likely, unlike hooks (`.claude/hooks/`), which make
 violations impossible.
 
 `simple-code/` is the one filled-out example, and the one worth keeping on
-every project. The other three aren't policy — they drive the process
-itself: `sdlc/` (`/sdlc` — which stage the branch is in and what's next),
-`bootstrap/` (one-time project setup), and `worktree/` (parallel work
-streams).
+every project. The others aren't policy — they drive the process itself:
+`sdlc/` (`/sdlc` — which stage the branch is in and what's next),
+`bootstrap/` (one-time project setup), `worktree/` (parallel work streams),
+and `review/` (`/review` — Stage 4's default local pass against
+`REVIEW.md`, run inline instead of fanning out into subagents).
 
 Add more folders following the same shape — one directory per skill,
 containing a `SKILL.md` with frontmatter describing when it triggers. Good

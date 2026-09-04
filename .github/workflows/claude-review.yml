@@ -50,8 +50,8 @@ jobs:
               echo
               echo "No \`ANTHROPIC_API_KEY\` secret is set. Add one under"
               echo "**Settings → Secrets and variables → Actions** to turn"
-              echo "automated review on. Until then, run \`/code-review\`"
-              echo "locally — \`REVIEW.md\`'s passes still apply to this PR."
+              echo "automated review on. Until then, run \`/review\`"
+              echo "locally — it runs \`REVIEW.md\`'s passes against this PR."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 

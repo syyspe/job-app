@@ -11,7 +11,7 @@ Implement the work order in `plans/<slug>.plan.md`.
 ## The stage ends at that commit
 
 Nothing else belongs here — not the verification command, not `verifier`, not
-`/code-review`. A build session is the worst-placed judge of its own build: it
+`/review`. A build session is the worst-placed judge of its own build: it
 knows what the code was *meant* to do, which is exactly the assumption
 verification exists to break. Hand it to a session that has to read the diff
 cold.

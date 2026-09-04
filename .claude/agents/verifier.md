@@ -1,6 +1,6 @@
 ---
 name: verifier
-description: Use at the start of Stage 4 (Ship) to independently verify a committed build against its plan.md before it goes to review and a PR. Fresh context, no assumptions carried over from the implementing session — runs the verification command from CLAUDE.md, checks the diff matches the plan's work order, and reports pass/fail with specifics. Use PROACTIVELY once code is committed, before /code-review and before opening a PR.
+description: Use at the start of Stage 4 (Ship) to independently verify a committed build against its plan.md before it goes to review and a PR. Fresh context, no assumptions carried over from the implementing session — runs the verification command from CLAUDE.md, checks the diff matches the plan's work order, and reports pass/fail with specifics. Use PROACTIVELY once code is committed, before /review and before opening a PR.
 tools: Read, Bash, Grep, Glob
 model: sonnet
 ---
