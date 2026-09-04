@@ -1,6 +1,6 @@
 ---
 name: review
-description: Use when the user wants a local code review of the current diff, or explicitly runs `/review` — the Stage 4 default. Runs REVIEW.md's four passes (Bugs, Security, Scope, Simplicity) as a single inline pass, no subagent fan-out, mirroring what `.github/workflows/claude-review.yml` sends to CI. Cheap alternative to the built-in `/code-review`, which ignores REVIEW.md and fans out into several parallel subagents. Reach for `/code-review` instead only when you deliberately want its deeper, differently-scoped pass.
+description: Use when the user wants a local code review of the current diff, or explicitly runs `/review` — the Stage 4 default. Runs REVIEW.md's four passes (Bugs, Security, Scope, Simplicity) as a single inline pass, no subagent fan-out, mirroring what `.github/workflows/claude-review.yml` sends to CI. Cheap alternative to the built-in `/code-review`, which ignores REVIEW.md and fans out into several parallel subagents. Never invoke `/code-review` on your own judgment, even for a diff that seems to warrant its deeper pass — ask the user first, every time.
 ---
 
 # Local review against REVIEW.md
@@ -58,5 +58,6 @@ pass found nothing, say so in one line rather than omitting it silently.
   `@claude` response loop in `REVIEW.md` handles follow-ups.
 - Historical git-blame digging, cross-PR comment lookups, or a confidence
   scoring pass — that kind of digging is what makes the built-in expensive.
-  If a finding genuinely needs it to confirm, say so and let the user decide
-  whether it's worth a `/code-review` pass instead.
+  If a finding genuinely needs it to confirm, say so and ask the user
+  whether it's worth a `/code-review` pass — never invoke it yourself, even
+  when the answer seems obviously yes.

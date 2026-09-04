@@ -13,11 +13,13 @@ proceed.
 3. **`/review`.** Fix what it raises. It runs all four `REVIEW.md` passes
    (Bugs, Security, Scope, Simplicity) as one inline pass against the diff —
    see `.claude/skills/review/SKILL.md` for exactly what it covers. The
-   built-in `/code-review` is not part of the default sequence: it doesn't
-   read `REVIEW.md`, and above `low`/`medium` effort it fans out into several
-   parallel subagents that get expensive fast. Reach for it deliberately, as
-   an extra pass, when a change is high-stakes enough to want its
-   differently-scoped bug/cleanup sweep on top of `/review`.
+   built-in `/code-review` is not part of the default sequence, and this
+   session does not decide on its own to run it: it doesn't read
+   `REVIEW.md`, and above `low`/`medium` effort it fans out into several
+   parallel subagents that get expensive fast. If the diff seems to warrant
+   its differently-scoped bug/cleanup sweep on top of `/review`, say so and
+   ask the user — never invoke it unasked, no matter how high-stakes the
+   diff looks.
 4. **`/security-review`** when the diff touches a real boundary — user input,
    auth, secrets, deserialization, file or network I/O, a new dependency.
    `/review`'s Security pass already ran, scaled to what the project is;
