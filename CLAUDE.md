@@ -40,14 +40,32 @@ with no `failed` line. Playwright: `N passed`.
 
 ## Architecture
 
-- `src/` — the React app. `main.tsx` mounts, `App.tsx` is the root component;
-  `src/assets/` holds bundled images/SVGs.
+- `src/` — the React app. `main.tsx` mounts, `App.tsx` is the root component
+  and owns the application state; `types.ts` and the two CSS files sit beside
+  them.
+  - `src/components/` — the four presentational components and their tests.
+  - `src/lib/api.ts` — every `fetch` against `/api`. Components don't call
+    `fetch` themselves.
+  - `src/test/setupTests.ts` — Vitest setup, named by `vite.config.ts`.
+- `server/` — the Express API. `index.ts` reads the env and listens, `app.ts`
+  is wiring only (routers, static files, error handler), `types.ts` is the
+  server's copy of the domain types (`src/types.ts` is the client's — the two
+  are kept in step by hand).
+  - `server/routes/` — one router factory per resource, plus its tests.
+  - `server/models/` — sqlite row shapes and the row→domain mappers.
+  - `server/lib/` — helpers with no Express dependency (`validation.ts`,
+    `files.ts`).
+  - `server/middleware/` — Express middleware (`errors.ts`).
+  - `server/db/index.ts` — `openDatabase`: connection plus schema.
 - `public/` — served verbatim at the site root, not processed by Vite.
 - `e2e/` — Playwright specs, configured by `playwright.config.ts`.
-- `server/` — **not created yet.** When the app needs a backend, the Node API
-  goes here. Until then this is a frontend-only project.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are
   generated — never edit by hand, never commit.
+
+Where new code goes: a component in `src/components/`; an endpoint in the
+matching `server/routes/*.ts`, or a new router factory there mounted from
+`app.ts`; a row shape or mapper in `server/models/`. A helper two routers both
+need goes in `server/lib/` — never import one router from another.
 
 ## Things Claude gets wrong here
 

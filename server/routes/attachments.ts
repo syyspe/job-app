@@ -5,8 +5,9 @@ import type Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { toAttachment, unlinkIfExists } from './applications.ts'
-import type { AttachmentRow } from './applications.ts'
+import { toAttachment } from '../models/attachment.ts'
+import { unlinkIfExists } from '../lib/files.ts'
+import type { AttachmentRow } from '../models/attachment.ts'
 
 function checkApplicationExists(db: Database.Database) {
   return (req: Request, res: Response, next: NextFunction) => {
