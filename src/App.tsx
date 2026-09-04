@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ApplicationsView } from './components/ApplicationsView.tsx'
 import { LoginForm } from './components/LoginForm.tsx'
+import { NavBar } from './components/NavBar.tsx'
 import { getCurrentUser, login, logout } from './lib/api.ts'
 import type { User } from './types.ts'
 import './App.css'
@@ -33,21 +34,13 @@ function App() {
   }
 
   return (
-    <main>
-      <h1>Job applications</h1>
-      {loaded && !user && <LoginForm onLogin={handleLogin} />}
-      {user && (
-        <>
-          <div className="session-bar">
-            <span>{user.username}</span>
-            <button type="button" className="button" onClick={handleLogout}>
-              Log out
-            </button>
-          </div>
-          <ApplicationsView onUnauthorized={() => setUser(null)} />
-        </>
-      )}
-    </main>
+    <>
+      <NavBar user={user} onLogout={handleLogout} />
+      <main>
+        {loaded && !user && <LoginForm onLogin={handleLogin} />}
+        {user && <ApplicationsView onUnauthorized={() => setUser(null)} />}
+      </main>
+    </>
   )
 }
 
