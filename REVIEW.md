@@ -17,15 +17,17 @@ diff — `git diff @{upstream}...HEAD` plus uncommitted changes — unless you
 hand it a path, a branch, or a PR number.
 
 So in a local Stage 4, `/review` covers all four passes below in one shot.
-If you reach for `/code-review` instead (or in addition, for its deeper
-pass), keep in mind three of the four passes below then arrive by other
-routes: `verifier` covers the plan half of **Scope**, `/code-review` covers
-**Bugs** and most of **Simplicity**, and **Security** needs
-`/security-review` run explicitly — the brief half of **Scope** has no
-automation at all either way, that one is yours, when you read the PR.
-Anything here you need to bind a `/code-review` pass (an exclusion, a hard
-limit) has to be restated in `CLAUDE.md`, which is the only policy file it
-sees — `/review` reads this file directly, so it needs nothing restated.
+`/code-review` never runs unasked, however warranted a deeper pass looks —
+"this diff seems high-stakes" is a reason to ask the user, not to invoke it.
+If they do want it run (instead of, or in addition to, `/review`), keep in
+mind three of the four passes below then arrive by other routes: `verifier`
+covers the plan half of **Scope**, `/code-review` covers **Bugs** and most
+of **Simplicity**, and **Security** needs `/security-review` run explicitly
+— the brief half of **Scope** has no automation at all either way, that one
+is yours, when you read the PR. Anything here you need to bind a
+`/code-review` pass (an exclusion, a hard limit) has to be restated in
+`CLAUDE.md`, which is the only policy file it sees — `/review` reads this
+file directly, so it needs nothing restated.
 
 ## Passes
 
