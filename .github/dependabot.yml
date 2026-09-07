@@ -1,0 +1,15 @@
+# The workflow pins its actions to commit SHAs (a tag is mutable, a SHA is
+# not). This is what keeps those pins from silently rotting: Dependabot
+# opens a PR when a pinned action has a new release, and updates the
+# trailing "# v1" comment along with the SHA.
+#
+# npm is deliberately not listed. This repo is the skeleton's test bed and
+# gets rebuilt often; a monthly stream of dependency PRs would be noise
+# against that. Add a second `package-ecosystem: npm` entry here if it ever
+# becomes something you actually run day to day.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
