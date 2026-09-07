@@ -15,6 +15,7 @@ function toInput(application: Application): ApplicationInput {
     company: application.company,
     role: application.role,
     dateApplied: application.dateApplied,
+    deadline: application.deadline,
     status: application.status,
     link: application.link,
     notes: application.notes,
@@ -39,6 +40,9 @@ export function ApplicationDetail({
         </button>
       }
     >
+      <p className="timestamps">
+        Created {application.createdAt} · Updated {application.updatedAt}
+      </p>
       <AttachmentList
         attachments={application.attachments}
         onUpload={onUploadAttachment}

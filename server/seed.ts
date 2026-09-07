@@ -1,5 +1,5 @@
 import { openDatabase } from './db/index.ts'
-import { seedUser, migrateApplicationsToUser } from './lib/seed.ts'
+import { seedUser, migrateApplicationsToUser, migrateApplicationDates } from './lib/seed.ts'
 
 const dbPath = process.env.DB_PATH
 const username = process.env.SEED_USERNAME
@@ -11,3 +11,4 @@ if (!dbPath || !username || !password) {
 const db = openDatabase(dbPath)
 const userId = seedUser(db, username, password)
 migrateApplicationsToUser(db, userId)
+migrateApplicationDates(db)

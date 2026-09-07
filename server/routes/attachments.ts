@@ -7,6 +7,7 @@ import { extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { toAttachment } from '../models/attachment.ts'
 import { unlinkIfExists } from '../lib/files.ts'
+import { touchApplication } from '../lib/applications.ts'
 import type { AttachmentRow } from '../models/attachment.ts'
 
 function checkApplicationExists(db: Database.Database) {
@@ -56,6 +57,7 @@ function uploadHandler(db: Database.Database) {
     const row = db
       .prepare('SELECT * FROM attachments WHERE id = ?')
       .get(result.lastInsertRowid) as AttachmentRow
+    touchApplication(db, applicationId)
     res.status(201).json(toAttachment(row))
   }
 }
@@ -97,6 +99,7 @@ function removeHandler(db: Database.Database, uploadsDir: string) {
       `DELETE FROM attachments
         WHERE id = ? AND application_id IN (SELECT id FROM applications WHERE user_id = ?)`,
     ).run(id, req.userId)
+    touchApplication(db, row.application_id)
     res.status(204).end()
   }
 }

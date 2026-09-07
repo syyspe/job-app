@@ -7,6 +7,7 @@ const emptyInput: ApplicationInput = {
   company: '',
   role: '',
   dateApplied: '',
+  deadline: '',
   status: 'draft',
   link: '',
   notes: '',
@@ -98,6 +99,12 @@ export function ApplicationForm({
           required={input.status !== 'draft'}
         />
       </label>
+      <TextField
+        label="Deadline"
+        type="date"
+        value={input.deadline}
+        onChange={(value) => setInput({ ...input, deadline: value })}
+      />
       <label>
         Status
         <select value={input.status} onChange={handleStatusChange}>

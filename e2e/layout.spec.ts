@@ -8,7 +8,7 @@ test('the form and list sit side by side on wide viewports, stacked on narrow on
 
   await page.getByRole('textbox', { name: 'Company' }).fill('Layout Co')
   await page.getByRole('textbox', { name: 'Role' }).fill('Engineer')
-  await page.getByLabel('Date applied').fill('2026-01-15')
+  await page.getByLabel('Date applied', { exact: true }).fill('2026-01-15')
 
   const addButton = page.getByRole('button', { name: 'Add application' })
   await addButton.click()

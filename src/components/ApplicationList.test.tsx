@@ -10,9 +10,12 @@ const applications: Application[] = [
     company: 'Acme',
     role: 'Engineer',
     dateApplied: '2026-01-15',
+    deadline: '',
     status: 'applied',
     link: '',
     notes: '',
+    createdAt: '2026-01-15 09:00:00',
+    updatedAt: '2026-01-15 09:00:00',
     attachments: [],
   },
   {
@@ -20,9 +23,12 @@ const applications: Application[] = [
     company: 'Globex',
     role: 'Designer',
     dateApplied: '2026-02-01',
+    deadline: '2026-03-01',
     status: 'interview',
     link: '',
     notes: '',
+    createdAt: '2026-02-01 09:00:00',
+    updatedAt: '2026-02-01 09:00:00',
     attachments: [],
   },
 ]
@@ -42,6 +48,25 @@ test('renders a row for each application', () => {
 
   expect(screen.getByRole('button', { name: /Acme/ })).toBeVisible()
   expect(screen.getByRole('button', { name: /Globex/ })).toBeVisible()
+})
+
+test('shows a due date suffix only when the application has a deadline', () => {
+  render(
+    <ApplicationList
+      applications={applications}
+      expandedId={null}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+    />,
+  )
+
+  expect(
+    screen.getByRole('button', { name: /Globex.*due 2026-03-01/ }),
+  ).toBeVisible()
+  expect(screen.getByRole('button', { name: /^Acme/ }).textContent).not.toMatch(/due/)
 })
 
 test('the collapsed list shows no detail panel', () => {

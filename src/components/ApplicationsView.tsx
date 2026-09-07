@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ApplicationForm } from './ApplicationForm.tsx'
 import { ApplicationList } from './ApplicationList.tsx'
+import { ApplicationSort } from './ApplicationSort.tsx'
 import {
   UnauthorizedError,
   createApplication,
@@ -10,6 +11,8 @@ import {
   updateApplication,
   uploadAttachment,
 } from '../lib/api.ts'
+import { sortApplications } from '../lib/sorting.ts'
+import type { Sort } from '../lib/sorting.ts'
 import type { Application, ApplicationInput } from '../types.ts'
 
 function useApplications(onUnauthorized: () => void) {
@@ -103,21 +106,25 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
     handleUploadAttachment,
     handleRemoveAttachment,
   } = useApplications(onUnauthorized)
+  const [sort, setSort] = useState<Sort>({ field: 'createdAt', direction: 'desc' })
 
   return (
     <div className="layout">
       <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
-      <ApplicationList
-        applications={applications}
-        expandedId={expandedId}
-        onToggle={(id) =>
-          setExpandedId((current) => (current === id ? null : id))
-        }
-        onUpdate={handleUpdate}
-        onDelete={handleDelete}
-        onUploadAttachment={handleUploadAttachment}
-        onRemoveAttachment={handleRemoveAttachment}
-      />
+      <div>
+        <ApplicationSort sort={sort} onChange={setSort} />
+        <ApplicationList
+          applications={sortApplications(applications, sort)}
+          expandedId={expandedId}
+          onToggle={(id) =>
+            setExpandedId((current) => (current === id ? null : id))
+          }
+          onUpdate={handleUpdate}
+          onDelete={handleDelete}
+          onUploadAttachment={handleUploadAttachment}
+          onRemoveAttachment={handleRemoveAttachment}
+        />
+      </div>
     </div>
   )
 }

@@ -13,6 +13,9 @@ test('fills the form and calls onSubmit with the entered values', async () => {
   fireEvent.change(screen.getByLabelText('Date applied'), {
     target: { value: '2026-01-15' },
   })
+  fireEvent.change(screen.getByLabelText('Deadline'), {
+    target: { value: '2026-02-01' },
+  })
   await user.selectOptions(
     screen.getByRole('combobox', { name: 'Status' }),
     'interview',
@@ -31,6 +34,7 @@ test('fills the form and calls onSubmit with the entered values', async () => {
     company: 'Acme',
     role: 'Engineer',
     dateApplied: '2026-01-15',
+    deadline: '2026-02-01',
     status: 'interview',
     link: 'https://acme.example/jobs/1',
     notes: 'Referred by a friend',
@@ -58,6 +62,7 @@ test('clears the add form after submit', async () => {
   expect(screen.getByRole('textbox', { name: 'Link' })).toHaveValue('')
   expect(screen.getByRole('textbox', { name: 'Notes' })).toHaveValue('')
   expect(screen.getByLabelText('Date applied')).toHaveValue('')
+  expect(screen.getByLabelText('Deadline')).toHaveValue('')
   expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue('draft')
 })
 
@@ -67,6 +72,7 @@ test('keeps the edit form values after save', async () => {
     company: 'Acme',
     role: 'Engineer',
     dateApplied: '2026-01-15',
+    deadline: '2026-02-01',
     status: 'interview' as const,
     link: 'https://acme.example/jobs/1',
     notes: 'Referred by a friend',
@@ -80,6 +86,7 @@ test('keeps the edit form values after save', async () => {
   expect(screen.getByRole('textbox', { name: 'Company' })).toHaveValue('Acme')
   expect(screen.getByRole('textbox', { name: 'Role' })).toHaveValue('Engineer')
   expect(screen.getByLabelText('Date applied')).toHaveValue('2026-01-15')
+  expect(screen.getByLabelText('Deadline')).toHaveValue('2026-02-01')
   expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue(
     'interview',
   )
@@ -91,6 +98,7 @@ test('keeps in-progress edits when the parent rerenders', async () => {
     company: 'Acme',
     role: 'Engineer',
     dateApplied: '2026-01-15',
+    deadline: '',
     status: 'interview' as const,
     link: '',
     notes: '',
@@ -127,6 +135,7 @@ test('changing the date on a non-draft leaves its status alone', () => {
     company: 'Acme',
     role: 'Engineer',
     dateApplied: '2026-01-15',
+    deadline: '',
     status: 'interview' as const,
     link: '',
     notes: '',
@@ -156,4 +165,18 @@ test('the date input is required unless the status is draft', async () => {
   )
 
   expect(screen.getByLabelText('Date applied')).toBeRequired()
+})
+
+test('the deadline is never required, regardless of status', async () => {
+  const user = userEvent.setup()
+  render(<ApplicationForm submitLabel="Add application" onSubmit={vi.fn()} />)
+
+  expect(screen.getByLabelText('Deadline')).not.toBeRequired()
+
+  await user.selectOptions(
+    screen.getByRole('combobox', { name: 'Status' }),
+    'interview',
+  )
+
+  expect(screen.getByLabelText('Deadline')).not.toBeRequired()
 })

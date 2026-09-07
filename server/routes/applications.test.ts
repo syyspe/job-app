@@ -43,6 +43,7 @@ test('create, list, update, delete round trip', async () => {
       company: 'Acme',
       role: 'Engineer',
       dateApplied: '2026-01-01',
+      deadline: '2026-02-01',
       status: 'applied',
       link: 'https://acme.example/jobs/1',
       notes: 'Referred by a friend',
@@ -52,6 +53,7 @@ test('create, list, update, delete round trip', async () => {
   const created = (await createRes.json()) as Application
   expect(created.id).toBeTypeOf('number')
   expect(created.company).toBe('Acme')
+  expect(created.deadline).toBe('2026-02-01')
   expect(created.attachments).toEqual([])
 
   const listRes = await fetch(`${baseUrl}/api/applications`, { headers: { Cookie: cookie } })
@@ -67,6 +69,7 @@ test('create, list, update, delete round trip', async () => {
       company: 'Acme',
       role: 'Senior Engineer',
       dateApplied: '2026-01-01',
+      deadline: '2026-03-01',
       status: 'interview',
       link: 'https://acme.example/jobs/1',
       notes: 'Passed phone screen',
@@ -76,6 +79,7 @@ test('create, list, update, delete round trip', async () => {
   const updated = (await updateRes.json()) as Application
   expect(updated.role).toBe('Senior Engineer')
   expect(updated.status).toBe('interview')
+  expect(updated.deadline).toBe('2026-03-01')
 
   const deleteRes = await fetch(`${baseUrl}/api/applications/${created.id}`, {
     method: 'DELETE',
