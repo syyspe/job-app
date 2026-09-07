@@ -31,15 +31,20 @@ export function migrateApplicationsToUser(db: Database.Database, userId: number)
           company      TEXT NOT NULL,
           role         TEXT NOT NULL,
           date_applied TEXT NOT NULL,
+          deadline     TEXT NOT NULL DEFAULT '',
           status       TEXT NOT NULL,
           link         TEXT NOT NULL DEFAULT '',
-          notes        TEXT NOT NULL DEFAULT ''
+          notes        TEXT NOT NULL DEFAULT '',
+          created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
         );
       `)
       db.prepare(
         `INSERT INTO applications_new
-           (id, user_id, company, role, date_applied, status, link, notes)
-         SELECT id, ?, company, role, date_applied, status, link, notes
+           (id, user_id, company, role, date_applied, deadline, status, link, notes,
+            created_at, updated_at)
+         SELECT id, ?, company, role, date_applied, deadline, status, link, notes,
+                created_at, updated_at
          FROM applications`,
       ).run(userId)
       db.exec('DROP TABLE applications')
@@ -52,19 +57,4 @@ export function migrateApplicationsToUser(db: Database.Database, userId: number)
   } finally {
     db.pragma('foreign_keys = ON')
   }
-}
-
-export function migrateApplicationDates(db: Database.Database): void {
-  const columns = db.pragma('table_info(applications)') as { name: string }[]
-  if (columns.some((column) => column.name === 'deadline')) return
-
-  db.transaction(() => {
-    db.exec(`
-      ALTER TABLE applications ADD COLUMN deadline TEXT NOT NULL DEFAULT '';
-      ALTER TABLE applications ADD COLUMN created_at TEXT NOT NULL DEFAULT '';
-      ALTER TABLE applications ADD COLUMN updated_at TEXT NOT NULL DEFAULT '';
-      UPDATE applications
-         SET created_at = datetime('now'), updated_at = datetime('now');
-    `)
-  })()
 }

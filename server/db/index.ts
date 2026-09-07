@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { migrate } from '../lib/migrations.ts'
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS users (
@@ -45,5 +46,6 @@ export function openDatabase(dbPath: string): Database.Database {
   const db = new Database(dbPath)
   db.pragma('foreign_keys = ON')
   db.exec(SCHEMA)
+  migrate(db)
   return db
 }
