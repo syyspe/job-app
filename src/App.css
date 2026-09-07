@@ -90,6 +90,25 @@ ul {
   padding: 4px;
 }
 
+.sort-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.sort-bar select {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.timestamps {
+  color: var(--text);
+  font-size: 13px;
+}
+
 .attachment-item {
   display: flex;
   align-items: center;

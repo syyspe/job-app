@@ -91,6 +91,67 @@ test('uploading a file attaches it to the application and can be downloaded back
   expect(await downloadRes.text()).toBe('hello resume')
 })
 
+test('uploading an attachment moves the parent application\'s updatedAt', async () => {
+  const application = await createApplication()
+  const db = openDatabase(join(root, 'app.db'))
+  db.prepare(
+    "UPDATE applications SET updated_at = '2020-01-01 00:00:00' WHERE id = ?",
+  ).run(application.id)
+
+  await fetch(`${baseUrl}/api/applications/${application.id}/attachments`, {
+    method: 'POST',
+    headers: { Cookie: cookie },
+    body: resumeFile(),
+  })
+
+  const listRes = await fetch(`${baseUrl}/api/applications`, { headers: { Cookie: cookie } })
+  const [listed] = (await listRes.json()) as Application[]
+  expect(listed.updatedAt).not.toBe('2020-01-01 00:00:00')
+})
+
+test('removing an attachment moves the parent application\'s updatedAt', async () => {
+  const application = await createApplication()
+  const uploadRes = await fetch(
+    `${baseUrl}/api/applications/${application.id}/attachments`,
+    { method: 'POST', headers: { Cookie: cookie }, body: resumeFile() },
+  )
+  const attachment = (await uploadRes.json()) as Attachment
+
+  const db = openDatabase(join(root, 'app.db'))
+  db.prepare(
+    "UPDATE applications SET updated_at = '2020-01-01 00:00:00' WHERE id = ?",
+  ).run(application.id)
+
+  await fetch(`${baseUrl}/api/attachments/${attachment.id}`, {
+    method: 'DELETE',
+    headers: { Cookie: cookie },
+  })
+
+  const listRes = await fetch(`${baseUrl}/api/applications`, { headers: { Cookie: cookie } })
+  const [listed] = (await listRes.json()) as Application[]
+  expect(listed.updatedAt).not.toBe('2020-01-01 00:00:00')
+})
+
+test('downloading an attachment does not move the parent application\'s updatedAt', async () => {
+  const application = await createApplication()
+  const uploadRes = await fetch(
+    `${baseUrl}/api/applications/${application.id}/attachments`,
+    { method: 'POST', headers: { Cookie: cookie }, body: resumeFile() },
+  )
+  const attachment = (await uploadRes.json()) as Attachment
+
+  const db = openDatabase(join(root, 'app.db'))
+  db.prepare(
+    "UPDATE applications SET updated_at = '2020-01-01 00:00:00' WHERE id = ?",
+  ).run(application.id)
+
+  await fetch(`${baseUrl}/api/attachments/${attachment.id}`, { headers: { Cookie: cookie } })
+
+  const listRes = await fetch(`${baseUrl}/api/applications`, { headers: { Cookie: cookie } })
+  const [listed] = (await listRes.json()) as Application[]
+  expect(listed.updatedAt).toBe('2020-01-01 00:00:00')
+})
+
 test('removing an attachment clears its row and its file', async () => {
   const application = await createApplication()
   const uploadRes = await fetch(

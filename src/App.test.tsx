@@ -11,9 +11,12 @@ const sampleApplications: Application[] = [
     company: 'Acme',
     role: 'Engineer',
     dateApplied: '2026-01-15',
+    deadline: '',
     status: 'applied',
     link: '',
     notes: '',
+    createdAt: '2026-01-15 09:00:00',
+    updatedAt: '2026-01-15 09:00:00',
     attachments: [],
   },
 ]

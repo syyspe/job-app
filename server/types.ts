@@ -27,8 +27,11 @@ export interface Application {
   company: string
   role: string
   dateApplied: string
+  deadline: string
   status: Status
   link: string
   notes: string
+  createdAt: string
+  updatedAt: string
   attachments: Attachment[]
 }

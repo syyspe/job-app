@@ -22,9 +22,12 @@ const SCHEMA = `
     company      TEXT NOT NULL,
     role         TEXT NOT NULL,
     date_applied TEXT NOT NULL,
+    deadline     TEXT NOT NULL DEFAULT '',
     status       TEXT NOT NULL,
     link         TEXT NOT NULL DEFAULT '',
-    notes        TEXT NOT NULL DEFAULT ''
+    notes        TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS attachments (

@@ -4,7 +4,7 @@ import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { seedUser, migrateApplicationsToUser } from './seed.ts'
+import { seedUser, migrateApplicationsToUser, migrateApplicationDates } from './seed.ts'
 
 let root: string
 let db: Database.Database
@@ -88,6 +88,34 @@ test('migrating twice is a no-op the second time', () => {
     user_id: number
   }
   expect(application.user_id).toBe(userId)
+})
+
+test('migrating a legacy database adds deadline and timestamp columns and backfills the timestamps', () => {
+  migrateApplicationDates(db)
+
+  const application = db.prepare('SELECT * FROM applications WHERE id = 1').get() as {
+    company: string
+    deadline: string
+    created_at: string
+    updated_at: string
+  }
+  expect(application.company).toBe('Acme')
+  expect(application.deadline).toBe('')
+  expect(application.created_at).not.toBe('')
+  expect(application.updated_at).not.toBe('')
+})
+
+test('migrating dates twice is a no-op the second time', () => {
+  migrateApplicationDates(db)
+  const first = db.prepare('SELECT created_at FROM applications WHERE id = 1').get() as {
+    created_at: string
+  }
+
+  expect(() => migrateApplicationDates(db)).not.toThrow()
+  const second = db.prepare('SELECT created_at FROM applications WHERE id = 1').get() as {
+    created_at: string
+  }
+  expect(second.created_at).toBe(first.created_at)
 })
 
 test('seeding twice does not create a second user', () => {

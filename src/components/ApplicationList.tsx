@@ -34,6 +34,7 @@ export function ApplicationList({
             onClick={() => onToggle(application.id)}
           >
             {application.company} — {application.role} ({application.status})
+            {application.deadline && ` · due ${application.deadline}`}
           </button>
           {expandedId === application.id && (
             <ApplicationDetail

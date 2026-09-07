@@ -2,11 +2,12 @@ import { Router } from 'express'
 import type { Request, Response } from 'express'
 import type Database from 'better-sqlite3'
 import { join } from 'node:path'
-import { toApplication } from '../models/application.ts'
+import { toApplication, matchesInput } from '../models/application.ts'
 import type { ApplicationRow } from '../models/application.ts'
 import type { AttachmentRow } from '../models/attachment.ts'
 import { validateInput } from '../lib/validation.ts'
 import { unlinkIfExists } from '../lib/files.ts'
+import { touchApplication } from '../lib/applications.ts'
 
 type AttachmentsForApplication = Database.Statement<[number, number], AttachmentRow>
 
@@ -32,14 +33,17 @@ function createHandler(db: Database.Database) {
 
     const result = db
       .prepare(
-        `INSERT INTO applications (user_id, company, role, date_applied, status, link, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO applications
+           (user_id, company, role, date_applied, deadline, status, link, notes,
+            created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
       )
       .run(
         req.userId,
         input.company,
         input.role,
         input.dateApplied,
+        input.deadline,
         input.status,
         input.link,
         input.notes,
@@ -52,6 +56,16 @@ function createHandler(db: Database.Database) {
   }
 }
 
+function findOwnedApplication(
+  db: Database.Database,
+  id: number,
+  userId: number,
+): ApplicationRow | undefined {
+  return db
+    .prepare('SELECT * FROM applications WHERE id = ? AND user_id = ?')
+    .get(id, userId) as ApplicationRow | undefined
+}
+
 function updateHandler(db: Database.Database, attachments: AttachmentsForApplication) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
@@ -61,27 +75,29 @@ function updateHandler(db: Database.Database, attachments: AttachmentsForApplica
       return
     }
 
-    const result = db
-      .prepare(
-        `UPDATE applications
-         SET company = ?, role = ?, date_applied = ?, status = ?, link = ?, notes = ?
-         WHERE id = ? AND user_id = ?`,
-      )
-      .run(
-        input.company,
-        input.role,
-        input.dateApplied,
-        input.status,
-        input.link,
-        input.notes,
-        id,
-        req.userId,
-      )
-
-    if (result.changes === 0) {
+    const existing = findOwnedApplication(db, id, req.userId)
+    if (!existing) {
       res.status(404).json({ error: 'not found' })
       return
     }
+
+    db.prepare(
+      `UPDATE applications
+       SET company = ?, role = ?, date_applied = ?, deadline = ?, status = ?, link = ?, notes = ?
+       WHERE id = ? AND user_id = ?`,
+    ).run(
+      input.company,
+      input.role,
+      input.dateApplied,
+      input.deadline,
+      input.status,
+      input.link,
+      input.notes,
+      id,
+      req.userId,
+    )
+
+    if (!matchesInput(existing, input)) touchApplication(db, id)
 
     const row = db.prepare('SELECT * FROM applications WHERE id = ?').get(id) as ApplicationRow
     res.json(toApplication(row, attachments.all(id, req.userId)))
