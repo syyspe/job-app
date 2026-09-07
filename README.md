@@ -42,7 +42,8 @@ and what's next; **`/sdlc`** re-answers that any time you ask.
 → Secrets → Actions) so `.github/workflows/claude-review.yml` reviews PRs
 automatically. Without it the workflow skips cleanly and PRs stay green;
 `/review` in a local session covers the same `REVIEW.md` passes with no
-key — see that file.
+key — see that file. Note that the key is billed to whoever owns it: turning
+this on means you pay for a review of every PR here.
 
 ## Running the server
 
@@ -200,5 +201,16 @@ gate anything hard to reverse — production deploys, protected-path edits.
   practice, and it's real work to maintain — out of proportion here. The
   substitute is the "Things Claude gets wrong here" section of `CLAUDE.md`:
   when a mistake recurs, write it down there.
-- No license file — add one before making the repo public if you intend
-  others to reuse it.
+
+## License
+
+[MIT](LICENSE). Copy it, fork it, sell whatever you build with it.
+
+Worth saying plainly: this is a **single-user tool that runs on your own
+machine**, and it's the test bed for the
+[ai-sdlc-skeleton](https://github.com/syyspe/ai-sdlc-skeleton) workflow — the
+process is the point, the app is what the process was pointed at. There's no
+signup and no rate limiting, and CSRF rests on the session cookie being
+`httpOnly` + `sameSite: lax` rather than on tokens — enough for one person
+and a local SQLite file, not enough for the open internet. Add those before
+putting it anywhere public. `SECURITY.md` says the same in more detail.

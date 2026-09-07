@@ -24,13 +24,24 @@ jobs:
   review:
     # Full review on new/updated PRs; targeted response when someone tags
     # @claude on a comment (REVIEW.md's "response loop").
+    #
+    # The comment path is gated hard, because on a public repo anyone with a
+    # GitHub account can write "@claude" anywhere — and unlike `pull_request`
+    # from a fork, `issue_comment` runs in the base-branch context with this
+    # workflow's secrets and write permissions. So: comments on pull requests
+    # only (not plain issues), and only from someone who already has write
+    # access here.
     if: >
       github.event_name == 'pull_request' ||
-      contains(github.event.comment.body, '@claude')
+      ((github.event_name == 'pull_request_review_comment' ||
+        github.event.issue.pull_request != null) &&
+       contains(github.event.comment.body, '@claude') &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+                github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -55,7 +66,7 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636 # v1
         if: steps.key.outputs.present == 'true'
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
