@@ -71,6 +71,11 @@ the seed script only, and it only ever creates the user once: if
 `.env` does not change its password. Get `SEED_USERNAME`/`SEED_PASSWORD`
 right in `.env` before the first run against a given database.
 
+Schema migrations are not the seed script's job — `openDatabase` runs them
+every time the database is opened, so any entry point (the server, the seed
+CLI, tests) gets a current schema. `npm run seed` is only about the seed user
+and pre-auth applications.
+
 ### Development
 
 Two processes: Vite serves the React app on `:5173` with HMR and proxies

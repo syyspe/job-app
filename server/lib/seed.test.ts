@@ -4,7 +4,8 @@ import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { seedUser, migrateApplicationsToUser, migrateApplicationDates } from './seed.ts'
+import { seedUser, migrateApplicationsToUser } from './seed.ts'
+import { migrate } from './migrations.ts'
 
 let root: string
 let db: Database.Database
@@ -46,6 +47,7 @@ beforeEach(() => {
     `INSERT INTO attachments (application_id, stored_name, original_name, mime_type)
      VALUES (1, 'stored.txt', 'resume.txt', 'text/plain')`,
   ).run()
+  migrate(db)
 })
 
 afterEach(() => {
@@ -60,9 +62,15 @@ test('migrating a legacy database assigns every application to the seeded user a
   const application = db.prepare('SELECT * FROM applications WHERE id = 1').get() as {
     user_id: number
     company: string
+    deadline: string
+    created_at: string
+    updated_at: string
   }
   expect(application.user_id).toBe(userId)
   expect(application.company).toBe('Acme')
+  expect(application.deadline).toBe('')
+  expect(application.created_at).not.toBe('')
+  expect(application.updated_at).not.toBe('')
 
   const attachment = db
     .prepare('SELECT * FROM attachments WHERE application_id = 1')
@@ -88,34 +96,6 @@ test('migrating twice is a no-op the second time', () => {
     user_id: number
   }
   expect(application.user_id).toBe(userId)
-})
-
-test('migrating a legacy database adds deadline and timestamp columns and backfills the timestamps', () => {
-  migrateApplicationDates(db)
-
-  const application = db.prepare('SELECT * FROM applications WHERE id = 1').get() as {
-    company: string
-    deadline: string
-    created_at: string
-    updated_at: string
-  }
-  expect(application.company).toBe('Acme')
-  expect(application.deadline).toBe('')
-  expect(application.created_at).not.toBe('')
-  expect(application.updated_at).not.toBe('')
-})
-
-test('migrating dates twice is a no-op the second time', () => {
-  migrateApplicationDates(db)
-  const first = db.prepare('SELECT created_at FROM applications WHERE id = 1').get() as {
-    created_at: string
-  }
-
-  expect(() => migrateApplicationDates(db)).not.toThrow()
-  const second = db.prepare('SELECT created_at FROM applications WHERE id = 1').get() as {
-    created_at: string
-  }
-  expect(second.created_at).toBe(first.created_at)
 })
 
 test('seeding twice does not create a second user', () => {
