@@ -51,8 +51,7 @@ test('renders newest-created applications first on mount', async () => {
 
   await screen.findByRole('button', { name: /Acme/ })
   const rows = screen
-    .getAllByRole('button')
-    .filter((button) => button.className.includes('row-button'))
+    .getAllByRole('button', { name: /Acme|Globex|Initech/ })
     .map((button) => button.textContent)
   expect(rows).toEqual([
     expect.stringContaining('Globex'),

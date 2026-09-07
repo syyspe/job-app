@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApplicationForm } from './ApplicationForm.tsx'
 import { ApplicationList } from './ApplicationList.tsx'
 import { ApplicationSort } from './ApplicationSort.tsx'
@@ -107,6 +107,10 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
     handleRemoveAttachment,
   } = useApplications(onUnauthorized)
   const [sort, setSort] = useState<Sort>({ field: 'createdAt', direction: 'desc' })
+  const sortedApplications = useMemo(
+    () => sortApplications(applications, sort),
+    [applications, sort],
+  )
 
   return (
     <div className="layout">
@@ -114,7 +118,7 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
       <div>
         <ApplicationSort sort={sort} onChange={setSort} />
         <ApplicationList
-          applications={sortApplications(applications, sort)}
+          applications={sortedApplications}
           expandedId={expandedId}
           onToggle={(id) =>
             setExpandedId((current) => (current === id ? null : id))
