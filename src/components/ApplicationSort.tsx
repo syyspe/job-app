@@ -15,10 +15,6 @@ interface ApplicationSortProps {
 }
 
 export function ApplicationSort({ sort, onChange }: ApplicationSortProps) {
-  function toggleDirection() {
-    onChange({ ...sort, direction: sort.direction === 'asc' ? 'desc' : 'asc' })
-  }
-
   return (
     <div className="sort-bar">
       <label>
@@ -34,9 +30,29 @@ export function ApplicationSort({ sort, onChange }: ApplicationSortProps) {
           ))}
         </select>
       </label>
-      <button type="button" className="button" onClick={toggleDirection}>
-        {sort.direction === 'asc' ? 'Ascending' : 'Descending'}
-      </button>
+      <fieldset>
+        <legend>Direction</legend>
+        <label>
+          <input
+            type="radio"
+            name="sort-direction"
+            value="asc"
+            checked={sort.direction === 'asc'}
+            onChange={() => onChange({ ...sort, direction: 'asc' })}
+          />
+          Ascending
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="sort-direction"
+            value="desc"
+            checked={sort.direction === 'desc'}
+            onChange={() => onChange({ ...sort, direction: 'desc' })}
+          />
+          Descending
+        </label>
+      </fieldset>
     </div>
   )
 }
