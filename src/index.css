@@ -5,6 +5,8 @@
   --border: #e5e4e7;
   --accent: #7c3aed;
   --accent-bg: rgba(124, 58, 237, 0.1);
+  --ok: #15803d;
+  --danger: #b91c1c;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
 
@@ -26,6 +28,8 @@
     --border: #2e303a;
     --accent: #c084fc;
     --accent-bg: rgba(192, 132, 252, 0.15);
+    --ok: #4ade80;
+    --danger: #f87171;
   }
 }
 

@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 import App from './App'
+import { ToastProvider } from './components/ToastProvider'
 import type { Application, User } from './types'
 
 const sampleUser: User = { id: 1, username: 'testuser' }
@@ -31,11 +33,24 @@ function stubFetch(meStatus: number) {
           ? new Response(JSON.stringify(sampleUser), { status: 200 })
           : new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })
       }
+      if (url.endsWith('/api/login')) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401,
+        })
+      }
       if (url.endsWith('/api/applications')) {
         return new Response(JSON.stringify(sampleApplications), { status: 200 })
       }
       return new Response(null, { status: 404 })
     }),
+  )
+}
+
+function renderApp() {
+  render(
+    <ToastProvider>
+      <App />
+    </ToastProvider>,
   )
 }
 
@@ -45,7 +60,7 @@ afterEach(() => {
 
 test('renders the login form when /api/me is 401', async () => {
   stubFetch(401)
-  render(<App />)
+  renderApp()
   expect(
     await screen.findByRole('button', { name: 'Log in' }),
   ).toBeVisible()
@@ -53,8 +68,25 @@ test('renders the login form when /api/me is 401', async () => {
 
 test('renders the applications when /api/me succeeds', async () => {
   stubFetch(200)
-  render(<App />)
+  renderApp()
   expect(
     await screen.findByRole('button', { name: /Acme/ }),
   ).toBeVisible()
+})
+
+test('a failed login shows an error toast', async () => {
+  const user = userEvent.setup()
+  stubFetch(401)
+  renderApp()
+
+  await user.type(
+    await screen.findByRole('textbox', { name: 'Username' }),
+    'testuser',
+  )
+  await user.type(screen.getByLabelText('Password'), 'wrong')
+  await user.click(screen.getByRole('button', { name: 'Log in' }))
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'Invalid username or password',
+  )
 })

@@ -15,16 +15,3 @@ test('submitting calls onLogin with both values', async () => {
   expect(onLogin).toHaveBeenCalledWith('testuser', 'test-password')
 })
 
-test('a rejected onLogin shows the alert', async () => {
-  const user = userEvent.setup()
-  const onLogin = vi.fn().mockRejectedValue(new Error('nope'))
-  render(<LoginForm onLogin={onLogin} />)
-
-  await user.type(screen.getByRole('textbox', { name: 'Username' }), 'testuser')
-  await user.type(screen.getByLabelText('Password'), 'wrong')
-  await user.click(screen.getByRole('button', { name: 'Log in' }))
-
-  expect(await screen.findByRole('alert')).toHaveTextContent(
-    'Invalid username or password',
-  )
-})

@@ -8,16 +8,10 @@ interface LoginFormProps {
 export function LoginForm({ onLogin }: LoginFormProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
-    setError('')
-    try {
-      await onLogin(username, password)
-    } catch {
-      setError('Invalid username or password')
-    }
+    await onLogin(username, password)
   }
 
   return (
@@ -40,7 +34,6 @@ export function LoginForm({ onLogin }: LoginFormProps) {
           required
         />
       </label>
-      {error && <p role="alert">{error}</p>}
       <div className="form-actions">
         <button type="submit" className="button button-primary">
           Log in

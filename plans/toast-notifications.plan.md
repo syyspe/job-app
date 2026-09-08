@@ -23,7 +23,7 @@ there is one mechanism, not two. No new dependencies.
 Decisions taken from the brief's open questions:
 
 - **Durations:** success 4000 ms, error 8000 ms, both in one exported constant
-  in `ToastProvider.tsx`.
+  in `src/lib/toast.ts`.
 - **Stack cap:** 3 — a burst drops the oldest (`.slice(-MAX_TOASTS)`).
 - **Toast state survives re-renders** because it lives in the provider, above
   `<App />`. Nothing more is needed.
@@ -31,13 +31,15 @@ Decisions taken from the brief's open questions:
 ## Affected files
 
 - `src/lib/toast.ts` — **new.** `ToastKind`, `Toast`, `ToastApi` types,
-  `ToastContext`, and the `useToast()` hook (throws if used outside the
-  provider). No JSX, so it exports no component and stays clear of
-  `react/only-export-components`.
+  `ToastContext`, the `useToast()` hook (throws if used outside the
+  provider), and the `TOAST_DURATIONS_MS` (`{ success: 4000, error: 8000 }`)
+  and `MAX_TOASTS` constants. No JSX, so it exports no component and stays
+  clear of `react/only-export-components` — which is why the constants live
+  here rather than in `ToastProvider.tsx`, where exporting them alongside a
+  component trips that rule.
 - `src/components/ToastProvider.tsx` — **new.** Owns the `Toast[]` state, ids,
   the per-toast `setTimeout`, the cap, and `dismiss`. Renders
-  `{children}` plus `<ToastHost>`. Exports `TOAST_DURATIONS_MS`
-  (`{ success: 4000, error: 8000 }`) and `MAX_TOASTS` so tests can use them.
+  `{children}` plus `<ToastHost>`.
 - `src/components/ToastHost.tsx` — **new.** Presentational stack: props
   `toasts` and `onDismiss`, no state.
 - `src/main.tsx` — wrap `<App />` in `<ToastProvider>`.
@@ -92,9 +94,10 @@ each new behaviour.
    `setTimeout(() => dismiss(id), TOAST_DURATIONS_MS[kind])`. Provider renders
    `<ToastContext value={api}>{children}<ToastHost … /></ToastContext>` (React
    19 context-as-provider form). Tests drive it through a small probe component
-   that calls `useToast()`, with `vi.useFakeTimers()` and
-   `userEvent.setup({ advanceTimers: vi.advanceTimersByTime })`; advance timers
-   inside `act()`.
+   that calls `useToast()`, with
+   `vi.useFakeTimers({ shouldAdvanceTime: true })`; advance timers inside
+   `act()`. `shouldAdvanceTime` is required — with plain fake timers every
+   `userEvent` interaction hangs until the test times out.
 
 4. **`main.tsx`.** Wrap `<App />` in `<ToastProvider>` inside `<StrictMode>`.
 
@@ -158,6 +161,7 @@ each new behaviour.
   - `showSuccess` / `showError` from `useToast()` put a toast on screen
   - a success toast is gone after `TOAST_DURATIONS_MS.success`; an error toast
     is still there at that point and gone after `TOAST_DURATIONS_MS.error`
+  - a toast can be dismissed early by its close button
   - a 4th toast drops the oldest (`MAX_TOASTS`)
 - Updated `src/components/ApplicationsView.test.tsx`: local `renderView()`
   wrapping in `<ToastProvider>`; add — a successful add shows 'Application
