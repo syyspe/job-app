@@ -97,6 +97,12 @@ ul {
   margin-bottom: 12px;
 }
 
+.sort-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .sort-bar select {
   font: inherit;
   padding: 6px 8px;

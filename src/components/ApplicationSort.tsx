@@ -34,7 +34,7 @@ export function ApplicationSort({ sort, onChange }: ApplicationSortProps) {
           ))}
         </select>
       </label>
-      <button type="button" onClick={toggleDirection}>
+      <button type="button" className="button" onClick={toggleDirection}>
         {sort.direction === 'asc' ? 'Ascending' : 'Descending'}
       </button>
     </div>
