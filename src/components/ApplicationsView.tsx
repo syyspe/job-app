@@ -12,26 +12,30 @@ import {
   uploadAttachment,
 } from '../lib/api.ts'
 import { sortApplications } from '../lib/sorting.ts'
+import { useToast } from '../lib/toast.ts'
 import type { Sort } from '../lib/sorting.ts'
 import type { Application, ApplicationInput } from '../types.ts'
 
 function useApplications(onUnauthorized: () => void) {
   const [applications, setApplications] = useState<Application[]>([])
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const { showSuccess, showError } = useToast()
 
   const run = useCallback(
-    async (task: () => Promise<void>) => {
+    async (task: () => Promise<void>, successMessage?: string) => {
       try {
         await task()
+        if (successMessage) showSuccess(successMessage)
       } catch (error) {
         if (error instanceof UnauthorizedError) {
+          showError('Your session expired — please log in again')
           onUnauthorized()
           return
         }
-        throw error
+        showError(error instanceof Error ? error.message : 'Something went wrong')
       }
     },
-    [onUnauthorized],
+    [onUnauthorized, showSuccess, showError],
   )
 
   async function reload() {
@@ -47,14 +51,14 @@ function useApplications(onUnauthorized: () => void) {
     await run(async () => {
       await createApplication(input)
       await reload()
-    })
+    }, 'Application added')
   }
 
   async function handleUpdate(id: number, input: ApplicationInput) {
     await run(async () => {
       await updateApplication(id, input)
       await reload()
-    })
+    }, 'Application saved')
   }
 
   async function handleDelete(id: number) {
@@ -62,21 +66,21 @@ function useApplications(onUnauthorized: () => void) {
       await deleteApplication(id)
       setExpandedId((current) => (current === id ? null : current))
       await reload()
-    })
+    }, 'Application deleted')
   }
 
   async function handleUploadAttachment(applicationId: number, file: File) {
     await run(async () => {
       await uploadAttachment(applicationId, file)
       await reload()
-    })
+    }, 'Attachment uploaded')
   }
 
   async function handleRemoveAttachment(attachmentId: number) {
     await run(async () => {
       await deleteAttachment(attachmentId)
       await reload()
-    })
+    }, 'Attachment removed')
   }
 
   return {

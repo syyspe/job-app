@@ -10,6 +10,7 @@ test('the login form appears when logged out', async ({ page }) => {
 
 test('a reload keeps the session', async ({ page }) => {
   await logIn(page)
+  await expect(page.getByText('Logged in')).toBeVisible()
   await page.reload()
   await expect(page.getByRole('button', { name: 'Log out' })).toBeVisible()
 })
