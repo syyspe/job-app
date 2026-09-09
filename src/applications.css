@@ -1,0 +1,197 @@
+.application-list,
+.attachment-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.application-item {
+  position: relative;
+  overflow: hidden;
+  padding: var(--s-3) var(--s-4) var(--s-3) var(--s-5);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+/* The spine is a positioned pseudo-element, not a border, so widening it on
+   expand doesn't reflow the text beside it. */
+.application-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--st);
+}
+
+.application-item:hover {
+  background: var(--surface-raised);
+  border-color: var(--line-strong);
+}
+
+.application-item:has(.row-button:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.application-item:has(.row-button[aria-expanded='true']) {
+  background: var(--surface-raised);
+  border-color: var(--line-strong);
+}
+
+.application-item:has(.row-button[aria-expanded='true'])::before {
+  width: 6px;
+}
+
+.application-item[data-status='draft'] {
+  --st: var(--st-draft);
+  --st-bg: var(--st-draft-bg);
+  --st-fg: var(--st-draft-fg);
+}
+
+.application-item[data-status='applied'] {
+  --st: var(--st-applied);
+  --st-bg: var(--st-applied-bg);
+  --st-fg: var(--st-applied-fg);
+}
+
+.application-item[data-status='screening'] {
+  --st: var(--st-screening);
+  --st-bg: var(--st-screening-bg);
+  --st-fg: var(--st-screening-fg);
+}
+
+.application-item[data-status='interview'] {
+  --st: var(--st-interview);
+  --st-bg: var(--st-interview-bg);
+  --st-fg: var(--st-interview-fg);
+}
+
+.application-item[data-status='offer'] {
+  --st: var(--st-offer);
+  --st-bg: var(--st-offer-bg);
+  --st-fg: var(--st-offer-fg);
+}
+
+/* Closed applications recede — a thinner neutral spine and a muted company
+   name, never opacity, which would drop the row below AA. */
+.application-item[data-status='rejected'] {
+  --st: var(--st-rejected);
+  --st-bg: var(--st-rejected-bg);
+  --st-fg: var(--st-rejected-fg);
+}
+
+.application-item[data-status='rejected']::before {
+  width: 2px;
+}
+
+.application-item[data-status='rejected'] .row-company {
+  color: var(--ink-muted);
+}
+
+.row-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'company status'
+    'role deadline';
+  align-items: center;
+  gap: var(--s-1) var(--s-3);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.row-button:focus-visible {
+  outline: none;
+}
+
+.row-company {
+  grid-area: company;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.row-role {
+  grid-area: role;
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+}
+
+.row-status {
+  grid-area: status;
+  justify-self: end;
+  padding: 2px var(--s-2);
+  border-radius: var(--r-sm);
+  background: var(--st-bg);
+  color: var(--st-fg);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.row-deadline {
+  grid-area: deadline;
+  justify-self: end;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.application-item form {
+  margin: var(--s-4) 0 0;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}
+
+.timestamps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-4);
+  color: var(--ink-muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-2) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+
+.attachment-list:not(:empty) {
+  margin-bottom: var(--s-3);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  padding: var(--s-7) var(--s-5);
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--ink-muted);
+}
+
+.empty-state-title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--ink);
+}

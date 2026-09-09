@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { ChangeEvent, FormEvent, ReactNode } from 'react'
+import { STATUS_LABELS } from '../lib/status.ts'
 import { STATUSES } from '../types.ts'
 import type { ApplicationInput, Status } from '../types.ts'
 
@@ -110,7 +111,7 @@ export function ApplicationForm({
         <select value={input.status} onChange={handleStatusChange}>
           {STATUSES.map((status) => (
             <option key={status} value={status}>
-              {status}
+              {STATUS_LABELS[status]}
             </option>
           ))}
         </select>

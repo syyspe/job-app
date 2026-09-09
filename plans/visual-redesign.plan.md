@@ -79,13 +79,18 @@ Decisions settled here so they are not re-litigated at build time:
 - `src/App.tsx` — import `./applications.css` alongside `./App.css`.
 - `index.html` — `<link rel="preload">` for the font.
 - `src/components/ApplicationList.tsx` — row markup and the empty state.
+  Built as three functions rather than one: the `<li>` moved into a local
+  `ApplicationRow` and the empty state into a local `EmptyState`, because
+  keeping it inline put `ApplicationList` at 59 lines, past `simple-code`'s
+  40-line function limit. Same DOM either way.
 - `src/components/ApplicationDetail.tsx` — formatted timestamps.
 - `src/components/ApplicationForm.tsx` — status `<option>` labels via
   `STATUS_LABELS` (values stay lowercase).
 - `src/components/ApplicationsView.tsx` — wrap the add form in a titled panel.
 - `src/components/LoginForm.tsx` — wrap in a centred panel.
 - `CLAUDE.md` — the architecture section says "the two CSS files"; make it
-  three and name what each owns.
+  three and name what each owns. Also add a bullet for the two new `src/lib`
+  display-formatting modules, which the section would otherwise omit.
 
 **Not touched:** `src/lib/sorting.ts`, `src/lib/api.ts`,
 `ApplicationSort.tsx` (restyled by CSS only — same markup, same contract),

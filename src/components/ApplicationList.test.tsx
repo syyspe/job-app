@@ -64,7 +64,7 @@ test('shows a due date suffix only when the application has a deadline', () => {
   )
 
   expect(
-    screen.getByRole('button', { name: /Globex.*due 2026-03-01/ }),
+    screen.getByRole('button', { name: /Globex.*due 1 Mar 2026/ }),
   ).toBeVisible()
   expect(screen.getByRole('button', { name: /^Acme/ }).textContent).not.toMatch(/due/)
 })
@@ -107,4 +107,46 @@ test('the expanded row shows its detail panel and reports a delete', async () =>
   ).toHaveLength(1)
   await user.click(screen.getByRole('button', { name: 'Delete application' }))
   expect(onDelete).toHaveBeenCalledWith(1)
+})
+
+test('each row reports whether it is expanded', () => {
+  render(
+    <ApplicationList
+      applications={applications}
+      expandedId={1}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+    />,
+  )
+
+  expect(screen.getByRole('button', { name: /^Acme/ })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  )
+  expect(screen.getByRole('button', { name: /Globex/ })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+})
+
+test('the empty state names the app and points at the form', () => {
+  render(
+    <ApplicationList
+      applications={[]}
+      expandedId={null}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+    />,
+  )
+
+  expect(screen.getByText('Nothing tracked yet')).toBeVisible()
+  expect(
+    screen.getByText('Add your first application with the form.'),
+  ).toBeVisible()
 })

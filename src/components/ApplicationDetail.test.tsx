@@ -81,7 +81,8 @@ test('renders both timestamps read-only with no input for either', () => {
     />,
   )
 
-  expect(screen.getByText('Created 2026-01-15 09:00:00 · Updated 2026-01-16 10:30:00')).toBeVisible()
+  expect(screen.getByText('Created 15 Jan 2026, 09:00')).toBeVisible()
+  expect(screen.getByText('Updated 16 Jan 2026, 10:30')).toBeVisible()
   expect(screen.queryByLabelText(/created/i)).not.toBeInTheDocument()
   expect(screen.queryByLabelText(/updated/i)).not.toBeInTheDocument()
 })
