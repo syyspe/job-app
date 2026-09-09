@@ -23,7 +23,7 @@ test('add, edit, attach a file, and delete an application', async ({
     .getByRole('combobox', { name: 'Status' })
     .selectOption('interview')
   await detail.getByRole('button', { name: 'Save' }).click()
-  await expect(page.getByRole('button', { name: /interview/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Interview/ })).toBeVisible()
 
   await detail.getByLabel('Attach a file').setInputFiles({
     name: 'resume.txt',

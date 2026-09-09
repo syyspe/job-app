@@ -6,6 +6,7 @@ import { getCurrentUser, login, logout } from './lib/api.ts'
 import { useToast } from './lib/toast.ts'
 import type { User } from './types.ts'
 import './App.css'
+import './applications.css'
 
 function App() {
   const [user, setUser] = useState<User | null>(null)

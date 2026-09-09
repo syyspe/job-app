@@ -46,8 +46,14 @@ with no `failed` line. Playwright: `N passed`.
 ## Architecture
 
 - `src/` — the React app. `main.tsx` mounts, `App.tsx` is the auth shell (login
-  state, login/logout, the `<main>`/`<h1>` frame); `types.ts` and the two CSS
-  files sit beside them.
+  state, login/logout, the `<main>`/`<h1>` frame); `types.ts` and the three CSS
+  files sit beside them. The CSS splits by scope, and a value belongs to
+  exactly one of them: `index.css` owns the design tokens (type, space, radii,
+  the light and dark palettes, the status colours) plus element resets and
+  `.button`; `App.css` owns the app frame — nav, `main`, the layout grid,
+  panels, forms, the sort bar, toasts; `applications.css` owns the list
+  surface — rows, the status spine, the chip, detail, attachments, empty
+  state. New rules read tokens from `index.css` rather than inventing values.
   - `src/components/` — six presentational components, each with a test
     beside it: `LoginForm` for the login screen, `ApplicationsView` (with its
     local `useApplications` hook) for the applications UI, plus the original
@@ -55,6 +61,10 @@ with no `failed` line. Playwright: `N passed`.
   - `src/lib/api.ts` — every `fetch` against `/api`. Components don't call
     `fetch` themselves. Sends `credentials: 'same-origin'` on every call and
     throws `UnauthorizedError` on a 401.
+  - `src/lib/dates.ts` and `src/lib/status.ts` — display formatting: the two
+    date formatters (locale pinned to `en-GB` so tests are deterministic) and
+    `STATUS_LABELS`, the capitalised label per `Status`. Status *values* stay
+    lowercase everywhere; only the label is capitalised.
   - `src/test/setupTests.ts` — Vitest setup, named by `vite.config.ts`.
 - `server/` — the Express API. `index.ts` reads the env and listens, `app.ts`
   is wiring only (routers, static files, error handler) — including the

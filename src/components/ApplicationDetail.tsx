@@ -1,5 +1,6 @@
 import { ApplicationForm } from './ApplicationForm.tsx'
 import { AttachmentList } from './AttachmentList.tsx'
+import { formatTimestamp } from '../lib/dates.ts'
 import type { Application, ApplicationInput } from '../types.ts'
 
 interface ApplicationDetailProps {
@@ -41,7 +42,8 @@ export function ApplicationDetail({
       }
     >
       <p className="timestamps">
-        Created {application.createdAt} · Updated {application.updatedAt}
+        <span>Created {formatTimestamp(application.createdAt)}</span>
+        <span>Updated {formatTimestamp(application.updatedAt)}</span>
       </p>
       <AttachmentList
         attachments={application.attachments}

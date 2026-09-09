@@ -118,7 +118,10 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
 
   return (
     <div className="layout">
-      <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
+      <section className="panel">
+        <h2>Add an application</h2>
+        <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
+      </section>
       <div>
         <ApplicationSort sort={sort} onChange={setSort} />
         <ApplicationList
