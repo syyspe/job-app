@@ -110,6 +110,15 @@ ul {
   border-radius: 4px;
 }
 
+.sort-bar fieldset {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
 .timestamps {
   color: var(--text);
   font-size: 13px;
