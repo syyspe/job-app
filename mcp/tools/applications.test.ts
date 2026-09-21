@@ -86,7 +86,7 @@ test('get_application on an unknown id names the id', async () => {
   expect(textOf(result)).toContain('no application with id 9999')
 })
 
-test('set_application_status changes the status and leaves the other fields alone', async () => {
+test('update_application changes only the fields given', async () => {
   const created = await createApplication({
     deadline: '2026-02-01',
     link: 'https://example.test/job',
@@ -94,22 +94,41 @@ test('set_application_status changes the status and leaves the other fields alon
   })
 
   const updated = jsonOf<Application>(
-    await call('set_application_status', { id: created.id, status: 'interview' }),
+    await call('update_application', {
+      id: created.id,
+      status: 'interview',
+      notes: 'phone screen booked',
+    }),
   )
 
   expect(updated.status).toBe('interview')
+  expect(updated.notes).toBe('phone screen booked')
   expect(updated.company).toBe(created.company)
   expect(updated.role).toBe(created.role)
   expect(updated.dateApplied).toBe(created.dateApplied)
   expect(updated.deadline).toBe('2026-02-01')
   expect(updated.link).toBe('https://example.test/job')
-  expect(updated.notes).toBe('referred by a friend')
+})
+
+test('a dateless draft can be moved to applied with a dateApplied in the same call', async () => {
+  const draft = await createApplication({ status: 'draft', dateApplied: '' })
+
+  const updated = jsonOf<Application>(
+    await call('update_application', {
+      id: draft.id,
+      status: 'applied',
+      dateApplied: '2026-03-02',
+    }),
+  )
+
+  expect(updated.status).toBe('applied')
+  expect(updated.dateApplied).toBe('2026-03-02')
 })
 
 test('moving a dateless draft onwards is a tool error, not a bare 400', async () => {
   const draft = await createApplication({ status: 'draft', dateApplied: '' })
 
-  const result = await call('set_application_status', { id: draft.id, status: 'applied' })
+  const result = await call('update_application', { id: draft.id, status: 'applied' })
 
   expect(result.isError).toBe(true)
   expect(textOf(result)).toContain('dateApplied')
@@ -118,8 +137,18 @@ test('moving a dateless draft onwards is a tool error, not a bare 400', async ()
   expect(unchanged.status).toBe('draft')
 })
 
-test('set_application_status on an unknown id names the id', async () => {
-  const result = await call('set_application_status', { id: 9999, status: 'offer' })
+test('an empty string clears an optional field', async () => {
+  const created = await createApplication({ link: 'https://example.test/job' })
+
+  const updated = jsonOf<Application>(
+    await call('update_application', { id: created.id, link: '' }),
+  )
+
+  expect(updated.link).toBe('')
+})
+
+test('update_application on an unknown id names the id', async () => {
+  const result = await call('update_application', { id: 9999, status: 'offer' })
 
   expect(result.isError).toBe(true)
   expect(textOf(result)).toContain('no application with id 9999')

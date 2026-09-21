@@ -26,7 +26,8 @@ the same full-object shape the edit form already posts.
 
 - `mcp/tools/applications.ts` — replace `registerSetStatus` with
   `registerUpdate`; lift the seven field schemas into one shared `fields` map
-  so `create_application` and `update_application` describe them once.
+  so `create_application` and `update_application` describe them once; replace
+  `toInput` with `mergeInput`.
 - `mcp/tools/applications.test.ts` — rework the three
   `set_application_status` tests into `update_application` tests and add the
   partial-update, same-call `dateApplied`, and clear-a-field cases.
@@ -62,11 +63,19 @@ Red-green-refactor per `simple-code`: each step's test first.
      `.default()` anywhere here would silently blank a field.
    - Handler: `async ({ id, ...given })` →
      `const existing = await fetchApplication(client, id)` (this is also what
-     gives the unknown-id error), `const input = { ...toInput(existing),
-     ...given }`, `checkDateApplied(input)`, then
+     gives the unknown-id error), `const input = mergeInput(existing, given)`,
+     `checkDateApplied(input)`, then
      `client.sendJson<Application>('PUT', `/api/applications/${id}`, input)`
-     wrapped in `jsonResult`. Zod drops absent optional keys, so the spread
-     merges cleanly; nothing else is needed.
+     wrapped in `jsonResult`.
+
+     **Departure from the plan as written:** the merge is a spelled-out
+     `mergeInput(existing, given)` — `given.company ?? existing.company` and
+     its six siblings — replacing `toInput`, not a `{ ...toInput(existing),
+     ...given }` spread. Zod does drop absent optional keys at runtime, but
+     the *type* of `given` carries every field as `string | undefined`, so the
+     spread types `status` and `dateApplied` as possibly undefined and
+     `checkDateApplied` stops compiling. `??` says "omitted keeps its current
+     value" in the code itself, and `''` still clears a field.
 
 3. **Delete `registerSetStatus`** and swap it for `registerUpdate` in
    `registerApplicationTools`.
@@ -74,7 +83,8 @@ Red-green-refactor per `simple-code`: each step's test first.
 4. **Docs and the tool-list test.** `mcp/server.test.ts`'s sorted array and
    the README tool list.
 
-Keep `toInput` as it is. Don't touch `server/`, `src/`, or the committed
+`mergeInput` is `toInput`'s only successor and `registerUpdate` its only
+caller. Don't touch `server/`, `src/`, or the committed
 `brief/` and `plans/` files from the earlier MCP stream — they are the record
 of what was built then.
 
