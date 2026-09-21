@@ -107,7 +107,7 @@ function updateHandler(db: Database.Database, attachments: AttachmentsForApplica
 function archiveHandler(db: Database.Database, attachments: AttachmentsForApplication) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    const { archived } = req.body as { archived: unknown }
+    const archived = (req.body as { archived?: unknown } | undefined)?.archived
     if (typeof archived !== 'boolean') {
       res.status(400).json({ error: 'invalid archived' })
       return

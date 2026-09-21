@@ -102,6 +102,16 @@ test('rejects a non-boolean archived with 400', async () => {
   expect((await setArchived(created.id, 'yes')).status).toBe(400)
 })
 
+test('a request with no body is a 400', async () => {
+  const created = await createApplication()
+
+  const res = await fetch(`${baseUrl}/api/applications/${created.id}/archived`, {
+    method: 'PUT',
+    headers: { Cookie: cookie },
+  })
+  expect(res.status).toBe(400)
+})
+
 test('an unknown application is a 404', async () => {
   expect((await setArchived(9999, true)).status).toBe(404)
 })
