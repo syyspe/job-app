@@ -24,6 +24,10 @@
   any pre-auth applications to it. Run once against a fresh or pre-auth
   database before the server will answer any `/api` route other than
   `/api/login`.
+- MCP server: `npm run mcp` — the stdio server Claude Desktop spawns. Needs
+  `JOBAPP_API_URL`, `JOBAPP_USERNAME` and `JOBAPP_PASSWORD` in the
+  environment (it does not read `.env`) and an already-running API. See the
+  README's "Claude Desktop (MCP)" section.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
@@ -35,9 +39,14 @@ with no `failed` line. Playwright: `N passed`.
 - Framework: React 19.2.8 + React DOM 19.2.8, built by Vite 8.2.2.
 - Testing: Vitest 4.1.11 with Testing Library (jsdom) for unit/component
   tests, Playwright 1.62.1 for end-to-end.
-- Dependency policy: no new dependencies without approval.
-- Unit tests live beside the code they test as `src/**/*.test.tsx?`; that
-  glob is what Vitest picks up. E2E specs go in `e2e/*.spec.ts`.
+- Dependency policy: no new dependencies without approval. Approved so far
+  beyond the framework set: `@modelcontextprotocol/sdk` 1.30.0 and `zod`
+  4.6.5, both for `mcp/`.
+- Unit tests live beside the code they test as `src/**/*.test.tsx?`,
+  `server/**/*.test.ts` and `mcp/**/*.test.ts`; those globs are what Vitest
+  picks up. E2E specs go in `e2e/*.spec.ts`.
+- `tsconfig.server.json` covers both `server/` and `mcp/` — one project, one
+  set of settings, and `mcp/`'s import of `server/types.ts` stays plain.
 - Import `test`/`expect` from `vitest` explicitly — globals are off, so an
   undeclared `test` is a type error at build time, not a runtime surprise.
 - Query by accessible role/name in tests (`getByRole`), not by CSS class or
@@ -87,6 +96,22 @@ with no `failed` line. Playwright: `N passed`.
   - `server/seed.ts` — the `npm run seed` CLI entry point.
   - `server/test/auth.ts` — `loginAs`, a test helper that logs in and returns
     a cookie header string for route tests to pass by hand.
+- `mcp/` — the stdio MCP server Claude Desktop talks to. It speaks HTTP to a
+  running API exactly as the browser does, opens no database, and imports
+  nothing from `server/` except `types.ts`. `index.ts` reads the three
+  `JOBAPP_*` env vars and connects the stdio transport; `server.ts` is
+  `createMcpServer(client)`, wiring only. **Nothing in `mcp/` may write to
+  stdout** — that is the JSON-RPC channel; diagnostics go to `console.error`.
+  - `mcp/lib/` — no MCP dependency: `client.ts` (the fetch layer — cookie,
+    lazy login, one re-login on a 401, `ApiError`), `applications.ts`
+    (`fetchApplication`, `checkDateApplied`), `files.ts`, `results.ts`.
+  - `mcp/tools/` — one file per tool group (`applications.ts`,
+    `attachments.ts`), each exporting a `register*Tools(server, client)`.
+    Tool schemas are zod. A handler signals failure by **throwing**; the SDK
+    turns that into the tool error the user reads.
+  - `mcp/test/harness.ts` — `startHarness`, which runs a real `createApp()`
+    on an ephemeral port and links a real MCP client to the server in
+    memory, so tools are exercised over the protocol.
 - `public/` — served verbatim at the site root, not processed by Vite.
 - `e2e/` — Playwright specs, configured by `playwright.config.ts`.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are
