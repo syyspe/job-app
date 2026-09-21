@@ -100,6 +100,45 @@ Listens on `PORT` (default `3001`). `npm run test:e2e:prod` runs the same e2e
 specs as `npm run test:e2e`, but against `npm start` instead of the two dev
 servers — useful for confirming the built app actually works end to end.
 
+## Claude Desktop (MCP)
+
+`mcp/` is a stdio MCP server that gives Claude Desktop seven tools over this
+app: `list_applications`, `get_application`, `create_application`,
+`attach_file`, `set_application_status`, `archive_application` and
+`read_attachment`. It speaks to the API over HTTP exactly as the browser
+does, so **the API has to be running already** (`npm run dev:server`, or
+`npm start`) and the seed user has to exist — if it isn't up, the first tool
+call says so.
+
+Add it to `claude_desktop_config.json` and restart Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "job-applications": {
+      "command": "node",
+      "args": ["/absolute/path/to/job-app/mcp/index.ts"],
+      "env": {
+        "JOBAPP_API_URL": "http://localhost:3001",
+        "JOBAPP_USERNAME": "you",
+        "JOBAPP_PASSWORD": "your-password"
+      }
+    }
+  }
+}
+```
+
+The three env vars are all required, and Claude Desktop is the only thing
+that supplies them — the MCP server does not read `.env`. Use the same
+credentials `npm run seed` created.
+
+Claude Desktop spawns the server with a minimal `PATH`, so a bare `node` may
+not resolve; if the server shows as failed, put the absolute path from
+`which node` in `command`.
+
+`npm run mcp` runs the same server against your own shell's env vars, which
+is the quickest way to check it by hand before wiring Claude Desktop up.
+
 ## The default branch is PR-only
 
 Nothing lands on the default branch except by merged pull request. On a solo

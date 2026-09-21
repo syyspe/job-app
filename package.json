@@ -16,15 +16,18 @@
     "test:e2e:prod": "playwright test --config=playwright.prod.config.ts",
     "seed": "node --env-file-if-exists=.env server/seed.ts",
     "lint": "oxlint",
+    "mcp": "node mcp/index.ts",
     "preview": "vite preview",
     "start": "npm run build && node --env-file-if-exists=.env server/index.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^13.0.3",
     "express": "^5.2.1",
     "multer": "^2.3.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
