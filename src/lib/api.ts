@@ -75,6 +75,16 @@ export async function updateApplication(
   return parseJson(response)
 }
 
+export async function setArchived(id: number, archived: boolean): Promise<Application> {
+  const response = await fetch(`/api/applications/${id}/archived`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ archived }),
+  })
+  return parseJson(response)
+}
+
 export async function deleteApplication(id: number): Promise<void> {
   await checkOk(
     await fetch(`/api/applications/${id}`, {

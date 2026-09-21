@@ -12,6 +12,7 @@ export interface ApplicationRow {
   status: string
   link: string
   notes: string
+  archived: number
   created_at: string
   updated_at: string
 }
@@ -29,6 +30,7 @@ export function toApplication(
     status: row.status as Application['status'],
     link: row.link,
     notes: row.notes,
+    archived: row.archived === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     attachments: attachmentRows.map(toAttachment),

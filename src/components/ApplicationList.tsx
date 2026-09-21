@@ -20,6 +20,7 @@ interface ApplicationRowProps {
   onDelete: () => void
   onUploadAttachment: (file: File) => void
   onRemoveAttachment: (attachmentId: number) => void
+  onSetArchived: (archived: boolean) => void
 }
 
 function ApplicationRow({
@@ -30,24 +31,38 @@ function ApplicationRow({
   onDelete,
   onUploadAttachment,
   onRemoveAttachment,
+  onSetArchived,
 }: ApplicationRowProps) {
   return (
-    <li className="application-item" data-status={application.status}>
-      <button
-        type="button"
-        className="row-button"
-        aria-expanded={expanded}
-        onClick={onToggle}
-      >
-        <span className="row-company">{application.company}</span>
-        <span className="row-role">{application.role}</span>
-        <span className="row-status">{STATUS_LABELS[application.status]}</span>
-        {application.deadline && (
-          <span className="row-deadline">
-            due {formatDate(application.deadline)}
-          </span>
-        )}
-      </button>
+    <li
+      className="application-item"
+      data-status={application.status}
+      data-archived={application.archived}
+    >
+      <div className="row-head">
+        <button
+          type="button"
+          className="row-button"
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
+          <span className="row-company">{application.company}</span>
+          <span className="row-role">{application.role}</span>
+          <span className="row-status">{STATUS_LABELS[application.status]}</span>
+          {application.deadline && (
+            <span className="row-deadline">
+              due {formatDate(application.deadline)}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          className="row-archive"
+          onClick={() => onSetArchived(!application.archived)}
+        >
+          {application.archived ? 'Unarchive' : 'Archive'}
+        </button>
+      </div>
       {expanded && (
         <ApplicationDetail
           application={application}
@@ -69,6 +84,7 @@ interface ApplicationListProps {
   onDelete: (id: number) => void
   onUploadAttachment: (applicationId: number, file: File) => void
   onRemoveAttachment: (attachmentId: number) => void
+  onSetArchived: (id: number, archived: boolean) => void
 }
 
 export function ApplicationList({
@@ -79,6 +95,7 @@ export function ApplicationList({
   onDelete,
   onUploadAttachment,
   onRemoveAttachment,
+  onSetArchived,
 }: ApplicationListProps) {
   if (applications.length === 0) {
     return <EmptyState />
@@ -98,6 +115,7 @@ export function ApplicationList({
             onUploadAttachment(application.id, file)
           }
           onRemoveAttachment={onRemoveAttachment}
+          onSetArchived={(archived) => onSetArchived(application.id, archived)}
         />
       ))}
     </ul>

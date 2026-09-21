@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 import { ApplicationList } from './ApplicationList'
@@ -14,6 +14,7 @@ const applications: Application[] = [
     status: 'applied',
     link: '',
     notes: '',
+    archived: false,
     createdAt: '2026-01-15 09:00:00',
     updatedAt: '2026-01-15 09:00:00',
     attachments: [],
@@ -27,6 +28,7 @@ const applications: Application[] = [
     status: 'interview',
     link: '',
     notes: '',
+    archived: false,
     createdAt: '2026-02-01 09:00:00',
     updatedAt: '2026-02-01 09:00:00',
     attachments: [],
@@ -43,6 +45,7 @@ test('renders a row for each application', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -60,6 +63,7 @@ test('shows a due date suffix only when the application has a deadline', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -79,6 +83,7 @@ test('the collapsed list shows no detail panel', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -99,6 +104,7 @@ test('the expanded row shows its detail panel and reports a delete', async () =>
       onDelete={onDelete}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -119,6 +125,7 @@ test('each row reports whether it is expanded', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -142,6 +149,7 @@ test('the empty state names the app and points at the form', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -149,4 +157,70 @@ test('the empty state names the app and points at the form', () => {
   expect(
     screen.getByText('Add your first application with the form.'),
   ).toBeVisible()
+})
+
+const withArchived: Application[] = [
+  applications[0],
+  { ...applications[1], archived: true },
+]
+
+test('a row offers Archive, and an archived row offers Unarchive', () => {
+  render(
+    <ApplicationList
+      applications={withArchived}
+      expandedId={null}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
+    />,
+  )
+
+  const [active, archived] = screen.getAllByRole('listitem')
+  expect(within(active).getByRole('button', { name: 'Archive' })).toBeVisible()
+  expect(within(archived).getByRole('button', { name: 'Unarchive' })).toBeVisible()
+})
+
+test('clicking the archive button reports the opposite of the row flag', async () => {
+  const user = userEvent.setup()
+  const onSetArchived = vi.fn()
+  render(
+    <ApplicationList
+      applications={withArchived}
+      expandedId={null}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={onSetArchived}
+    />,
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Archive' }))
+  expect(onSetArchived).toHaveBeenCalledWith(1, true)
+
+  await user.click(screen.getByRole('button', { name: 'Unarchive' }))
+  expect(onSetArchived).toHaveBeenCalledWith(2, false)
+})
+
+test('an archived row is marked as archived', () => {
+  render(
+    <ApplicationList
+      applications={withArchived}
+      expandedId={null}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
+    />,
+  )
+
+  const [active, archived] = screen.getAllByRole('listitem')
+  expect(active).toHaveAttribute('data-archived', 'false')
+  expect(archived).toHaveAttribute('data-archived', 'true')
 })

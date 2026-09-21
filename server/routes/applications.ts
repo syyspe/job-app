@@ -104,6 +104,31 @@ function updateHandler(db: Database.Database, attachments: AttachmentsForApplica
   }
 }
 
+function archiveHandler(db: Database.Database, attachments: AttachmentsForApplication) {
+  return (req: Request, res: Response) => {
+    const id = Number(req.params.id)
+    const archived = (req.body as { archived?: unknown } | undefined)?.archived
+    if (typeof archived !== 'boolean') {
+      res.status(400).json({ error: 'invalid archived' })
+      return
+    }
+
+    if (!findOwnedApplication(db, id, req.userId)) {
+      res.status(404).json({ error: 'not found' })
+      return
+    }
+
+    db.prepare('UPDATE applications SET archived = ? WHERE id = ? AND user_id = ?').run(
+      archived ? 1 : 0,
+      id,
+      req.userId,
+    )
+
+    const row = db.prepare('SELECT * FROM applications WHERE id = ?').get(id) as ApplicationRow
+    res.json(toApplication(row, attachments.all(id, req.userId)))
+  }
+}
+
 function deleteHandler(
   db: Database.Database,
   uploadsDir: string,
@@ -144,6 +169,7 @@ export function createApplicationsRouter(
   router.get('/applications', listHandler(db, attachments))
   router.post('/applications', createHandler(db))
   router.put('/applications/:id', updateHandler(db, attachments))
+  router.put('/applications/:id/archived', archiveHandler(db, attachments))
   router.delete('/applications/:id', deleteHandler(db, uploadsDir, attachments))
 
   return router

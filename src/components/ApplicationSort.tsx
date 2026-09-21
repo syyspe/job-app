@@ -12,9 +12,16 @@ const FIELD_LABELS: Record<SortField, string> = {
 interface ApplicationSortProps {
   sort: Sort
   onChange: (sort: Sort) => void
+  showArchived: boolean
+  onShowArchivedChange: (showArchived: boolean) => void
 }
 
-export function ApplicationSort({ sort, onChange }: ApplicationSortProps) {
+export function ApplicationSort({
+  sort,
+  onChange,
+  showArchived,
+  onShowArchivedChange,
+}: ApplicationSortProps) {
   return (
     <div className="sort-bar">
       <label>
@@ -53,6 +60,14 @@ export function ApplicationSort({ sort, onChange }: ApplicationSortProps) {
           Descending
         </label>
       </fieldset>
+      <label>
+        <input
+          type="checkbox"
+          checked={showArchived}
+          onChange={(e) => onShowArchivedChange(e.target.checked)}
+        />
+        Show archived
+      </label>
     </div>
   )
 }

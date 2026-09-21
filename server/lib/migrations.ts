@@ -15,6 +15,14 @@ export function migrateApplicationDates(db: Database.Database): void {
   })()
 }
 
+export function migrateApplicationArchived(db: Database.Database): void {
+  const columns = db.pragma('table_info(applications)') as { name: string }[]
+  if (columns.some((column) => column.name === 'archived')) return
+
+  db.exec('ALTER TABLE applications ADD COLUMN archived INTEGER NOT NULL DEFAULT 0')
+}
+
 export function migrate(db: Database.Database): void {
   migrateApplicationDates(db)
+  migrateApplicationArchived(db)
 }
