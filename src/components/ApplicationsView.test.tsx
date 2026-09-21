@@ -15,6 +15,7 @@ const sampleApplications: Application[] = [
     status: 'applied',
     link: '',
     notes: '',
+    archived: false,
     createdAt: '2026-01-15 09:00:00',
     updatedAt: '2026-01-15 09:00:00',
     attachments: [],
@@ -130,5 +131,48 @@ test('a failed add shows the server error message', async () => {
 
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Company is required',
+  )
+})
+
+const mixedApplications: Application[] = [
+  { ...sampleApplications[0], id: 1, company: 'Acme' },
+  { ...sampleApplications[0], id: 2, company: 'Globex', archived: true },
+]
+
+test('archived applications stay hidden until the checkbox is ticked', async () => {
+  const user = userEvent.setup()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify(mixedApplications), { status: 200 })),
+  )
+  renderView()
+  await screen.findByRole('button', { name: /Acme/ })
+
+  const checkbox = screen.getByRole('checkbox', { name: 'Show archived' })
+  expect(checkbox).not.toBeChecked()
+  expect(screen.queryByRole('button', { name: /Globex/ })).not.toBeInTheDocument()
+
+  await user.click(checkbox)
+  expect(screen.getByRole('button', { name: /Globex/ })).toBeVisible()
+  expect(screen.getByRole('button', { name: /Acme/ })).toBeVisible()
+
+  await user.click(checkbox)
+  expect(screen.queryByRole('button', { name: /Globex/ })).not.toBeInTheDocument()
+})
+
+test('archiving a row asks the API to archive it', async () => {
+  const user = userEvent.setup()
+  const fetchMock = vi.fn(
+    async () => new Response(JSON.stringify(mixedApplications), { status: 200 }),
+  )
+  vi.stubGlobal('fetch', fetchMock)
+  renderView()
+  await screen.findByRole('button', { name: /Acme/ })
+
+  await user.click(screen.getByRole('button', { name: 'Archive' }))
+
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/applications/1/archived',
+    expect.objectContaining({ method: 'PUT', body: JSON.stringify({ archived: true }) }),
   )
 })

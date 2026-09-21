@@ -17,6 +17,7 @@ const sampleApplications: Application[] = [
     status: 'applied',
     link: '',
     notes: '',
+    archived: false,
     createdAt: '2026-01-15 09:00:00',
     updatedAt: '2026-01-15 09:00:00',
     attachments: [],

@@ -4,7 +4,7 @@ import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { migrateApplicationDates } from './migrations.ts'
+import { migrateApplicationArchived, migrateApplicationDates } from './migrations.ts'
 
 let root: string
 let db: Database.Database
@@ -61,4 +61,26 @@ test('migrating dates twice is a no-op the second time', () => {
     created_at: string
   }
   expect(second.created_at).toBe(first.created_at)
+})
+
+test('migrating a legacy database adds archived, unarchived, to existing rows', () => {
+  migrateApplicationArchived(db)
+
+  const application = db.prepare('SELECT * FROM applications WHERE id = 1').get() as {
+    company: string
+    archived: number
+  }
+  expect(application.company).toBe('Acme')
+  expect(application.archived).toBe(0)
+})
+
+test('migrating archived twice is a no-op the second time', () => {
+  migrateApplicationArchived(db)
+  db.prepare('UPDATE applications SET archived = 1 WHERE id = 1').run()
+
+  expect(() => migrateApplicationArchived(db)).not.toThrow()
+  const application = db.prepare('SELECT archived FROM applications WHERE id = 1').get() as {
+    archived: number
+  }
+  expect(application.archived).toBe(1)
 })

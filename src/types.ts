@@ -31,6 +31,7 @@ export interface Application {
   status: Status
   link: string
   notes: string
+  archived: boolean
   createdAt: string
   updatedAt: string
   attachments: Attachment[]

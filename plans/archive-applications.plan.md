@@ -51,10 +51,12 @@ Two questions settled during planning:
   `Application`. Same `credentials: 'same-origin'` + `parseJson` shape as
   `updateApplication`.
 - `src/components/ApplicationsView.tsx` — `handleSetArchived` in
-  `useApplications`; `showArchived` state in `ApplicationsView`; filter before
-  sort in the existing `useMemo`.
+  `useApplications` (with a success toast, like every other mutation there);
+  `showArchived` state in `ApplicationsView`; filter before sort in the
+  existing `useMemo`.
 - `src/components/ApplicationSort.tsx` — the "Show archived" checkbox, plus
-  its two props.
+  its two props. No new CSS: `App.css`'s `.sort-bar label` already lays out a
+  control and its text.
 - `src/components/ApplicationList.tsx` — the per-row Archive/Unarchive button
   and `data-archived` on the `<li>`.
 - `src/applications.css` — `.row-head`, `.row-archive`, and the archived-row
@@ -138,10 +140,11 @@ Red-green-refactor per slice, back to front:
    `migrate()`, with its two tests.
 2. **Domain types and mapper.** `archived` on both `types.ts` copies,
    `ApplicationRow`, and `toApplication`. This turns every `Application`
-   fixture in the test suite into a type error — fix them in this step (7
+   fixture in the test suite into a type error — fix them in this step (8
    literals across `src/App.test.tsx`, `src/lib/sorting.test.ts`,
    `src/components/ApplicationList.test.tsx`,
-   `src/components/ApplicationsView.test.tsx`) by adding `archived: false`.
+   `src/components/ApplicationsView.test.tsx`, and
+   `src/components/ApplicationDetail.test.tsx`) by adding `archived: false`.
 3. **The endpoint**, with its route tests.
 4. **`setArchived` in `src/lib/api.ts`.**
 5. **The row button** in `ApplicationList`, with its tests, plus the CSS.
@@ -177,14 +180,17 @@ Red-green-refactor per slice, back to front:
   value.
 - `src/components/ApplicationsView.test.tsx` — archived applications are
   hidden on load and the checkbox starts unchecked; ticking it reveals them
-  mixed into the same list; unticking hides them again.
+  mixed into the same list; unticking hides them again; clicking Archive on a
+  row `PUT`s to the new endpoint.
 - `e2e/archive.spec.ts` — add an application, archive it from its row, it
   leaves the list; tick "Show archived", it's back; unarchive it; untick, and
   it stays.
 
 **Updated**
 
-- The four fixture files in work-order step 2 (`archived: false`).
+- The five fixture files in work-order step 2 (`archived: false`).
+- `src/components/ApplicationSort.test.tsx`'s existing renders, which now pass
+  the two new required props.
 
 **Verification command:** `npm test` — the gate. Then `npm run lint` and
 `npm run build`, and `npm run test:e2e` for the new spec.

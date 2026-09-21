@@ -8,6 +8,7 @@ import {
   deleteApplication,
   deleteAttachment,
   listApplications,
+  setArchived,
   updateApplication,
   uploadAttachment,
 } from '../lib/api.ts'
@@ -69,6 +70,13 @@ function useApplications(onUnauthorized: () => void) {
     }, 'Application deleted')
   }
 
+  async function handleSetArchived(id: number, archived: boolean) {
+    await run(async () => {
+      await setArchived(id, archived)
+      await reload()
+    }, archived ? 'Application archived' : 'Application unarchived')
+  }
+
   async function handleUploadAttachment(applicationId: number, file: File) {
     await run(async () => {
       await uploadAttachment(applicationId, file)
@@ -90,6 +98,7 @@ function useApplications(onUnauthorized: () => void) {
     handleAdd,
     handleUpdate,
     handleDelete,
+    handleSetArchived,
     handleUploadAttachment,
     handleRemoveAttachment,
   }
@@ -107,14 +116,18 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
     handleAdd,
     handleUpdate,
     handleDelete,
+    handleSetArchived,
     handleUploadAttachment,
     handleRemoveAttachment,
   } = useApplications(onUnauthorized)
   const [sort, setSort] = useState<Sort>({ field: 'createdAt', direction: 'desc' })
-  const sortedApplications = useMemo(
-    () => sortApplications(applications, sort),
-    [applications, sort],
-  )
+  const [showArchived, setShowArchived] = useState(false)
+  const visibleApplications = useMemo(() => {
+    const visible = showArchived
+      ? applications
+      : applications.filter((application) => !application.archived)
+    return sortApplications(visible, sort)
+  }, [applications, showArchived, sort])
 
   return (
     <div className="layout">
@@ -123,9 +136,14 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
         <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
       </section>
       <div>
-        <ApplicationSort sort={sort} onChange={setSort} />
+        <ApplicationSort
+          sort={sort}
+          onChange={setSort}
+          showArchived={showArchived}
+          onShowArchivedChange={setShowArchived}
+        />
         <ApplicationList
-          applications={sortedApplications}
+          applications={visibleApplications}
           expandedId={expandedId}
           onToggle={(id) =>
             setExpandedId((current) => (current === id ? null : id))
@@ -134,6 +152,7 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
           onDelete={handleDelete}
           onUploadAttachment={handleUploadAttachment}
           onRemoveAttachment={handleRemoveAttachment}
+          onSetArchived={handleSetArchived}
         />
       </div>
     </div>
