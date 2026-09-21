@@ -23,6 +23,6 @@ test('the server offers exactly the seven job-application tools', async () => {
     'get_application',
     'list_applications',
     'read_attachment',
-    'set_application_status',
+    'update_application',
   ])
 })

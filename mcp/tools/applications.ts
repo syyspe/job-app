@@ -8,19 +8,35 @@ import { jsonResult } from '../lib/results.ts'
 
 const idField = z.number().int().describe('The application id.')
 
-const statusField = z
-  .enum(STATUSES)
-  .describe(`Where the application stands: ${STATUSES.join(', ')}.`)
+const fields = {
+  company: z.string().describe('The company applied to.'),
+  role: z.string().describe('The role applied for.'),
+  dateApplied: z
+    .string()
+    .describe('The date the application was sent, YYYY-MM-DD. Only a draft may omit it.'),
+  deadline: z.string().describe('The application deadline, YYYY-MM-DD.'),
+  status: z.enum(STATUSES).describe(`Where the application stands: ${STATUSES.join(', ')}.`),
+  link: z.string().describe('A link to the posting.'),
+  notes: z.string().describe('Free-text notes.'),
+}
 
-function toInput(application: Application) {
+type ApplicationFields = Pick<
+  Application,
+  'company' | 'role' | 'dateApplied' | 'deadline' | 'status' | 'link' | 'notes'
+>
+
+function mergeInput(
+  existing: Application,
+  given: Partial<ApplicationFields>,
+): ApplicationFields {
   return {
-    company: application.company,
-    role: application.role,
-    dateApplied: application.dateApplied,
-    deadline: application.deadline,
-    status: application.status,
-    link: application.link,
-    notes: application.notes,
+    company: given.company ?? existing.company,
+    role: given.role ?? existing.role,
+    dateApplied: given.dateApplied ?? existing.dateApplied,
+    deadline: given.deadline ?? existing.deadline,
+    status: given.status ?? existing.status,
+    link: given.link ?? existing.link,
+    notes: given.notes ?? existing.notes,
   }
 }
 
@@ -61,16 +77,13 @@ function registerCreate(server: McpServer, client: ApiClient): void {
     {
       description: 'File a new job application.',
       inputSchema: {
-        company: z.string().describe('The company applied to.'),
-        role: z.string().describe('The role applied for.'),
-        dateApplied: z
-          .string()
-          .default('')
-          .describe('The date the application was sent, YYYY-MM-DD. Only a draft may omit it.'),
-        deadline: z.string().default('').describe('The application deadline, YYYY-MM-DD.'),
-        status: statusField.default('applied'),
-        link: z.string().default('').describe('A link to the posting.'),
-        notes: z.string().default('').describe('Free-text notes.'),
+        company: fields.company,
+        role: fields.role,
+        dateApplied: fields.dateApplied.default(''),
+        deadline: fields.deadline.default(''),
+        status: fields.status.default('applied'),
+        link: fields.link.default(''),
+        notes: fields.notes.default(''),
       },
     },
     async (input) => {
@@ -80,16 +93,27 @@ function registerCreate(server: McpServer, client: ApiClient): void {
   )
 }
 
-function registerSetStatus(server: McpServer, client: ApiClient): void {
+function registerUpdate(server: McpServer, client: ApiClient): void {
   server.registerTool(
-    'set_application_status',
+    'update_application',
     {
-      description: 'Move an application to another status, leaving its other fields alone.',
-      inputSchema: { id: idField, status: statusField },
+      description:
+        'Update a job application. Fields left out keep their current value; ' +
+        'an empty string clears an optional one.',
+      inputSchema: {
+        id: idField,
+        company: fields.company.optional(),
+        role: fields.role.optional(),
+        dateApplied: fields.dateApplied.optional(),
+        deadline: fields.deadline.optional(),
+        status: fields.status.optional(),
+        link: fields.link.optional(),
+        notes: fields.notes.optional(),
+      },
     },
-    async ({ id, status }) => {
+    async ({ id, ...given }) => {
       const existing = await fetchApplication(client, id)
-      const input = { ...toInput(existing), status }
+      const input = mergeInput(existing, given)
       checkDateApplied(input)
       return jsonResult(
         await client.sendJson<Application>('PUT', `/api/applications/${id}`, input),
@@ -123,6 +147,6 @@ export function registerApplicationTools(server: McpServer, client: ApiClient): 
   registerList(server, client)
   registerGet(server, client)
   registerCreate(server, client)
-  registerSetStatus(server, client)
+  registerUpdate(server, client)
   registerArchive(server, client)
 }
