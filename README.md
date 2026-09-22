@@ -66,16 +66,39 @@ existed, assign them to it:
 npm run seed
 ```
 
-There is no signup endpoint and no password-reset flow — accounts come from
-the seed script only, and it only ever creates the user once: if
-`SEED_USERNAME` already exists, re-running `npm run seed` after editing
-`.env` does not change its password. Get `SEED_USERNAME`/`SEED_PASSWORD`
-right in `.env` before the first run against a given database.
+There is no signup endpoint — the first account comes from the seed script
+only, and it only ever creates the user once: if `SEED_USERNAME` already
+exists, re-running `npm run seed` after editing `.env` does not change its
+password. Get `SEED_USERNAME`/`SEED_PASSWORD` right in `.env` before the
+first run against a given database.
+
+What every run does change is the role: `npm run seed` makes that user an
+admin, whether it just created it or found it already there. That is the only
+way an admin comes into being — the migration that adds the `role` column
+gives every existing user `basic` and promotes nobody. After pulling a build
+with roles in it, run `npm run seed` once or the database has no admin.
 
 Schema migrations are not the seed script's job — `openDatabase` runs them
 every time the database is opened, so any entry point (the server, the seed
 CLI, tests) gets a current schema. `npm run seed` is only about the seed user
 and pre-auth applications.
+
+### The Admin page
+
+An admin sees an **Admin** control in the nav bar; a basic user does not, and
+`/api/users` answers them `403` whatever they do. On that page an admin can
+add a user, switch anyone between admin and basic, reset a password, and
+delete an account. Two things the server refuses: deleting yourself, and
+demoting the last admin — so there is always an admin, and always someone
+holding the session that could promote another.
+
+Deleting a user is permanent and takes their applications and uploaded files
+with it. Applications stay strictly per-user regardless: no admin sees
+another person's applications anywhere in the app.
+
+There is no self-service password reset. A forgotten password is an admin's
+job on this page; if the forgotten password *is* the last admin's, re-run
+`npm run seed` with that user's `SEED_USERNAME` and a new `SEED_PASSWORD`.
 
 ### Development
 

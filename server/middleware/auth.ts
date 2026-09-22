@@ -28,3 +28,18 @@ export function requireSession(db: Database.Database) {
     next()
   }
 }
+
+export function requireAdmin(db: Database.Database) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const user = db
+      .prepare('SELECT role FROM users WHERE id = ?')
+      .get(req.userId) as { role: string }
+
+    if (user.role !== 'admin') {
+      res.status(403).json({ error: 'forbidden' })
+      return
+    }
+
+    next()
+  }
+}

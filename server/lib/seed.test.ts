@@ -106,3 +106,24 @@ test('seeding twice does not create a second user', () => {
   const count = db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }
   expect(count.n).toBe(1)
 })
+
+test('seeding a fresh user makes it an admin', () => {
+  const userId = seedUser(db, 'testuser', 'test-password')
+
+  const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as {
+    role: string
+  }
+  expect(user.role).toBe('admin')
+})
+
+test('re-seeding an existing user promotes it to admin', () => {
+  const userId = seedUser(db, 'testuser', 'test-password')
+  db.prepare(`UPDATE users SET role = 'basic' WHERE id = ?`).run(userId)
+
+  seedUser(db, 'testuser', 'test-password')
+
+  const user = db.prepare('SELECT role FROM users WHERE id = ?').get(userId) as {
+    role: string
+  }
+  expect(user.role).toBe('admin')
+})

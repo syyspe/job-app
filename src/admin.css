@@ -1,0 +1,82 @@
+/* The admin surface: the user rows, the role control, and the clusters that
+   confirm a destructive change. Every value is a token from index.css. */
+
+.user-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.user-item {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-3) var(--s-4) var(--s-3) var(--s-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+/* The spine the application rows use, carrying role instead of status. */
+.user-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--line-strong);
+}
+
+.user-item[data-role='admin']::before {
+  background: var(--accent);
+}
+
+.user-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.user-name {
+  font-weight: 600;
+}
+
+.user-role select {
+  font: inherit;
+  padding: var(--s-1) var(--s-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.user-actions,
+.user-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.user-confirm {
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+}
+
+/* A form, so it arrives as a column from App.css — the row is the point. */
+.user-reset {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--s-2);
+}
+
+.user-reset label {
+  flex: 1 1 200px;
+}

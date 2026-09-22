@@ -71,6 +71,9 @@ test('/me returns the user with the cookie and 401 without', async () => {
 
   const withCookie = await fetch(`${baseUrl}/api/me`, { headers: { Cookie: cookie } })
   expect(withCookie.status).toBe(200)
+  const user = (await withCookie.json()) as User
+  expect(user.username).toBe('testuser')
+  expect(user.role).toBe('basic')
 
   const withoutCookie = await fetch(`${baseUrl}/api/me`)
   expect(withoutCookie.status).toBe(401)

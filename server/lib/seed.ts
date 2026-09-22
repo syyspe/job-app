@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3'
 import { hashPassword } from './passwords.ts'
 import type { UserRow } from '../models/user.ts'
+import { setUserRole } from './users.ts'
 
 export function createUser(db: Database.Database, username: string, password: string): number {
   const result = db
@@ -9,12 +10,14 @@ export function createUser(db: Database.Database, username: string, password: st
   return Number(result.lastInsertRowid)
 }
 
+/** The seeded user is the way an admin comes into being — every run grants it. */
 export function seedUser(db: Database.Database, username: string, password: string): number {
   const existing = db
     .prepare('SELECT * FROM users WHERE username = ?')
     .get(username) as UserRow | undefined
-  if (existing) return existing.id
-  return createUser(db, username, password)
+  const id = existing ? existing.id : createUser(db, username, password)
+  setUserRole(db, id, 'admin')
+  return id
 }
 
 export function migrateApplicationsToUser(db: Database.Database, userId: number): void {

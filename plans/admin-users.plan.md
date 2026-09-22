@@ -74,8 +74,13 @@ The brief's three open questions are settled:
     when the id is unknown.
   - `DELETE /users/:id` → the cascade, below.
 - `server/app.ts` — mount after `requireSession`, so the mount order still
-  reads as the whole protection story:
-  `app.use('/api', requireAdmin(db), createUsersRouter(db, uploadsDir))`.
+  reads as the whole protection story. Two lines rather than the one this plan
+  first called for, because `app.use('/api', requireAdmin(db), router)` would
+  run the admin check over *every* `/api` request that reached it — correct
+  only as long as the users router stays mounted last:
+  `app.use('/api/users', requireAdmin(db))` then
+  `app.use('/api', createUsersRouter(db, uploadsDir))`, which scopes the check
+  to the user routes whatever the order.
 - `server/routes/auth.ts` — nothing to change: `/me` returns `toUser(row)`,
   which now carries the role.
 
@@ -112,7 +117,12 @@ CASCADE`:
   `reload()`, one handler per action. Layout uses the existing `.layout` grid:
   create panel left, list right.
 - `src/components/UserForm.tsx` (new) — username, password, role `<select>`,
-  submit. Same markup idiom as `LoginForm`/`ApplicationForm`.
+  submit. Same markup idiom as `LoginForm`/`ApplicationForm`. It takes a
+  `UserInput` (added to `src/types.ts` beside `ApplicationInput`, mirroring
+  the server's copy in `lib/validation.ts`), which `api.ts`'s `createUser`
+  takes too.
+- `src/lib/roles.ts` (new) — `ROLE_LABELS`, the capitalised label per `Role`,
+  exactly as `status.ts` does for `Status`. Both the form and the row need it.
 - `src/components/UserList.tsx` (new) — `<ul>` of `UserRow`s, plus the empty
   state.
 - `src/components/UserRow.tsx` (new) — one row: username, role `<select>`,
@@ -127,7 +137,9 @@ CASCADE`:
   logout. `AdminView` takes the same `onUnauthorized={() => setUser(null)}`.
 - `src/admin.css` (new), imported in `App.tsx` beside `applications.css` — owns
   the admin surface only (user rows, the role control, the confirm cluster),
-  reading tokens from `index.css`. **Read the `frontend-design` skill before
+  reading tokens from `index.css`. The one exception is `.button-danger`, a
+  general button modifier, which goes in `index.css` beside `.button-primary`
+  because that file owns `.button`. **Read the `frontend-design` skill before
   writing this file and the markup it styles**; invent no values.
 
 ### Docs
