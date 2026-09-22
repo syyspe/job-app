@@ -22,6 +22,25 @@ const sampleApplications: Application[] = [
   },
 ]
 
+interface StubOptions {
+  pageSize?: number
+  post?: () => Response
+}
+
+// Every test needs /api/config answered as well as /api/applications, so the
+// stub routes by URL rather than returning the same body to everything.
+function stubFetch(applications: Application[], { pageSize = 10, post }: StubOptions = {}) {
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === 'POST' && post) return post()
+    if (String(input) === '/api/config') {
+      return new Response(JSON.stringify({ pageSize }), { status: 200 })
+    }
+    return new Response(JSON.stringify(applications), { status: 200 })
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
 function renderView(onUnauthorized = vi.fn()) {
   render(
     <ToastProvider>
@@ -35,13 +54,7 @@ afterEach(() => {
 })
 
 test('loads and renders applications from the API', async () => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(
-      async () =>
-        new Response(JSON.stringify(sampleApplications), { status: 200 }),
-    ),
-  )
+  stubFetch(sampleApplications)
   renderView()
   expect(
     await screen.findByRole('button', { name: /Acme/ }),
@@ -54,10 +67,7 @@ test('renders newest-created applications first on mount', async () => {
     { ...sampleApplications[0], id: 2, company: 'Globex', createdAt: '2026-03-01 09:00:00' },
     { ...sampleApplications[0], id: 3, company: 'Initech', createdAt: '2026-02-01 09:00:00' },
   ]
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => new Response(JSON.stringify(outOfOrder), { status: 200 })),
-  )
+  stubFetch(outOfOrder)
   renderView()
 
   await screen.findByRole('button', { name: /Acme/ })
@@ -96,14 +106,9 @@ async function addApplication(user: ReturnType<typeof userEvent.setup>) {
 
 test('a successful add shows a success toast', async () => {
   const user = userEvent.setup()
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
-      init?.method === 'POST'
-        ? new Response(JSON.stringify(sampleApplications[0]), { status: 201 })
-        : new Response(JSON.stringify(sampleApplications), { status: 200 }),
-    ),
-  )
+  stubFetch(sampleApplications, {
+    post: () => new Response(JSON.stringify(sampleApplications[0]), { status: 201 }),
+  })
   renderView()
   await screen.findByRole('button', { name: /Acme/ })
 
@@ -114,16 +119,10 @@ test('a successful add shows a success toast', async () => {
 
 test('a failed add shows the server error message', async () => {
   const user = userEvent.setup()
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
-      init?.method === 'POST'
-        ? new Response(JSON.stringify({ error: 'Company is required' }), {
-            status: 400,
-          })
-        : new Response(JSON.stringify(sampleApplications), { status: 200 }),
-    ),
-  )
+  stubFetch(sampleApplications, {
+    post: () =>
+      new Response(JSON.stringify({ error: 'Company is required' }), { status: 400 }),
+  })
   renderView()
   await screen.findByRole('button', { name: /Acme/ })
 
@@ -141,10 +140,7 @@ const mixedApplications: Application[] = [
 
 test('archived applications stay hidden until the toggle reveals them', async () => {
   const user = userEvent.setup()
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => new Response(JSON.stringify(mixedApplications), { status: 200 })),
-  )
+  stubFetch(mixedApplications)
   renderView()
   await screen.findByRole('button', { name: /Acme/ })
 
@@ -160,10 +156,7 @@ test('archived applications stay hidden until the toggle reveals them', async ()
 })
 
 test('with nothing archived there is no archived toggle at all', async () => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => new Response(JSON.stringify(sampleApplications), { status: 200 })),
-  )
+  stubFetch(sampleApplications)
   renderView()
   await screen.findByRole('button', { name: /Acme/ })
 
@@ -176,10 +169,7 @@ test('with every application archived the surface says so and offers to reveal t
     ...application,
     archived: true,
   }))
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => new Response(JSON.stringify(allArchived), { status: 200 })),
-  )
+  stubFetch(allArchived)
   renderView()
 
   expect(await screen.findByText('Nothing to show')).toBeVisible()
@@ -192,10 +182,7 @@ test('with every application archived the surface says so and offers to reveal t
 
 test('archiving a row asks the API to archive it', async () => {
   const user = userEvent.setup()
-  const fetchMock = vi.fn(
-    async () => new Response(JSON.stringify(mixedApplications), { status: 200 }),
-  )
-  vi.stubGlobal('fetch', fetchMock)
+  const fetchMock = stubFetch(mixedApplications)
   renderView()
   const row = await screen.findByRole('button', { name: /Acme/ })
 
@@ -206,4 +193,87 @@ test('archiving a row asks the API to archive it', async () => {
     '/api/applications/1/archived',
     expect.objectContaining({ method: 'PUT', body: JSON.stringify({ archived: true }) }),
   )
+})
+
+// Created oldest-first, so under the default sort Company 5 is the top row.
+function makeApplications(count: number): Application[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...sampleApplications[0],
+    id: index + 1,
+    company: `Company ${index + 1}`,
+    createdAt: `2026-01-0${index + 1} 09:00:00`,
+  }))
+}
+
+async function goToPageTwo(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+  expect(screen.getByText('Page 2 of 3')).toBeVisible()
+}
+
+test('a list longer than a page renders one page at a time', async () => {
+  const user = userEvent.setup()
+  stubFetch(makeApplications(5), { pageSize: 2 })
+  renderView()
+
+  await screen.findByRole('button', { name: /Company 5/ })
+  expect(screen.getByRole('button', { name: /Company 4/ })).toBeVisible()
+  expect(screen.queryByRole('button', { name: /Company 3/ })).not.toBeInTheDocument()
+  expect(screen.getByText('Page 1 of 3')).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+
+  expect(screen.getByRole('button', { name: /Company 3/ })).toBeVisible()
+  expect(screen.queryByRole('button', { name: /Company 5/ })).not.toBeInTheDocument()
+})
+
+test('a list that fits on one page has no pager', async () => {
+  stubFetch(makeApplications(2), { pageSize: 2 })
+  renderView()
+
+  await screen.findByRole('button', { name: /Company 2/ })
+  expect(screen.queryByRole('navigation', { name: 'Application pages' })).not.toBeInTheDocument()
+})
+
+test('changing the sort returns to page 1', async () => {
+  const user = userEvent.setup()
+  stubFetch(makeApplications(5), { pageSize: 2 })
+  renderView()
+  await screen.findByRole('button', { name: /Company 5/ })
+
+  await goToPageTwo(user)
+  await user.click(screen.getByRole('button', { name: 'Sort oldest first' }))
+
+  expect(screen.getByText('Page 1 of 3')).toBeVisible()
+  expect(screen.getByRole('button', { name: /Company 1/ })).toBeVisible()
+})
+
+test('revealing the archived applications returns to page 1 and counts them all', async () => {
+  const user = userEvent.setup()
+  const applications = makeApplications(6)
+  applications[0] = { ...applications[0], archived: true }
+  stubFetch(applications, { pageSize: 2 })
+  renderView()
+  await screen.findByRole('button', { name: /Company 6/ })
+
+  await goToPageTwo(user)
+  // Company 1 is archived and sorts last, so the count spans more than this page.
+  await user.click(screen.getByRole('button', { name: 'Show 1 archived' }))
+
+  expect(screen.getByText('Page 1 of 3')).toBeVisible()
+})
+
+test('adding an application returns to page 1', async () => {
+  const user = userEvent.setup()
+  const applications = makeApplications(5)
+  stubFetch(applications, {
+    pageSize: 2,
+    post: () => new Response(JSON.stringify(applications[0]), { status: 201 }),
+  })
+  renderView()
+  await screen.findByRole('button', { name: /Company 5/ })
+
+  await goToPageTwo(user)
+  await addApplication(user)
+
+  expect(await screen.findByText('Page 1 of 3')).toBeVisible()
 })

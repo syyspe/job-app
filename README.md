@@ -54,6 +54,14 @@ default, so it fails fast at startup if either is missing:
 - `UPLOADS_DIR` — full path to the uploads directory
 - `SEED_USERNAME` / `SEED_PASSWORD` — the login `npm run seed` creates
 
+Two more are optional:
+
+- `PORT` — the port the API listens on (default 3001)
+- `PAGE_SIZE` — how many applications one page of the list shows (default 7).
+  The client asks the API for it, so changing it needs a server restart only —
+  no rebuild. Anything that isn't a whole number of at least 1 fails at
+  startup.
+
 Copy `.env.example` to `.env`, fill in real paths, and pick your own
 `SEED_USERNAME`/`SEED_PASSWORD` — do this before either mode below.
 

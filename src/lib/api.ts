@@ -1,4 +1,5 @@
 import type {
+  AppConfig,
   Application,
   ApplicationInput,
   Attachment,
@@ -94,6 +95,11 @@ export async function deleteUser(id: number): Promise<void> {
       credentials: 'same-origin',
     }),
   )
+}
+
+export async function getConfig(): Promise<AppConfig> {
+  const response = await fetch('/api/config', { credentials: 'same-origin' })
+  return parseJson(response)
 }
 
 export async function listApplications(): Promise<Application[]> {

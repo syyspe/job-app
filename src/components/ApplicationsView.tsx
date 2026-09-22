@@ -3,16 +3,19 @@ import { ApplicationForm } from './ApplicationForm.tsx'
 import { ApplicationList } from './ApplicationList.tsx'
 import { ApplicationSort } from './ApplicationSort.tsx'
 import { ArchivedToggle } from './ArchivedToggle.tsx'
+import { Pagination } from './Pagination.tsx'
 import {
   UnauthorizedError,
   createApplication,
   deleteApplication,
   deleteAttachment,
+  getConfig,
   listApplications,
   setArchived,
   updateApplication,
   uploadAttachment,
 } from '../lib/api.ts'
+import { paginate } from '../lib/paging.ts'
 import { sortApplications } from '../lib/sorting.ts'
 import { useToast } from '../lib/toast.ts'
 import type { Sort } from '../lib/sorting.ts'
@@ -20,6 +23,7 @@ import type { Application, ApplicationInput } from '../types.ts'
 
 function useApplications(onUnauthorized: () => void) {
   const [applications, setApplications] = useState<Application[]>([])
+  const [pageSize, setPageSize] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const { showSuccess, showError } = useToast()
 
@@ -44,9 +48,15 @@ function useApplications(onUnauthorized: () => void) {
     setApplications(await listApplications())
   }
 
+  async function load() {
+    const [config, list] = await Promise.all([getConfig(), listApplications()])
+    setPageSize(config.pageSize)
+    setApplications(list)
+  }
+
   useEffect(() => {
-    // eslint-disable-next-line react/set-state-in-effect -- reload() sets state after an await, not synchronously
-    void run(reload)
+    // eslint-disable-next-line react/set-state-in-effect -- load() sets state after an await, not synchronously
+    void run(load)
   }, [run])
 
   async function handleAdd(input: ApplicationInput) {
@@ -94,6 +104,7 @@ function useApplications(onUnauthorized: () => void) {
 
   return {
     applications,
+    pageSize,
     expandedId,
     setExpandedId,
     handleAdd,
@@ -112,6 +123,7 @@ interface ApplicationsViewProps {
 export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
   const {
     applications,
+    pageSize,
     expandedId,
     setExpandedId,
     handleAdd,
@@ -123,6 +135,7 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
   } = useApplications(onUnauthorized)
   const [sort, setSort] = useState<Sort>({ field: 'createdAt', direction: 'desc' })
   const [showArchived, setShowArchived] = useState(false)
+  const [page, setPage] = useState(1)
   const archivedCount = useMemo(
     () => applications.filter((application) => application.archived).length,
     [applications],
@@ -133,17 +146,33 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
       : applications.filter((application) => !application.archived)
     return sortApplications(visible, sort)
   }, [applications, showArchived, sort])
+  const { items: pageApplications, page: currentPage, pageCount } = useMemo(
+    () => paginate(visibleApplications, page, pageSize),
+    [visibleApplications, page, pageSize],
+  )
 
   return (
     <div className="layout">
       <section className="panel">
         <h2>Add an application</h2>
-        <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
+        <ApplicationForm
+          submitLabel="Add application"
+          onSubmit={async (input) => {
+            await handleAdd(input)
+            setPage(1)
+          }}
+        />
       </section>
       <div>
-        <ApplicationSort sort={sort} onChange={setSort} />
+        <ApplicationSort
+          sort={sort}
+          onChange={(next) => {
+            setSort(next)
+            setPage(1)
+          }}
+        />
         <ApplicationList
-          applications={visibleApplications}
+          applications={pageApplications}
           expandedId={expandedId}
           onToggle={(id) =>
             setExpandedId((current) => (current === id ? null : id))
@@ -155,10 +184,14 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
           onSetArchived={handleSetArchived}
           hiddenArchivedCount={showArchived ? 0 : archivedCount}
         />
+        <Pagination page={currentPage} pageCount={pageCount} onChange={setPage} />
         <ArchivedToggle
           count={archivedCount}
           showArchived={showArchived}
-          onChange={setShowArchived}
+          onChange={(next) => {
+            setShowArchived(next)
+            setPage(1)
+          }}
         />
       </div>
     </div>

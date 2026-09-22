@@ -43,6 +43,9 @@ function stubFetch(meStatus: number, me: User = sampleUser) {
           status: 401,
         })
       }
+      if (url.endsWith('/api/config')) {
+        return new Response(JSON.stringify({ pageSize: 7 }), { status: 200 })
+      }
       if (url.endsWith('/api/applications')) {
         return new Response(JSON.stringify(sampleApplications), { status: 200 })
       }

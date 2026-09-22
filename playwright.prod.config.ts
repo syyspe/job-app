@@ -19,6 +19,8 @@ export default defineConfig({
       PORT: String(port),
       DB_PATH: join(dataDir, 'app.db'),
       UPLOADS_DIR: join(dataDir, 'uploads'),
+      // Small enough that the e2e specs can page a list they can build by hand.
+      PAGE_SIZE: '3',
       SEED_USERNAME: TEST_USERNAME,
       SEED_PASSWORD: TEST_PASSWORD,
     },
