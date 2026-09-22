@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
+import type { ComponentProps } from 'react'
 import { ApplicationDetail } from './ApplicationDetail'
 import type { Application } from '../types'
 
@@ -27,8 +28,10 @@ const application: Application = {
   ],
 }
 
-test('buttons appear in order: Remove file, Save, Archive, Delete application', () => {
-  render(
+type DetailProps = ComponentProps<typeof ApplicationDetail>
+
+function renderDetail(overrides: Partial<DetailProps> = {}) {
+  return render(
     <ApplicationDetail
       application={application}
       onUpdate={vi.fn()}
@@ -36,8 +39,13 @@ test('buttons appear in order: Remove file, Save, Archive, Delete application', 
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      {...overrides}
     />,
   )
+}
+
+test('buttons appear in order: Remove file, Save, Archive, Delete application', () => {
+  renderDetail()
 
   const buttons = screen.getAllByRole('button').map((button) => button.textContent)
   expect(buttons).toEqual([
@@ -48,49 +56,24 @@ test('buttons appear in order: Remove file, Save, Archive, Delete application', 
   ])
 })
 
-test('Save and Delete share a parent element', () => {
-  render(
-    <ApplicationDetail
-      application={application}
-      onUpdate={vi.fn()}
-      onDelete={vi.fn()}
-      onUploadAttachment={vi.fn()}
-      onRemoveAttachment={vi.fn()}
-      onSetArchived={vi.fn()}
-    />,
-  )
+test('Save, Archive and Delete share a parent element', () => {
+  renderDetail()
 
   const save = screen.getByRole('button', { name: 'Save' })
+  const archive = screen.getByRole('button', { name: 'Archive' })
   const remove = screen.getByRole('button', { name: 'Delete application' })
-  expect(save.parentElement).toBe(remove.parentElement)
+  expect(archive.parentElement).toBe(save.parentElement)
+  expect(remove.parentElement).toBe(save.parentElement)
 })
 
 test('the file picker is present and labelled', () => {
-  render(
-    <ApplicationDetail
-      application={application}
-      onUpdate={vi.fn()}
-      onDelete={vi.fn()}
-      onUploadAttachment={vi.fn()}
-      onRemoveAttachment={vi.fn()}
-      onSetArchived={vi.fn()}
-    />,
-  )
+  renderDetail()
 
   expect(screen.getByLabelText('Attach a file')).toBeInTheDocument()
 })
 
 test('renders both timestamps read-only with no input for either', () => {
-  render(
-    <ApplicationDetail
-      application={application}
-      onUpdate={vi.fn()}
-      onDelete={vi.fn()}
-      onUploadAttachment={vi.fn()}
-      onRemoveAttachment={vi.fn()}
-      onSetArchived={vi.fn()}
-    />,
-  )
+  renderDetail()
 
   expect(screen.getByText('Created 15 Jan 2026, 09:00')).toBeVisible()
   expect(screen.getByText('Updated 16 Jan 2026, 10:30')).toBeVisible()
@@ -101,16 +84,7 @@ test('renders both timestamps read-only with no input for either', () => {
 test('clicking Archive reports the opposite of the archived flag', async () => {
   const user = userEvent.setup()
   const onSetArchived = vi.fn()
-  render(
-    <ApplicationDetail
-      application={application}
-      onUpdate={vi.fn()}
-      onDelete={vi.fn()}
-      onUploadAttachment={vi.fn()}
-      onRemoveAttachment={vi.fn()}
-      onSetArchived={onSetArchived}
-    />,
-  )
+  renderDetail({ onSetArchived })
 
   await user.click(screen.getByRole('button', { name: 'Archive' }))
   expect(onSetArchived).toHaveBeenCalledWith(true)
@@ -119,16 +93,7 @@ test('clicking Archive reports the opposite of the archived flag', async () => {
 test('an archived application offers Unarchive', async () => {
   const user = userEvent.setup()
   const onSetArchived = vi.fn()
-  render(
-    <ApplicationDetail
-      application={{ ...application, archived: true }}
-      onUpdate={vi.fn()}
-      onDelete={vi.fn()}
-      onUploadAttachment={vi.fn()}
-      onRemoveAttachment={vi.fn()}
-      onSetArchived={onSetArchived}
-    />,
-  )
+  renderDetail({ application: { ...application, archived: true }, onSetArchived })
 
   await user.click(screen.getByRole('button', { name: 'Unarchive' }))
   expect(onSetArchived).toHaveBeenCalledWith(false)

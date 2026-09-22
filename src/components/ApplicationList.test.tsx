@@ -164,35 +164,30 @@ const withArchived: Application[] = [
   { ...applications[1], archived: true },
 ]
 
-test('an expanded row offers Archive, an expanded archived row Unarchive', () => {
-  const { rerender } = render(
+// Only the expanded row renders an archive control, and expandedId holds a
+// single id, so reaching both rows' controls means a rerender.
+function expandedList(expandedId: number, onSetArchived = vi.fn()) {
+  return (
     <ApplicationList
       applications={withArchived}
-      expandedId={1}
+      expandedId={expandedId}
       onToggle={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
-      onSetArchived={vi.fn()}
-    />,
+      onSetArchived={onSetArchived}
+    />
   )
+}
+
+test('an expanded row offers Archive, an expanded archived row Unarchive', () => {
+  const { rerender } = render(expandedList(1))
 
   const [active] = screen.getAllByRole('listitem')
   expect(within(active).getByRole('button', { name: 'Archive' })).toBeVisible()
 
-  rerender(
-    <ApplicationList
-      applications={withArchived}
-      expandedId={2}
-      onToggle={vi.fn()}
-      onUpdate={vi.fn()}
-      onDelete={vi.fn()}
-      onUploadAttachment={vi.fn()}
-      onRemoveAttachment={vi.fn()}
-      onSetArchived={vi.fn()}
-    />,
-  )
+  rerender(expandedList(2))
 
   const [, archived] = screen.getAllByRole('listitem')
   expect(within(archived).getByRole('button', { name: 'Unarchive' })).toBeVisible()
@@ -201,34 +196,12 @@ test('an expanded row offers Archive, an expanded archived row Unarchive', () =>
 test('clicking the archive button reports the opposite of the row flag', async () => {
   const user = userEvent.setup()
   const onSetArchived = vi.fn()
-  const { rerender } = render(
-    <ApplicationList
-      applications={withArchived}
-      expandedId={1}
-      onToggle={vi.fn()}
-      onUpdate={vi.fn()}
-      onDelete={vi.fn()}
-      onUploadAttachment={vi.fn()}
-      onRemoveAttachment={vi.fn()}
-      onSetArchived={onSetArchived}
-    />,
-  )
+  const { rerender } = render(expandedList(1, onSetArchived))
 
   await user.click(screen.getByRole('button', { name: 'Archive' }))
   expect(onSetArchived).toHaveBeenCalledWith(1, true)
 
-  rerender(
-    <ApplicationList
-      applications={withArchived}
-      expandedId={2}
-      onToggle={vi.fn()}
-      onUpdate={vi.fn()}
-      onDelete={vi.fn()}
-      onUploadAttachment={vi.fn()}
-      onRemoveAttachment={vi.fn()}
-      onSetArchived={onSetArchived}
-    />,
-  )
+  rerender(expandedList(2, onSetArchived))
 
   await user.click(screen.getByRole('button', { name: 'Unarchive' }))
   expect(onSetArchived).toHaveBeenCalledWith(2, false)
