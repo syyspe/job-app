@@ -65,12 +65,13 @@ with no `failed` line. Playwright: `N passed`.
   state; `admin.css` owns the admin surface — user rows, the role spine and
   control, the confirm clusters. New rules read tokens from `index.css` rather
   than inventing values.
-  - `src/components/` — ten presentational components, each with a test
+  - `src/components/` — eleven presentational components, each with a test
     beside it: `LoginForm` for the login screen, `ApplicationsView` (with its
-    local `useApplications` hook) for the applications UI, `AdminView` (with
-    its local `useUsers` hook) plus `UserForm`/`UserList`/`UserRow` for the
-    admin page, and the original four. `NavBar` switches between the two views
-    and shows the Admin control to admins only.
+    local `useApplications` hook) for the applications UI and `ArchivedToggle`
+    at the foot of its list, `AdminView` (with its local `useUsers` hook) plus
+    `UserForm`/`UserList`/`UserRow` for the admin page, and the original four.
+    `NavBar` switches between the two views and shows the Admin control to
+    admins only.
   - `src/lib/api.ts` — every `fetch` against `/api`. Components don't call
     `fetch` themselves. Sends `credentials: 'same-origin'` on every call and
     throws `UnauthorizedError` on a 401.

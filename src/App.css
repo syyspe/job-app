@@ -103,13 +103,9 @@ form textarea {
 .sort-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--s-4);
+  gap: var(--s-3);
   align-items: center;
   margin-bottom: var(--s-4);
-  padding: var(--s-2) var(--s-3);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
   font-size: var(--fs-sm);
   color: var(--ink-muted);
 }
@@ -128,20 +124,6 @@ form textarea {
   border-radius: var(--r-sm);
   background: var(--surface);
   color: var(--ink);
-}
-
-.sort-bar fieldset {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s-3);
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-
-.sort-bar legend {
-  padding: 0;
-  font-weight: 500;
 }
 
 .toast-stack {

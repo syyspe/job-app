@@ -3,7 +3,20 @@ import { formatDate } from '../lib/dates.ts'
 import { STATUS_LABELS } from '../lib/status.ts'
 import type { Application, ApplicationInput } from '../types.ts'
 
-function EmptyState() {
+function EmptyState({ hiddenArchivedCount }: { hiddenArchivedCount: number }) {
+  if (hiddenArchivedCount > 0) {
+    return (
+      <div className="empty-state">
+        <p className="empty-state-title">Nothing to show</p>
+        <p>
+          {hiddenArchivedCount === 1
+            ? '1 archived application is hidden.'
+            : `${hiddenArchivedCount} archived applications are hidden.`}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="empty-state">
       <p className="empty-state-title">Nothing tracked yet</p>
@@ -77,6 +90,7 @@ interface ApplicationListProps {
   onUploadAttachment: (applicationId: number, file: File) => void
   onRemoveAttachment: (attachmentId: number) => void
   onSetArchived: (id: number, archived: boolean) => void
+  hiddenArchivedCount: number
 }
 
 export function ApplicationList({
@@ -88,9 +102,10 @@ export function ApplicationList({
   onUploadAttachment,
   onRemoveAttachment,
   onSetArchived,
+  hiddenArchivedCount,
 }: ApplicationListProps) {
   if (applications.length === 0) {
-    return <EmptyState />
+    return <EmptyState hiddenArchivedCount={hiddenArchivedCount} />
   }
 
   return (

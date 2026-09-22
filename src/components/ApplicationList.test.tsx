@@ -46,6 +46,7 @@ test('renders a row for each application', () => {
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      hiddenArchivedCount={0}
     />,
   )
 
@@ -64,6 +65,7 @@ test('shows a due date suffix only when the application has a deadline', () => {
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      hiddenArchivedCount={0}
     />,
   )
 
@@ -84,6 +86,7 @@ test('the collapsed list shows no detail panel', () => {
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      hiddenArchivedCount={0}
     />,
   )
 
@@ -105,6 +108,7 @@ test('the expanded row shows its detail panel and reports a delete', async () =>
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      hiddenArchivedCount={0}
     />,
   )
 
@@ -126,6 +130,7 @@ test('each row reports whether it is expanded', () => {
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      hiddenArchivedCount={0}
     />,
   )
 
@@ -150,6 +155,7 @@ test('the empty state names the app and points at the form', () => {
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      hiddenArchivedCount={0}
     />,
   )
 
@@ -177,6 +183,7 @@ function expandedList(expandedId: number, onSetArchived = vi.fn()) {
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={onSetArchived}
+      hiddenArchivedCount={0}
     />
   )
 }
@@ -218,10 +225,49 @@ test('an archived row is marked as archived', () => {
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      hiddenArchivedCount={0}
     />,
   )
 
   const [active, archived] = screen.getAllByRole('listitem')
   expect(active).toHaveAttribute('data-archived', 'false')
   expect(archived).toHaveAttribute('data-archived', 'true')
+})
+
+test('an empty list with archived applications hidden says so instead', () => {
+  render(
+    <ApplicationList
+      applications={[]}
+      expandedId={null}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
+      hiddenArchivedCount={2}
+    />,
+  )
+
+  expect(screen.getByText('Nothing to show')).toBeVisible()
+  expect(screen.getByText('2 archived applications are hidden.')).toBeVisible()
+  expect(screen.queryByText('Nothing tracked yet')).not.toBeInTheDocument()
+})
+
+test('the hidden-archived line reads as a singular for one application', () => {
+  render(
+    <ApplicationList
+      applications={[]}
+      expandedId={null}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
+      hiddenArchivedCount={1}
+    />,
+  )
+
+  expect(screen.getByText('1 archived application is hidden.')).toBeVisible()
 })

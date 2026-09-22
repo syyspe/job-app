@@ -139,7 +139,7 @@ const mixedApplications: Application[] = [
   { ...sampleApplications[0], id: 2, company: 'Globex', archived: true },
 ]
 
-test('archived applications stay hidden until the checkbox is ticked', async () => {
+test('archived applications stay hidden until the toggle reveals them', async () => {
   const user = userEvent.setup()
   vi.stubGlobal(
     'fetch',
@@ -148,16 +148,46 @@ test('archived applications stay hidden until the checkbox is ticked', async () 
   renderView()
   await screen.findByRole('button', { name: /Acme/ })
 
-  const checkbox = screen.getByRole('checkbox', { name: 'Show archived' })
-  expect(checkbox).not.toBeChecked()
   expect(screen.queryByRole('button', { name: /Globex/ })).not.toBeInTheDocument()
 
-  await user.click(checkbox)
+  // The toggle's name changes with its state, so each click needs a fresh query.
+  await user.click(screen.getByRole('button', { name: 'Show 1 archived' }))
   expect(screen.getByRole('button', { name: /Globex/ })).toBeVisible()
   expect(screen.getByRole('button', { name: /Acme/ })).toBeVisible()
 
-  await user.click(checkbox)
+  await user.click(screen.getByRole('button', { name: 'Hide archived' }))
   expect(screen.queryByRole('button', { name: /Globex/ })).not.toBeInTheDocument()
+})
+
+test('with nothing archived there is no archived toggle at all', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify(sampleApplications), { status: 200 })),
+  )
+  renderView()
+  await screen.findByRole('button', { name: /Acme/ })
+
+  expect(screen.queryByRole('button', { name: /archived$/ })).not.toBeInTheDocument()
+})
+
+test('with every application archived the surface says so and offers to reveal them', async () => {
+  const user = userEvent.setup()
+  const allArchived = mixedApplications.map((application) => ({
+    ...application,
+    archived: true,
+  }))
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify(allArchived), { status: 200 })),
+  )
+  renderView()
+
+  expect(await screen.findByText('Nothing to show')).toBeVisible()
+  expect(screen.getByText('2 archived applications are hidden.')).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Show 2 archived' }))
+  expect(screen.getByRole('button', { name: /Acme/ })).toBeVisible()
+  expect(screen.getByRole('button', { name: /Globex/ })).toBeVisible()
 })
 
 test('archiving a row asks the API to archive it', async () => {

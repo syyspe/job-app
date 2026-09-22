@@ -4,116 +4,49 @@ import { expect, test, vi } from 'vitest'
 import { ApplicationSort } from './ApplicationSort'
 import type { Sort } from '../lib/sorting'
 
-test('the select and the direction radios have accessible names', () => {
+test('the select has an accessible name and shows the field in effect', () => {
   const sort: Sort = { field: 'createdAt', direction: 'desc' }
-  render(
-    <ApplicationSort
-      sort={sort}
-      onChange={vi.fn()}
-      showArchived={false}
-      onShowArchivedChange={vi.fn()}
-    />,
-  )
+  render(<ApplicationSort sort={sort} onChange={vi.fn()} />)
 
-  expect(screen.getByRole('combobox', { name: 'Sort by' })).toBeVisible()
-  expect(screen.getByRole('group', { name: 'Direction' })).toBeVisible()
-  expect(screen.getByRole('radio', { name: 'Descending' })).toBeChecked()
-  expect(screen.getByRole('radio', { name: 'Ascending' })).not.toBeChecked()
+  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveValue('createdAt')
 })
 
 test('choosing a field calls onChange with the new field', async () => {
   const user = userEvent.setup()
   const sort: Sort = { field: 'createdAt', direction: 'desc' }
   const onChange = vi.fn()
-  render(
-    <ApplicationSort
-      sort={sort}
-      onChange={onChange}
-      showArchived={false}
-      onShowArchivedChange={vi.fn()}
-    />,
-  )
+  render(<ApplicationSort sort={sort} onChange={onChange} />)
 
   await user.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'deadline')
 
   expect(onChange).toHaveBeenCalledWith({ field: 'deadline', direction: 'desc' })
 })
 
-test('choosing the other direction calls onChange with it', async () => {
-  const user = userEvent.setup()
-  const sort: Sort = { field: 'createdAt', direction: 'desc' }
-  const onChange = vi.fn()
-  render(
-    <ApplicationSort
-      sort={sort}
-      onChange={onChange}
-      showArchived={false}
-      onShowArchivedChange={vi.fn()}
-    />,
-  )
-
-  await user.click(screen.getByRole('radio', { name: 'Ascending' }))
-
-  expect(onChange).toHaveBeenCalledWith({ field: 'createdAt', direction: 'asc' })
-})
-
-test('choosing the direction already in effect does not call onChange', async () => {
-  const user = userEvent.setup()
-  const sort: Sort = { field: 'createdAt', direction: 'desc' }
-  const onChange = vi.fn()
-  render(
-    <ApplicationSort
-      sort={sort}
-      onChange={onChange}
-      showArchived={false}
-      onShowArchivedChange={vi.fn()}
-    />,
-  )
-
-  await user.click(screen.getByRole('radio', { name: 'Descending' }))
-
-  expect(onChange).not.toHaveBeenCalled()
-})
-
-test('the archived checkbox reflects the prop', () => {
-  const sort: Sort = { field: 'createdAt', direction: 'desc' }
+test('the direction button offers the order not in effect, worded per field', () => {
   const { rerender } = render(
-    <ApplicationSort
-      sort={sort}
-      onChange={vi.fn()}
-      showArchived={false}
-      onShowArchivedChange={vi.fn()}
-    />,
+    <ApplicationSort sort={{ field: 'createdAt', direction: 'desc' }} onChange={vi.fn()} />,
   )
-
-  expect(screen.getByRole('checkbox', { name: 'Show archived' })).not.toBeChecked()
+  expect(screen.getByRole('button', { name: 'Sort oldest first' })).toBeVisible()
 
   rerender(
-    <ApplicationSort
-      sort={sort}
-      onChange={vi.fn()}
-      showArchived
-      onShowArchivedChange={vi.fn()}
-    />,
+    <ApplicationSort sort={{ field: 'deadline', direction: 'asc' }} onChange={vi.fn()} />,
   )
+  expect(screen.getByRole('button', { name: 'Sort latest first' })).toBeVisible()
 
-  expect(screen.getByRole('checkbox', { name: 'Show archived' })).toBeChecked()
+  rerender(
+    <ApplicationSort sort={{ field: 'status', direction: 'asc' }} onChange={vi.fn()} />,
+  )
+  expect(screen.getByRole('button', { name: 'Sort latest stage first' })).toBeVisible()
 })
 
-test('ticking the archived checkbox calls onShowArchivedChange with the new value', async () => {
+test('clicking the direction button calls onChange with the flipped direction', async () => {
   const user = userEvent.setup()
-  const sort: Sort = { field: 'createdAt', direction: 'desc' }
-  const onShowArchivedChange = vi.fn()
+  const onChange = vi.fn()
   render(
-    <ApplicationSort
-      sort={sort}
-      onChange={vi.fn()}
-      showArchived={false}
-      onShowArchivedChange={onShowArchivedChange}
-    />,
+    <ApplicationSort sort={{ field: 'deadline', direction: 'asc' }} onChange={onChange} />,
   )
 
-  await user.click(screen.getByRole('checkbox', { name: 'Show archived' }))
+  await user.click(screen.getByRole('button', { name: 'Sort latest first' }))
 
-  expect(onShowArchivedChange).toHaveBeenCalledWith(true)
+  expect(onChange).toHaveBeenCalledWith({ field: 'deadline', direction: 'desc' })
 })

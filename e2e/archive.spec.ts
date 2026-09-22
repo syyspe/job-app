@@ -17,13 +17,14 @@ test('archive an application, reveal it, and unarchive it', async ({ page }) => 
   await item.getByRole('button', { name: 'Archive' }).click()
   await expect(row).not.toBeVisible()
 
-  const showArchived = page.getByRole('checkbox', { name: 'Show archived' })
-  await showArchived.check()
+  // The specs share one database, so match the count loosely.
+  await page.getByRole('button', { name: /^Show \d+ archived$/ }).click()
   await expect(row).toBeVisible()
 
   await item.getByRole('button', { name: 'Unarchive' }).click()
   await expect(item.getByRole('button', { name: 'Archive' })).toBeVisible()
 
-  await showArchived.uncheck()
+  // Nothing is archived any more, so the toggle stops existing.
+  await expect(page.getByRole('button', { name: /archived$/ })).toHaveCount(0)
   await expect(row).toBeVisible()
 })
