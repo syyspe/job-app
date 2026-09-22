@@ -9,6 +9,22 @@ export interface Sort {
   direction: 'asc' | 'desc'
 }
 
+export const SORT_FIELD_LABELS: Record<SortField, string> = {
+  status: 'Status',
+  dateApplied: 'Date applied',
+  deadline: 'Deadline',
+  createdAt: 'Created',
+  updatedAt: 'Updated',
+}
+
+export const SORT_ORDER_LABELS: Record<SortField, Record<Sort['direction'], string>> = {
+  status: { asc: 'earliest stage first', desc: 'latest stage first' },
+  dateApplied: { asc: 'oldest first', desc: 'newest first' },
+  deadline: { asc: 'soonest first', desc: 'latest first' },
+  createdAt: { asc: 'oldest first', desc: 'newest first' },
+  updatedAt: { asc: 'oldest first', desc: 'newest first' },
+}
+
 function compareValues(a: Application, b: Application, field: SortField): number {
   if (field === 'status') return STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status)
   return a[field].localeCompare(b[field])

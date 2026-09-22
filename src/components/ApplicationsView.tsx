@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApplicationForm } from './ApplicationForm.tsx'
 import { ApplicationList } from './ApplicationList.tsx'
 import { ApplicationSort } from './ApplicationSort.tsx'
+import { ArchivedToggle } from './ArchivedToggle.tsx'
 import {
   UnauthorizedError,
   createApplication,
@@ -122,6 +123,10 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
   } = useApplications(onUnauthorized)
   const [sort, setSort] = useState<Sort>({ field: 'createdAt', direction: 'desc' })
   const [showArchived, setShowArchived] = useState(false)
+  const archivedCount = useMemo(
+    () => applications.filter((application) => application.archived).length,
+    [applications],
+  )
   const visibleApplications = useMemo(() => {
     const visible = showArchived
       ? applications
@@ -136,12 +141,7 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
         <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
       </section>
       <div>
-        <ApplicationSort
-          sort={sort}
-          onChange={setSort}
-          showArchived={showArchived}
-          onShowArchivedChange={setShowArchived}
-        />
+        <ApplicationSort sort={sort} onChange={setSort} />
         <ApplicationList
           applications={visibleApplications}
           expandedId={expandedId}
@@ -153,6 +153,12 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
           onUploadAttachment={handleUploadAttachment}
           onRemoveAttachment={handleRemoveAttachment}
           onSetArchived={handleSetArchived}
+          hiddenArchivedCount={showArchived ? 0 : archivedCount}
+        />
+        <ArchivedToggle
+          count={archivedCount}
+          showArchived={showArchived}
+          onChange={setShowArchived}
         />
       </div>
     </div>

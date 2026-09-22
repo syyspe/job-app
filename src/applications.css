@@ -190,6 +190,11 @@
   margin-bottom: var(--s-3);
 }
 
+.archived-toggle {
+  margin-top: var(--s-3);
+  font-size: var(--fs-sm);
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;

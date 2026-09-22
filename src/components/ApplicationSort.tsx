@@ -1,27 +1,14 @@
-import { SORT_FIELDS } from '../lib/sorting.ts'
+import { SORT_FIELDS, SORT_FIELD_LABELS, SORT_ORDER_LABELS } from '../lib/sorting.ts'
 import type { Sort, SortField } from '../lib/sorting.ts'
-
-const FIELD_LABELS: Record<SortField, string> = {
-  status: 'Status',
-  dateApplied: 'Date applied',
-  deadline: 'Deadline',
-  createdAt: 'Created',
-  updatedAt: 'Updated',
-}
 
 interface ApplicationSortProps {
   sort: Sort
   onChange: (sort: Sort) => void
-  showArchived: boolean
-  onShowArchivedChange: (showArchived: boolean) => void
 }
 
-export function ApplicationSort({
-  sort,
-  onChange,
-  showArchived,
-  onShowArchivedChange,
-}: ApplicationSortProps) {
+export function ApplicationSort({ sort, onChange }: ApplicationSortProps) {
+  const offered = sort.direction === 'asc' ? 'desc' : 'asc'
+
   return (
     <div className="sort-bar">
       <label>
@@ -32,42 +19,18 @@ export function ApplicationSort({
         >
           {SORT_FIELDS.map((field) => (
             <option key={field} value={field}>
-              {FIELD_LABELS[field]}
+              {SORT_FIELD_LABELS[field]}
             </option>
           ))}
         </select>
       </label>
-      <fieldset>
-        <legend>Direction</legend>
-        <label>
-          <input
-            type="radio"
-            name="sort-direction"
-            value="asc"
-            checked={sort.direction === 'asc'}
-            onChange={() => onChange({ ...sort, direction: 'asc' })}
-          />
-          Ascending
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="sort-direction"
-            value="desc"
-            checked={sort.direction === 'desc'}
-            onChange={() => onChange({ ...sort, direction: 'desc' })}
-          />
-          Descending
-        </label>
-      </fieldset>
-      <label>
-        <input
-          type="checkbox"
-          checked={showArchived}
-          onChange={(e) => onShowArchivedChange(e.target.checked)}
-        />
-        Show archived
-      </label>
+      <button
+        type="button"
+        className="button"
+        onClick={() => onChange({ ...sort, direction: offered })}
+      >
+        Sort {SORT_ORDER_LABELS[sort.field][offered]}
+      </button>
     </div>
   )
 }
