@@ -58,13 +58,13 @@ function roleHandler(db: Database.Database) {
       return
     }
 
-    if (role === 'basic' && existing.role === 'admin' && adminCount(db) === 1) {
+    if (role !== 'admin' && existing.role === 'admin' && adminCount(db) === 1) {
       res.status(400).json({ error: 'cannot demote the last admin' })
       return
     }
 
     // The sole-admin case above is the same person, and reports itself better.
-    if (role === 'basic' && id === req.userId) {
+    if (role !== 'admin' && id === req.userId) {
       res.status(400).json({ error: 'cannot demote yourself' })
       return
     }
