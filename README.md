@@ -96,8 +96,9 @@ Deleting a user is permanent and takes their applications and uploaded files
 with it. Applications stay strictly per-user regardless: no admin sees
 another person's applications anywhere in the app.
 
-There is no self-service password reset. A forgotten password is an admin's
-job on this page; if the forgotten password *is* the last admin's, re-run
+There is no self-service password reset. Resetting a password also ends that
+user's existing sessions, so the old password's cookies stop working. A
+forgotten password is an admin's job on this page; if the forgotten password *is* the last admin's, re-run
 `npm run seed` with that user's `SEED_USERNAME` and a new `SEED_PASSWORD`.
 
 ### Development

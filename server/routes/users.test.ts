@@ -200,6 +200,16 @@ test('a password can be reset, and the old one stops working', async () => {
   expect(withOld.status).toBe(401)
 })
 
+test('a password reset logs the user out of the sessions they already had', async () => {
+  const before = await fetch(`${baseUrl}/api/me`, { headers: { Cookie: basicCookie } })
+  expect(before.status).toBe(200)
+
+  await put(`/api/users/${basicId}/password`, { password: 'reset-password' })
+
+  const after = await fetch(`${baseUrl}/api/me`, { headers: { Cookie: basicCookie } })
+  expect(after.status).toBe(401)
+})
+
 test('an empty password is refused and an unknown user is 404', async () => {
   const empty = await put(`/api/users/${basicId}/password`, { password: '' })
   expect(empty.status).toBe(400)

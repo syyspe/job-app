@@ -83,7 +83,11 @@ function passwordHandler(db: Database.Database) {
       return
     }
 
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), id)
+    // A reset logs the user out everywhere — the old password's sessions go with it.
+    db.transaction(() => {
+      db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), id)
+      db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id)
+    })()
     res.json(toUser(existing))
   }
 }
