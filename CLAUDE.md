@@ -143,7 +143,18 @@ need goes in `server/lib/` — never import one router from another.
 > Add to this list the second time Claude makes the same mistake — see
 > `REVIEW.md` for the review-feedback loop that feeds this section.
 
-_(empty — fills in from real mistakes.)_
+- **Check the e2e ports before running Playwright; don't run into an
+  occupied one.** `npm run test:e2e` needs 5173 and 3001,
+  `npm run test:e2e:prod` needs 3002. Both configs set
+  `reuseExistingServer: !process.env.CI`, so if something is already
+  listening Playwright silently attaches to it instead of booting a seeded
+  one — every spec then fails at login and it reads like a broken build, not
+  a port collision. Check first (`ss -ltnp | grep -E '5173|3001|3002'`), and
+  if a port is taken switch to a free one rather than killing the process or
+  running anyway: `test:e2e:prod` is the easy move, since it serves the
+  client from the API's own origin and its port is one `const port` in
+  `playwright.prod.config.ts`. `test:e2e`'s ports are not movable per run —
+  `vite.config.ts` hardwires the `/api` proxy to 3001.
 
 ## Working agreement
 
