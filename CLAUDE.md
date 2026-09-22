@@ -54,84 +54,50 @@ with no `failed` line. Playwright: `N passed`.
 
 ## Architecture
 
-- `src/` — the React app. `main.tsx` mounts, `App.tsx` is the auth shell (login
-  state, login/logout, the `<main>`/`<h1>` frame); `types.ts` and the four CSS
-  files sit beside them. The CSS splits by scope, and a value belongs to
-  exactly one of them: `index.css` owns the design tokens (type, space, radii,
-  the light and dark palettes, the status colours) plus element resets and
-  `.button`; `App.css` owns the app frame — nav, `main`, the layout grid,
-  panels, forms, the sort bar, toasts; `applications.css` owns the list
-  surface — rows, the status spine, the chip, detail, attachments, empty
-  state and the pager; `admin.css` owns the admin surface — user rows, the
-  role spine and control, the confirm clusters. New rules read tokens from
-  `index.css` rather than inventing values.
-  - `src/components/` — twelve presentational components, each with a test
-    beside it: `LoginForm` for the login screen, `ApplicationsView` (with its
-    local `useApplications` hook) for the applications UI and
-    `ArchivedToggle`/`Pagination` at the foot of its list, `AdminView` (with
-    its local `useUsers` hook) plus `UserForm`/`UserList`/`UserRow` for the
-    admin page, and the original four. `NavBar` switches between the two
-    views and shows the Admin control to admins only.
-  - `src/lib/api.ts` — every `fetch` against `/api`. Components don't call
-    `fetch` themselves. Sends `credentials: 'same-origin'` on every call and
-    throws `UnauthorizedError` on a 401.
-  - `src/lib/paging.ts` — `paginate`, the pure one-page-at-a-time slice. The
-    page size comes from `GET /api/config`; a null size means one page holding
-    everything, which is what the list shows until that call answers.
-  - `src/lib/dates.ts`, `src/lib/status.ts` and `src/lib/roles.ts` — display
-    formatting: the two date formatters (locale pinned to `en-GB` so tests are
-    deterministic), `STATUS_LABELS` and `ROLE_LABELS`, the capitalised label
-    per `Status` and per `Role`. Status and role *values* stay lowercase
-    everywhere; only the label is capitalised.
-  - `src/test/setupTests.ts` — Vitest setup, named by `vite.config.ts`.
-- `server/` — the Express API. `index.ts` reads the env and listens, `app.ts`
-  is wiring only (routers, static files, error handler) — including the
-  mount order `auth router → requireSession → the rest`, which is what
-  protects everything, and `requireAdmin` mounted at `/api/users` alone, which
-  is what keeps the user routes to admins. `types.ts` is the server's copy of the domain types
-  (`src/types.ts` is the client's — the two are kept in step by hand).
-  `ApplicationInput` is the exception: the server's copy lives in
-  `lib/validation.ts`, beside the check that enforces it.
-  - `server/routes/` — one router factory per resource, plus its tests,
-    including `auth.ts` (`/login`, `/logout`, `/me`), `config.ts` (`/config`,
-    the page size the client pages the list by) and `users.ts` (admin-only
-    account management).
-  - `server/models/` — sqlite row shapes and the row→domain mappers,
-    including `user.ts`.
-  - `server/lib/` — helpers with no Express dependency: `validation.ts`,
-    `files.ts`, `passwords.ts` (hashing and session tokens), `cookies.ts`
-    (reads the session cookie — Express 5 doesn't parse cookies), `seed.ts`
-    (the seed user, which every run makes an admin, and the legacy-database
-    migration), `users.ts` (`setUserRole`, `adminCount` — needed by both the
-    seed and the users router), `config.ts` (`parsePageSize`, which reads
-    `PAGE_SIZE` at startup and throws on anything that isn't a whole number of
-    at least 1).
-  - `server/middleware/` — Express middleware: `errors.ts`, `auth.ts`
-    (`requireSession`, `requireAdmin`).
-  - `server/db/index.ts` — `openDatabase`: connection plus schema.
-  - `server/seed.ts` — the `npm run seed` CLI entry point.
-  - `server/test/auth.ts` — `loginAs`, a test helper that logs in and returns
-    a cookie header string for route tests to pass by hand.
+- `src/` — the React app. `main.tsx` mounts; `App.tsx` is the auth shell
+  (login state, login/logout, the `<main>`/`<h1>` frame). Presentational
+  components live in `src/components/` with a test beside each, non-visual
+  helpers in `src/lib/`, and `src/test/setupTests.ts` is the Vitest setup
+  named by `vite.config.ts`.
+- `server/` — the Express API. `index.ts` reads the env and listens; `app.ts`
+  is wiring only (routers, static files, error handler). One router factory
+  per resource in `server/routes/`, row shapes and row→domain mappers in
+  `server/models/`, Express-free helpers in `server/lib/`, middleware in
+  `server/middleware/`, `openDatabase` in `server/db/index.ts`.
 - `mcp/` — the stdio MCP server Claude Desktop talks to. It speaks HTTP to a
-  running API exactly as the browser does, opens no database, and imports
-  nothing from `server/` except `types.ts`. `index.ts` reads the three
-  `JOBAPP_*` env vars and connects the stdio transport; `server.ts` is
-  `createMcpServer(client)`, wiring only. **Nothing in `mcp/` may write to
-  stdout** — that is the JSON-RPC channel; diagnostics go to `console.error`.
-  - `mcp/lib/` — no MCP dependency: `client.ts` (the fetch layer — cookie,
-    lazy login, one re-login on a 401, `ApiError`), `applications.ts`
-    (`fetchApplication`, `checkDateApplied`), `files.ts`, `results.ts`.
-  - `mcp/tools/` — one file per tool group (`applications.ts`,
-    `attachments.ts`), each exporting a `register*Tools(server, client)`.
-    Tool schemas are zod. A handler signals failure by **throwing**; the SDK
-    turns that into the tool error the user reads.
-  - `mcp/test/harness.ts` — `startHarness`, which runs a real `createApp()`
-    on an ephemeral port and links a real MCP client to the server in
-    memory, so tools are exercised over the protocol.
+  running API exactly as the browser does and opens no database. `index.ts`
+  reads the three `JOBAPP_*` env vars and connects the stdio transport;
+  `server.ts` is `createMcpServer(client)`, wiring only; `lib/` carries no MCP
+  dependency; `tools/` is one file per tool group, each exporting a
+  `register*Tools(server, client)` with zod schemas.
 - `public/` — served verbatim at the site root, not processed by Vite.
 - `e2e/` — Playwright specs, configured by `playwright.config.ts`.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are
   generated — never edit by hand, never commit.
+
+The rest of the tree is worth reading rather than listing here. These are the
+invariants a directory listing won't tell you:
+
+- **`app.ts`'s mount order is the security model.** `auth router →
+  requireSession → the rest` is what protects everything, and `requireAdmin`
+  mounted at `/api/users` alone is what keeps the user routes to admins.
+- **The domain types are duplicated by hand.** `server/types.ts` is the
+  server's copy and `src/types.ts` the client's; the two are kept in step
+  manually. `ApplicationInput` is the exception — the server's copy lives in
+  `server/lib/validation.ts`, beside the check that enforces it.
+- **Components never call `fetch`.** Every call against `/api` goes through
+  `src/lib/api.ts`, which sends `credentials: 'same-origin'` and throws
+  `UnauthorizedError` on a 401.
+- **Status and role *values* stay lowercase everywhere**; only the label is
+  capitalised, via `STATUS_LABELS`/`ROLE_LABELS`. Dates format through
+  `src/lib/dates.ts`, locale pinned to `en-GB` so tests are deterministic.
+- **A CSS value belongs to exactly one file**: `index.css` the design tokens,
+  resets and `.button`; `App.css` the app frame; `applications.css` the list
+  surface; `admin.css` the admin surface. New rules read tokens from
+  `index.css` rather than inventing values.
+- **Nothing in `mcp/` may write to stdout** — that is the JSON-RPC channel;
+  diagnostics go to `console.error`. A tool handler signals failure by
+  **throwing**; the SDK turns that into the tool error the user reads.
 
 Where new code goes: a component in `src/components/`; an endpoint in the
 matching `server/routes/*.ts`, or a new router factory there mounted from
