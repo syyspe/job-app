@@ -169,6 +169,7 @@ test('archiving a row asks the API to archive it', async () => {
   renderView()
   await screen.findByRole('button', { name: /Acme/ })
 
+  await user.click(screen.getByRole('button', { name: /Acme/ }))
   await user.click(screen.getByRole('button', { name: 'Archive' }))
 
   expect(fetchMock).toHaveBeenCalledWith(

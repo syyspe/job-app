@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 import { ApplicationDetail } from './ApplicationDetail'
 import type { Application } from '../types'
@@ -26,7 +27,7 @@ const application: Application = {
   ],
 }
 
-test('buttons appear in order: Remove file, Save, Delete application', () => {
+test('buttons appear in order: Remove file, Save, Archive, Delete application', () => {
   render(
     <ApplicationDetail
       application={application}
@@ -34,11 +35,17 @@ test('buttons appear in order: Remove file, Save, Delete application', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
   const buttons = screen.getAllByRole('button').map((button) => button.textContent)
-  expect(buttons).toEqual(['Remove file', 'Save', 'Delete application'])
+  expect(buttons).toEqual([
+    'Remove file',
+    'Save',
+    'Archive',
+    'Delete application',
+  ])
 })
 
 test('Save and Delete share a parent element', () => {
@@ -49,6 +56,7 @@ test('Save and Delete share a parent element', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -65,6 +73,7 @@ test('the file picker is present and labelled', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -79,6 +88,7 @@ test('renders both timestamps read-only with no input for either', () => {
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
       onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
     />,
   )
 
@@ -86,4 +96,40 @@ test('renders both timestamps read-only with no input for either', () => {
   expect(screen.getByText('Updated 16 Jan 2026, 10:30')).toBeVisible()
   expect(screen.queryByLabelText(/created/i)).not.toBeInTheDocument()
   expect(screen.queryByLabelText(/updated/i)).not.toBeInTheDocument()
+})
+
+test('clicking Archive reports the opposite of the archived flag', async () => {
+  const user = userEvent.setup()
+  const onSetArchived = vi.fn()
+  render(
+    <ApplicationDetail
+      application={application}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={onSetArchived}
+    />,
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Archive' }))
+  expect(onSetArchived).toHaveBeenCalledWith(true)
+})
+
+test('an archived application offers Unarchive', async () => {
+  const user = userEvent.setup()
+  const onSetArchived = vi.fn()
+  render(
+    <ApplicationDetail
+      application={{ ...application, archived: true }}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={onSetArchived}
+    />,
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Unarchive' }))
+  expect(onSetArchived).toHaveBeenCalledWith(false)
 })

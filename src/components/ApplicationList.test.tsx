@@ -164,11 +164,11 @@ const withArchived: Application[] = [
   { ...applications[1], archived: true },
 ]
 
-test('a row offers Archive, and an archived row offers Unarchive', () => {
-  render(
+test('an expanded row offers Archive, an expanded archived row Unarchive', () => {
+  const { rerender } = render(
     <ApplicationList
       applications={withArchived}
-      expandedId={null}
+      expandedId={1}
       onToggle={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
@@ -178,18 +178,33 @@ test('a row offers Archive, and an archived row offers Unarchive', () => {
     />,
   )
 
-  const [active, archived] = screen.getAllByRole('listitem')
+  const [active] = screen.getAllByRole('listitem')
   expect(within(active).getByRole('button', { name: 'Archive' })).toBeVisible()
+
+  rerender(
+    <ApplicationList
+      applications={withArchived}
+      expandedId={2}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={vi.fn()}
+    />,
+  )
+
+  const [, archived] = screen.getAllByRole('listitem')
   expect(within(archived).getByRole('button', { name: 'Unarchive' })).toBeVisible()
 })
 
 test('clicking the archive button reports the opposite of the row flag', async () => {
   const user = userEvent.setup()
   const onSetArchived = vi.fn()
-  render(
+  const { rerender } = render(
     <ApplicationList
       applications={withArchived}
-      expandedId={null}
+      expandedId={1}
       onToggle={vi.fn()}
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
@@ -201,6 +216,19 @@ test('clicking the archive button reports the opposite of the row flag', async (
 
   await user.click(screen.getByRole('button', { name: 'Archive' }))
   expect(onSetArchived).toHaveBeenCalledWith(1, true)
+
+  rerender(
+    <ApplicationList
+      applications={withArchived}
+      expandedId={2}
+      onToggle={vi.fn()}
+      onUpdate={vi.fn()}
+      onDelete={vi.fn()}
+      onUploadAttachment={vi.fn()}
+      onRemoveAttachment={vi.fn()}
+      onSetArchived={onSetArchived}
+    />,
+  )
 
   await user.click(screen.getByRole('button', { name: 'Unarchive' }))
   expect(onSetArchived).toHaveBeenCalledWith(2, false)

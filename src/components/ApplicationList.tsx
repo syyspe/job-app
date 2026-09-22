@@ -39,30 +39,21 @@ function ApplicationRow({
       data-status={application.status}
       data-archived={application.archived}
     >
-      <div className="row-head">
-        <button
-          type="button"
-          className="row-button"
-          aria-expanded={expanded}
-          onClick={onToggle}
-        >
-          <span className="row-company">{application.company}</span>
-          <span className="row-role">{application.role}</span>
-          <span className="row-status">{STATUS_LABELS[application.status]}</span>
-          {application.deadline && (
-            <span className="row-deadline">
-              due {formatDate(application.deadline)}
-            </span>
-          )}
-        </button>
-        <button
-          type="button"
-          className="row-archive"
-          onClick={() => onSetArchived(!application.archived)}
-        >
-          {application.archived ? 'Unarchive' : 'Archive'}
-        </button>
-      </div>
+      <button
+        type="button"
+        className="row-button"
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        <span className="row-company">{application.company}</span>
+        <span className="row-role">{application.role}</span>
+        <span className="row-status">{STATUS_LABELS[application.status]}</span>
+        {application.deadline && (
+          <span className="row-deadline">
+            due {formatDate(application.deadline)}
+          </span>
+        )}
+      </button>
       {expanded && (
         <ApplicationDetail
           application={application}
@@ -70,6 +61,7 @@ function ApplicationRow({
           onDelete={onDelete}
           onUploadAttachment={onUploadAttachment}
           onRemoveAttachment={onRemoveAttachment}
+          onSetArchived={onSetArchived}
         />
       )}
     </li>

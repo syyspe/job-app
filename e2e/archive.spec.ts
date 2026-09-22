@@ -13,6 +13,7 @@ test('archive an application, reveal it, and unarchive it', async ({ page }) => 
   await expect(row).toBeVisible()
   const item = page.getByRole('listitem').filter({ has: row })
 
+  await row.click()
   await item.getByRole('button', { name: 'Archive' }).click()
   await expect(row).not.toBeVisible()
 

@@ -32,14 +32,18 @@
   --canvas: #edf0f3;
   --surface: #fff;
   --surface-raised: #f7f9fa;
+  --surface-hover: #e7ecf0;
+  --surface-press: #d8dfe5;
   --ink: #141a21;
   --ink-muted: #57626f;
   --line: #d5dce3;
   --line-strong: #b6c0ca;
   --accent: #0c5a6b;
   --accent-tint: #dcebef;
+  --accent-press: #073f4b;
   --ok: #1f7a5a;
   --danger: #b3261e;
+  --danger-tint: #f8e0de;
 
   --st-draft: #7a8794;
   --st-draft-bg: #eaedf0;
@@ -77,14 +81,18 @@
     --canvas: #10151a;
     --surface: #191f26;
     --surface-raised: #212932;
+    --surface-hover: #2b343e;
+    --surface-press: #3a4653;
     --ink: #e7ecf1;
     --ink-muted: #98a5b3;
     --line: #2c353f;
     --line-strong: #3e4a57;
     --accent: #5fc6d9;
     --accent-tint: #12313a;
+    --accent-press: #9adceb;
     --ok: #4fbf92;
     --danger: #f2857c;
+    --danger-tint: #3b1f1d;
 
     --st-draft: #8c99a6;
     --st-draft-bg: #232b33;
@@ -160,11 +168,19 @@ textarea {
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
 .button:hover {
-  background: var(--surface-raised);
+  background: var(--surface-hover);
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.button:active {
+  background: var(--surface-press);
+  color: var(--ink);
+  border-color: var(--line-strong);
 }
 
 .button-primary {
@@ -174,7 +190,15 @@ textarea {
 }
 
 .button-primary:hover {
+  background: var(--accent);
+  color: var(--surface);
   border-color: var(--accent);
+}
+
+.button-primary:active {
+  background: var(--accent-press);
+  color: var(--surface);
+  border-color: var(--accent-press);
 }
 
 .button-danger {
@@ -183,6 +207,14 @@ textarea {
 }
 
 .button-danger:hover {
+  background: var(--danger-tint);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.button-danger:active {
+  background: var(--danger);
+  color: var(--surface);
   border-color: var(--danger);
 }
 

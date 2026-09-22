@@ -91,9 +91,13 @@ form textarea {
 
 .form-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s-2);
-  align-self: flex-start;
   margin-top: var(--s-1);
+}
+
+.form-actions .action-end {
+  margin-left: auto;
 }
 
 .sort-bar {

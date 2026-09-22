@@ -181,12 +181,13 @@ breaks nothing. Everything below follows from Archive moving into the panel.
 - **Updated: `src/components/ApplicationsView.test.tsx:172`** — expand the row
   before clicking Archive: `await user.click(screen.getByRole('button', {
   name: /Acme/ }))`, then click `Archive`. The `fetch` assertion is unchanged.
-- **Updated: `e2e/archive.spec.ts:16,23`** — click `row` to expand before each
-  of the two archive clicks. Line 23's unarchive already has the row visible
-  via `showArchived`; it still needs the expand click, and the assertion on
-  line 24 (`Archive` is back) only holds while the panel is open — after an
-  unarchive the panel stays open, so it passes as written once the expand is
-  added.
+- **Updated: `e2e/archive.spec.ts:16`** — click `row` to expand before the
+  archive click. The unarchive click on line 23 needs *no* expand: because
+  `handleSetArchived` leaves `expandedId` alone (decision 1), the row that
+  `showArchived` brings back is still expanded, and a click there would
+  collapse it. The assertion on line 24 (`Archive` is back) only holds while
+  the panel is open — after an unarchive the panel stays open, so it passes
+  as written.
 - Verification command: `npm test` — expect
   `Test Files N passed / Tests N passed` with no `failed` line. Then
   `npm run lint` clean and `npm run test:e2e` → `N passed`.
