@@ -9,6 +9,7 @@ interface ApplicationDetailProps {
   onDelete: () => void
   onUploadAttachment: (file: File) => void
   onRemoveAttachment: (attachmentId: number) => void
+  onSetArchived: (archived: boolean) => void
 }
 
 function toInput(application: Application): ApplicationInput {
@@ -29,6 +30,7 @@ export function ApplicationDetail({
   onDelete,
   onUploadAttachment,
   onRemoveAttachment,
+  onSetArchived,
 }: ApplicationDetailProps) {
   return (
     <ApplicationForm
@@ -36,9 +38,22 @@ export function ApplicationDetail({
       submitLabel="Save"
       onSubmit={onUpdate}
       actions={
-        <button type="button" className="button" onClick={onDelete}>
-          Delete application
-        </button>
+        <>
+          <button
+            type="button"
+            className="button"
+            onClick={() => onSetArchived(!application.archived)}
+          >
+            {application.archived ? 'Unarchive' : 'Archive'}
+          </button>
+          <button
+            type="button"
+            className="button button-danger action-end"
+            onClick={onDelete}
+          >
+            Delete application
+          </button>
+        </>
       }
     >
       <p className="timestamps">

@@ -31,7 +31,7 @@ export function AttachmentList({
             </a>
             <button
               type="button"
-              className="button"
+              className="button button-danger"
               onClick={() => onRemove(attachment.id)}
             >
               Remove file
