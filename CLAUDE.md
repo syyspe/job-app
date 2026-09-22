@@ -75,12 +75,15 @@ with no `failed` line. Playwright: `N passed`.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are
   generated — never edit by hand, never commit.
 
-The rest of the tree is worth reading rather than listing here. These are the
-invariants a directory listing won't tell you:
+`docs/architecture.md` has the file-by-file detail — what each module is for
+and what already exists — to read on demand rather than every session. These
+are the invariants a directory listing won't tell you:
 
 - **`app.ts`'s mount order is the security model.** `auth router →
   requireSession → the rest` is what protects everything, and `requireAdmin`
   mounted at `/api/users` alone is what keeps the user routes to admins.
+- **Express 5 doesn't parse cookies.** `server/lib/cookies.ts` reads the
+  session cookie by hand; that is the only reason the file exists.
 - **The domain types are duplicated by hand.** `server/types.ts` is the
   server's copy and `src/types.ts` the client's; the two are kept in step
   manually. `ApplicationInput` is the exception — the server's copy lives in
