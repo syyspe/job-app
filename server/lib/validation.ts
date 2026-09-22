@@ -1,4 +1,5 @@
-import { STATUSES } from '../types.ts'
+import { ROLES, STATUSES } from '../types.ts'
+import type { Role } from '../types.ts'
 
 export interface ApplicationInput {
   company: string
@@ -31,4 +32,26 @@ export function validateInput(body: unknown): ApplicationInput | null {
   if (status !== 'draft' && !dateApplied) return null
 
   return { company, role, dateApplied, deadline, status, link, notes }
+}
+
+export interface UserInput {
+  username: string
+  password: string
+  role: Role
+}
+
+export function isRole(value: unknown): value is Role {
+  return ROLES.includes(value as Role)
+}
+
+export function validateUserInput(body: unknown): UserInput | null {
+  if (typeof body !== 'object' || body === null) return null
+  const b = body as Record<string, unknown>
+  const username = text(b.username)
+  const password = text(b.password)
+
+  if (!username || !password) return null
+  if (!isRole(b.role)) return null
+
+  return { username, password, role: b.role }
 }

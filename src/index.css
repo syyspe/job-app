@@ -177,6 +177,15 @@ textarea {
   border-color: var(--accent);
 }
 
+.button-danger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.button-danger:hover {
+  border-color: var(--danger);
+}
+
 /* Load-bearing: AttachmentList hides a file input inside a .button label. */
 .button:focus-within,
 a:focus-visible,

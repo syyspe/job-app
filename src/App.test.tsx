@@ -5,7 +5,8 @@ import App from './App'
 import { ToastProvider } from './components/ToastProvider'
 import type { Application, User } from './types'
 
-const sampleUser: User = { id: 1, username: 'testuser' }
+const sampleUser: User = { id: 1, username: 'testuser', role: 'admin' }
+const basicUser: User = { id: 2, username: 'basic-user', role: 'basic' }
 
 const sampleApplications: Application[] = [
   {
@@ -24,15 +25,18 @@ const sampleApplications: Application[] = [
   },
 ]
 
-function stubFetch(meStatus: number) {
+function stubFetch(meStatus: number, me: User = sampleUser) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url.endsWith('/api/me')) {
         return meStatus === 200
-          ? new Response(JSON.stringify(sampleUser), { status: 200 })
+          ? new Response(JSON.stringify(me), { status: 200 })
           : new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })
+      }
+      if (url.endsWith('/api/users')) {
+        return new Response(JSON.stringify([me]), { status: 200 })
       }
       if (url.endsWith('/api/login')) {
         return new Response(JSON.stringify({ error: 'unauthorized' }), {
@@ -90,4 +94,26 @@ test('a failed login shows an error toast', async () => {
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Invalid username or password',
   )
+})
+
+test('an admin can switch to the admin view and back', async () => {
+  const user = userEvent.setup()
+  stubFetch(200)
+  renderApp()
+
+  await user.click(await screen.findByRole('button', { name: 'Admin' }))
+  expect(await screen.findByRole('heading', { name: 'Add a user' })).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Applications' }))
+  expect(
+    await screen.findByRole('heading', { name: 'Add an application' }),
+  ).toBeVisible()
+})
+
+test('a basic user gets the applications view and no admin control', async () => {
+  stubFetch(200, basicUser)
+  renderApp()
+
+  expect(await screen.findByRole('button', { name: /Acme/ })).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Admin' })).not.toBeInTheDocument()
 })

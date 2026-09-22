@@ -5,7 +5,8 @@ import { join } from 'node:path'
 import { createApplicationsRouter } from './routes/applications.ts'
 import { createAttachmentsRouter } from './routes/attachments.ts'
 import { createAuthRouter } from './routes/auth.ts'
-import { requireSession } from './middleware/auth.ts'
+import { createUsersRouter } from './routes/users.ts'
+import { requireAdmin, requireSession } from './middleware/auth.ts'
 import { jsonErrorHandler } from './middleware/errors.ts'
 
 type CreateAppOptions = { staticDir?: string }
@@ -21,6 +22,8 @@ export function createApp(
   app.use('/api', requireSession(db))
   app.use('/api', createApplicationsRouter(db, uploadsDir))
   app.use('/api', createAttachmentsRouter(db, uploadsDir))
+  app.use('/api/users', requireAdmin(db))
+  app.use('/api', createUsersRouter(db, uploadsDir))
   if (staticDir) {
     app.use(express.static(staticDir))
     app.use((req, res, next) => {

@@ -22,7 +22,15 @@ export function migrateApplicationArchived(db: Database.Database): void {
   db.exec('ALTER TABLE applications ADD COLUMN archived INTEGER NOT NULL DEFAULT 0')
 }
 
+export function migrateUserRole(db: Database.Database): void {
+  const columns = db.pragma('table_info(users)') as { name: string }[]
+  if (columns.some((column) => column.name === 'role')) return
+
+  db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'basic'`)
+}
+
 export function migrate(db: Database.Database): void {
   migrateApplicationDates(db)
   migrateApplicationArchived(db)
+  migrateUserRole(db)
 }

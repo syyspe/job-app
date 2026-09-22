@@ -1,6 +1,11 @@
+export const ROLES = ['admin', 'basic'] as const
+
+export type Role = (typeof ROLES)[number]
+
 export interface User {
   id: number
   username: string
+  role: Role
 }
 
 export const STATUSES = [

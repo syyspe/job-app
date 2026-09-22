@@ -1,4 +1,11 @@
-import type { Application, ApplicationInput, Attachment, User } from '../types.ts'
+import type {
+  Application,
+  ApplicationInput,
+  Attachment,
+  Role,
+  User,
+  UserInput,
+} from '../types.ts'
 
 export class UnauthorizedError extends Error {
   constructor() {
@@ -43,6 +50,50 @@ export async function getCurrentUser(): Promise<User | null> {
   const response = await fetch('/api/me', { credentials: 'same-origin' })
   if (response.status === 401) return null
   return parseJson(response)
+}
+
+export async function listUsers(): Promise<User[]> {
+  const response = await fetch('/api/users', { credentials: 'same-origin' })
+  return parseJson(response)
+}
+
+export async function createUser(input: UserInput): Promise<User> {
+  const response = await fetch('/api/users', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  return parseJson(response)
+}
+
+export async function setUserRole(id: number, role: Role): Promise<User> {
+  const response = await fetch(`/api/users/${id}/role`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  })
+  return parseJson(response)
+}
+
+export async function resetUserPassword(id: number, password: string): Promise<User> {
+  const response = await fetch(`/api/users/${id}/password`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  })
+  return parseJson(response)
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  await checkOk(
+    await fetch(`/api/users/${id}`, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    }),
+  )
 }
 
 export async function listApplications(): Promise<Application[]> {

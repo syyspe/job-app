@@ -4,7 +4,11 @@ import Database from 'better-sqlite3'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { migrateApplicationArchived, migrateApplicationDates } from './migrations.ts'
+import {
+  migrateApplicationArchived,
+  migrateApplicationDates,
+  migrateUserRole,
+} from './migrations.ts'
 
 let root: string
 let db: Database.Database
@@ -14,6 +18,13 @@ beforeEach(() => {
   db = new Database(join(root, 'app.db'))
   db.pragma('foreign_keys = ON')
   db.exec(`
+    CREATE TABLE users (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      username      TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE applications (
       id           INTEGER PRIMARY KEY AUTOINCREMENT,
       company      TEXT NOT NULL,
@@ -27,6 +38,9 @@ beforeEach(() => {
   db.prepare(
     `INSERT INTO applications (id, company, role, date_applied, status, link, notes)
      VALUES (1, 'Acme', 'Engineer', '2026-01-01', 'applied', '', '')`,
+  ).run()
+  db.prepare(
+    `INSERT INTO users (id, username, password_hash) VALUES (1, 'testuser', 'hash')`,
   ).run()
 })
 
@@ -83,4 +97,24 @@ test('migrating archived twice is a no-op the second time', () => {
     archived: number
   }
   expect(application.archived).toBe(1)
+})
+
+test('migrating a legacy database gives existing users the basic role', () => {
+  migrateUserRole(db)
+
+  const user = db.prepare('SELECT * FROM users WHERE id = 1').get() as {
+    username: string
+    role: string
+  }
+  expect(user.username).toBe('testuser')
+  expect(user.role).toBe('basic')
+})
+
+test('migrating the user role twice is a no-op the second time', () => {
+  migrateUserRole(db)
+  db.prepare(`UPDATE users SET role = 'admin' WHERE id = 1`).run()
+
+  expect(() => migrateUserRole(db)).not.toThrow()
+  const user = db.prepare('SELECT role FROM users WHERE id = 1').get() as { role: string }
+  expect(user.role).toBe('admin')
 })
