@@ -8,6 +8,10 @@ export interface User {
   role: Role
 }
 
+export interface AppConfig {
+  pageSize: number
+}
+
 export const STATUSES = [
   'draft',
   'applied',

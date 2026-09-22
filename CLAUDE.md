@@ -62,19 +62,22 @@ with no `failed` line. Playwright: `N passed`.
   `.button`; `App.css` owns the app frame — nav, `main`, the layout grid,
   panels, forms, the sort bar, toasts; `applications.css` owns the list
   surface — rows, the status spine, the chip, detail, attachments, empty
-  state; `admin.css` owns the admin surface — user rows, the role spine and
-  control, the confirm clusters. New rules read tokens from `index.css` rather
-  than inventing values.
-  - `src/components/` — eleven presentational components, each with a test
+  state and the pager; `admin.css` owns the admin surface — user rows, the
+  role spine and control, the confirm clusters. New rules read tokens from
+  `index.css` rather than inventing values.
+  - `src/components/` — twelve presentational components, each with a test
     beside it: `LoginForm` for the login screen, `ApplicationsView` (with its
-    local `useApplications` hook) for the applications UI and `ArchivedToggle`
-    at the foot of its list, `AdminView` (with its local `useUsers` hook) plus
-    `UserForm`/`UserList`/`UserRow` for the admin page, and the original four.
-    `NavBar` switches between the two views and shows the Admin control to
-    admins only.
+    local `useApplications` hook) for the applications UI and
+    `ArchivedToggle`/`Pagination` at the foot of its list, `AdminView` (with
+    its local `useUsers` hook) plus `UserForm`/`UserList`/`UserRow` for the
+    admin page, and the original four. `NavBar` switches between the two
+    views and shows the Admin control to admins only.
   - `src/lib/api.ts` — every `fetch` against `/api`. Components don't call
     `fetch` themselves. Sends `credentials: 'same-origin'` on every call and
     throws `UnauthorizedError` on a 401.
+  - `src/lib/paging.ts` — `paginate`, the pure one-page-at-a-time slice. The
+    page size comes from `GET /api/config`; a null size means one page holding
+    everything, which is what the list shows until that call answers.
   - `src/lib/dates.ts`, `src/lib/status.ts` and `src/lib/roles.ts` — display
     formatting: the two date formatters (locale pinned to `en-GB` so tests are
     deterministic), `STATUS_LABELS` and `ROLE_LABELS`, the capitalised label
@@ -90,8 +93,9 @@ with no `failed` line. Playwright: `N passed`.
   `ApplicationInput` is the exception: the server's copy lives in
   `lib/validation.ts`, beside the check that enforces it.
   - `server/routes/` — one router factory per resource, plus its tests,
-    including `auth.ts` (`/login`, `/logout`, `/me`) and `users.ts`
-    (admin-only account management).
+    including `auth.ts` (`/login`, `/logout`, `/me`), `config.ts` (`/config`,
+    the page size the client pages the list by) and `users.ts` (admin-only
+    account management).
   - `server/models/` — sqlite row shapes and the row→domain mappers,
     including `user.ts`.
   - `server/lib/` — helpers with no Express dependency: `validation.ts`,
@@ -99,7 +103,9 @@ with no `failed` line. Playwright: `N passed`.
     (reads the session cookie — Express 5 doesn't parse cookies), `seed.ts`
     (the seed user, which every run makes an admin, and the legacy-database
     migration), `users.ts` (`setUserRole`, `adminCount` — needed by both the
-    seed and the users router).
+    seed and the users router), `config.ts` (`parsePageSize`, which reads
+    `PAGE_SIZE` at startup and throws on anything that isn't a whole number of
+    at least 1).
   - `server/middleware/` — Express middleware: `errors.ts`, `auth.ts`
     (`requireSession`, `requireAdmin`).
   - `server/db/index.ts` — `openDatabase`: connection plus schema.
@@ -137,7 +143,18 @@ need goes in `server/lib/` — never import one router from another.
 > Add to this list the second time Claude makes the same mistake — see
 > `REVIEW.md` for the review-feedback loop that feeds this section.
 
-_(empty — fills in from real mistakes.)_
+- **Check the e2e ports before running Playwright; don't run into an
+  occupied one.** `npm run test:e2e` needs 5173 and 3001,
+  `npm run test:e2e:prod` needs 3002. Both configs set
+  `reuseExistingServer: !process.env.CI`, so if something is already
+  listening Playwright silently attaches to it instead of booting a seeded
+  one — every spec then fails at login and it reads like a broken build, not
+  a port collision. Check first (`ss -ltnp | grep -E '5173|3001|3002'`), and
+  if a port is taken switch to a free one rather than killing the process or
+  running anyway: `test:e2e:prod` is the easy move, since it serves the
+  client from the API's own origin and its port is one `const port` in
+  `playwright.prod.config.ts`. `test:e2e`'s ports are not movable per run —
+  `vite.config.ts` hardwires the `/api` proxy to 3001.
 
 ## Working agreement
 

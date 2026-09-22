@@ -195,6 +195,29 @@
   font-size: var(--fs-sm);
 }
 
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+}
+
+.pager span {
+  font-variant-numeric: tabular-nums;
+}
+
+.pager .button:disabled,
+.pager .button:disabled:hover {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--ink-muted);
+  cursor: default;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
