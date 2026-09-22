@@ -63,6 +63,12 @@ function roleHandler(db: Database.Database) {
       return
     }
 
+    // The sole-admin case above is the same person, and reports itself better.
+    if (role === 'basic' && id === req.userId) {
+      res.status(400).json({ error: 'cannot demote yourself' })
+      return
+    }
+
     setUserRole(db, id, role)
     res.json(toUser(findUser(db, id) as UserRow))
   }

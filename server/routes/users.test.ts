@@ -174,10 +174,17 @@ test('demoting the last admin is refused', async () => {
   const res = await put(`/api/users/${adminId}/role`, { role: 'basic' })
   expect(res.status).toBe(400)
   expect(await res.json()).toEqual({ error: 'cannot demote the last admin' })
+})
 
+test('demoting yourself is refused even when another admin exists', async () => {
   await put(`/api/users/${basicId}/role`, { role: 'admin' })
-  const withTwoAdmins = await put(`/api/users/${adminId}/role`, { role: 'basic' })
-  expect(withTwoAdmins.status).toBe(200)
+
+  const self = await put(`/api/users/${adminId}/role`, { role: 'basic' })
+  expect(self.status).toBe(400)
+  expect(await self.json()).toEqual({ error: 'cannot demote yourself' })
+
+  const other = await put(`/api/users/${basicId}/role`, { role: 'basic' })
+  expect(other.status).toBe(200)
 })
 
 test('a password can be reset, and the old one stops working', async () => {

@@ -88,9 +88,11 @@ and pre-auth applications.
 An admin sees an **Admin** control in the nav bar; a basic user does not, and
 `/api/users` answers them `403` whatever they do. On that page an admin can
 add a user, switch anyone between admin and basic, reset a password, and
-delete an account. Two things the server refuses: deleting yourself, and
-demoting the last admin — so there is always an admin, and always someone
-holding the session that could promote another.
+delete an account. Three things the server refuses: deleting yourself,
+demoting yourself, and demoting the last admin — so there is always an admin,
+and always someone holding the session that could promote another. Changing
+your own role is the one way you could have locked yourself out of this page,
+which is why the server stops it rather than the form.
 
 Deleting a user is permanent and takes their applications and uploaded files
 with it. Applications stay strictly per-user regardless: no admin sees
