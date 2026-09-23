@@ -193,7 +193,8 @@ Edit:
   here" empty. Leave `## The loop` exactly as it is — its `<slug>` is a
   variable that gets filled in per piece of work, not a setup placeholder.
 - **`README.md`** — replace the title and opening framing with the real
-  project name/purpose. Leave the stage-map table and process notes as-is.
+  project name/purpose. Leave the pointers to `/sdlc` and the `sdlc` skill
+  as-is.
 - **`REVIEW.md`** — fill "Excluded paths" with the stack's known
   generated/build dirs (Next.js → `.next/`, `node_modules/`; Django →
   `.venv/`, `__pycache__/`, `staticfiles/`). Leave the placeholder and say
