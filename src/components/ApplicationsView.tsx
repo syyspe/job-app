@@ -55,7 +55,6 @@ function useApplications(onUnauthorized: () => void) {
   }
 
   useEffect(() => {
-    // eslint-disable-next-line react/set-state-in-effect -- load() sets state after an await, not synchronously
     void run(load)
   }, [run])
 
