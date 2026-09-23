@@ -64,4 +64,11 @@ Name things for what they mean, not how they're implemented.
 
 ## Project-specific additions
 
-`<add any thresholds or exceptions specific to this repo here>`
+- **Signatures a dependency dictates are exempt from the parameter limit.**
+  If a library or framework calls your function with a fixed arity and
+  behaves differently with fewer parameters, match that signature. One
+  example is Express error middleware, which must take
+  `(err, req, res, next)` to be treated as an error handler. The exemption
+  only covers the parameter count. The body still follows every other limit.
+  It doesn't apply when you choose the signature, such as your own
+  callbacks, or props you could bundle into an object.

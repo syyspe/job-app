@@ -26,7 +26,6 @@ function App() {
         setLoaded(true)
       }
     }
-    // eslint-disable-next-line react/set-state-in-effect -- load() sets state after an await, not synchronously
     void load()
   }, [])
 
