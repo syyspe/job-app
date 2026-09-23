@@ -39,49 +39,68 @@ async function readError(response: Response): Promise<string> {
   return response.statusText
 }
 
+async function fetchOrExplain(
+  baseUrl: string,
+  path: string,
+  spec: RequestSpec,
+): Promise<Response> {
+  try {
+    return await fetch(`${baseUrl}${path}`, spec)
+  } catch {
+    throw new Error(
+      `cannot reach the job-applications API at ${baseUrl} — ` +
+        'is it running? (npm run dev:server)',
+    )
+  }
+}
+
+async function login(config: ApiConfig): Promise<string> {
+  const response = await fetchOrExplain(config.baseUrl, '/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: config.username, password: config.password }),
+  })
+  if (response.status === 401) {
+    throw new Error(
+      `login failed for user ${config.username} — check JOBAPP_USERNAME/JOBAPP_PASSWORD`,
+    )
+  }
+  const setCookie = response.headers.get('set-cookie')
+  if (!setCookie) throw new Error('login did not set a session cookie')
+  return setCookie.split(';')[0]
+}
+
+async function checked(response: Response): Promise<Response> {
+  if (response.ok) return response
+  throw new ApiError(response.status, await readError(response))
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  return (await response.json()) as T
+}
+
+async function readFile(response: Response): Promise<ApiFile> {
+  const contentType = response.headers.get('content-type') ?? 'application/octet-stream'
+  return {
+    bytes: new Uint8Array(await response.arrayBuffer()),
+    mimeType: contentType.split(';')[0].trim(),
+  }
+}
+
 export function createApiClient(config: ApiConfig): ApiClient {
   let cookie: string | null = null
 
-  async function fetchOrExplain(path: string, spec: RequestSpec): Promise<Response> {
-    try {
-      return await fetch(`${config.baseUrl}${path}`, spec)
-    } catch {
-      throw new Error(
-        `cannot reach the job-applications API at ${config.baseUrl} — ` +
-          'is it running? (npm run dev:server)',
-      )
-    }
-  }
-
-  async function login(): Promise<string> {
-    const response = await fetchOrExplain('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: config.username, password: config.password }),
-    })
-    if (response.status === 401) {
-      throw new Error(
-        `login failed for user ${config.username} — check JOBAPP_USERNAME/JOBAPP_PASSWORD`,
-      )
-    }
-    const setCookie = response.headers.get('set-cookie')
-    if (!setCookie) throw new Error('login did not set a session cookie')
-    return setCookie.split(';')[0]
-  }
-
   async function sessionCookie(): Promise<string> {
-    if (cookie === null) cookie = await login()
+    if (cookie === null) cookie = await login(config)
     return cookie
   }
 
   async function sendWithSession(path: string, spec: RequestSpec): Promise<Response> {
     const session = await sessionCookie()
-    return fetchOrExplain(path, { ...spec, headers: { ...spec.headers, Cookie: session } })
-  }
-
-  async function checked(response: Response): Promise<Response> {
-    if (response.ok) return response
-    throw new ApiError(response.status, await readError(response))
+    return fetchOrExplain(config.baseUrl, path, {
+      ...spec,
+      headers: { ...spec.headers, Cookie: session },
+    })
   }
 
   async function send(path: string, spec: RequestSpec): Promise<Response> {
@@ -94,31 +113,25 @@ export function createApiClient(config: ApiConfig): ApiClient {
 
   return {
     async getJson<T>(path: string): Promise<T> {
-      const response = await send(path, {})
-      return (await response.json()) as T
+      return readJson<T>(await send(path, {}))
     },
 
     async sendJson<T>(method: 'POST' | 'PUT', path: string, body: unknown): Promise<T> {
-      const response = await send(path, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      return (await response.json()) as T
+      return readJson<T>(
+        await send(path, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      )
     },
 
     async sendForm<T>(path: string, form: FormData): Promise<T> {
-      const response = await send(path, { method: 'POST', body: form })
-      return (await response.json()) as T
+      return readJson<T>(await send(path, { method: 'POST', body: form }))
     },
 
     async getFile(path: string): Promise<ApiFile> {
-      const response = await send(path, {})
-      const contentType = response.headers.get('content-type') ?? 'application/octet-stream'
-      return {
-        bytes: new Uint8Array(await response.arrayBuffer()),
-        mimeType: contentType.split(';')[0].trim(),
-      }
+      return readFile(await send(path, {}))
     },
   }
 }
