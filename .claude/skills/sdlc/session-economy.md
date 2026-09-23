@@ -83,6 +83,6 @@ session's job, done by a session that has to read the diff cold.
 - **Stage 4's light path.** A docs-only or internal-refactor diff can't
   change what the app does or where its boundaries are. The verification
   command and `/review`'s four passes (Scope included) still run; `verifier`
-  and `/security-review` add cost for little a diff like that
-  can get wrong. Anything executable — a hook, config, a dependency — can, so
-  it takes the full sequence.
+  and `/security-review` would cost more than they could catch in a diff
+  like that. Anything executable — a hook, config, a dependency — can go
+  wrong in ways they catch, so it takes the full sequence.
