@@ -1,6 +1,6 @@
 ---
 name: sdlc
-description: Use when the user asks where they are in the process, what to do next, how this repo's workflow works, how to start a piece of work, or what unlocks the next stage — and any time work is about to move from one stage to the next. Also user-invocable as /sdlc. Reports which of the four stages the current branch is in, derived from the artifacts on disk, and drives the next handoff.
+description: Use when the user asks where they are in the process, what to do next, how this repo's workflow works, how to start a piece of work, or what unlocks the next stage — and any time work is about to move from one stage to the next. Also user-invocable as /sdlc. Reports which of the four stages the current branch is in, derived from the artifacts committed on the branch, and drives the next handoff.
 ---
 
 # Where we are in the loop, and what's next
@@ -32,11 +32,13 @@ Read it off the branch, in this order — first match wins:
 
 1. `git rev-parse --abbrev-ref HEAD`. On `main`/`master`, no work stream is
    checked out: the next action is Stage 1 on a new branch.
-2. Otherwise the branch name is the slug. Check for `brief/<slug>.md` and
-   `plans/<slug>.plan.md`. Missing artifact → you are in the stage that
-   produces it.
-3. Both present, `git status --porcelain` dirty → Stage 3, in progress.
-4. Both present, tree clean → has code landed since the plan?
+2. Otherwise the branch name is the slug. An artifact counts only once it is
+   committed: `git cat-file -e HEAD:<path>` succeeds for `brief/<slug>.md`
+   and `plans/<slug>.plan.md`. An artifact not in `HEAD` → you are in the
+   stage that produces it; if the file is already on disk, that stage's next
+   action is to commit it.
+3. Both committed, `git status --porcelain` dirty → Stage 3, in progress.
+4. Both committed, tree clean → has code landed since the plan?
 
    ```bash
    plan_commit=$(git log --diff-filter=A --format=%H -1 -- "plans/$slug.plan.md")

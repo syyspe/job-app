@@ -5,11 +5,11 @@
 #      the bootstrap skill.
 #   2. Configured repo — report where the current branch stands in the loop
 #      and what the next action is. The stage is derived from the artifact
-#      chain itself — which of brief/plan exist for the branch slug, and
-#      whether code has landed since the plan commit — never from separate
-#      state and never from an approval flag. Every boundary is computable
-#      here; the sdlc skill says why that constraint drives where
-#      verification sits.
+#      chain itself — which of brief/plan are committed in HEAD for the
+#      branch slug, and whether code has landed since the plan commit —
+#      never from separate state and never from an approval flag. Every
+#      boundary is computable here; the sdlc skill says why that constraint
+#      drives where verification sits.
 #
 # Both paths only inject context — this hook never blocks anything, and any
 # probe that can't run (no git, missing dirs) falls back to silence.
@@ -38,8 +38,12 @@ print(json.dumps({"hookSpecificOutput": {
   exit 0
 }
 
+committed() {
+  git cat-file -e "HEAD:$1" 2>/dev/null
+}
+
 checklist_line() {
-  if [ -f "$1" ]; then
+  if committed "$1"; then
     printf '  [x] %s\n' "$1"
   else
     printf '  [ ] %s\n' "$1"
@@ -92,12 +96,19 @@ chain=$(
 
 # One imperative per state. The reasoning behind each lives in the sdlc skill,
 # which HOWTO points at — repeating it here is what let the two drift apart.
-if [ ! -f "$brief" ]; then
+if ! committed "$brief" && [ -f "$brief" ]; then
+  stage="Stage 1 (Brief) — brief written, not committed."
+  next="commit $brief. That commit ends the stage."
+elif ! committed "$brief"; then
   stage="Stage 1 (Brief) — not started."
   next="write $brief from brief/TEMPLATE.md, interviewing the user one question
 at a time, then commit it. That commit ends the stage. Full instructions:
 .claude/skills/sdlc/stages/1-brief.md"
-elif [ ! -f "$plan" ]; then
+elif ! committed "$plan" && [ -f "$plan" ]; then
+  stage="Stage 2 (Plan) — plan written, not committed."
+  next="commit $plan BEFORE any code. That commit ends the stage. Full
+instructions: .claude/skills/sdlc/stages/2-plan.md"
+elif ! committed "$plan"; then
   stage="Stage 2 (Plan) — brief committed, no plan yet."
   next="call the EnterPlanMode tool now, as your first action. Read $brief and
 iterate, then write $plan from plans/TEMPLATE.plan.md and commit it BEFORE any
