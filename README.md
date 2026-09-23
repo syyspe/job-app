@@ -2,27 +2,10 @@
 
 Manages job applications.
 
-Built on a personal-scale AI-native SDLC: **every stage produces a
-version-controlled artifact the next stage reads.** You stay accountable for
-judgment calls (what to build, whether the plan is right, whether it merges);
-Claude does the work in between.
-
-```
-brief.md  →  plan.md  →  code + tests  →  PR
- (Brief)     (Plan)      (Build)          (Ship)
-```
-
-| Stage | Artifact | Done when | Which unlocks |
-|---|---|---|---|
-| 1. Brief | `brief/<slug>.md` | problem, requirements, approach, out-of-scope are written down | Plan |
-| 2. Plan | `plans/<slug>.plan.md` | plan committed **before** any code | Build |
-| 3. Build | code + tests | the work order is committed | Ship |
-| 4. Ship | verification, review, PR | verification passes, `verifier` says PASS, you merge | Brief, again |
-
-There is no `status:` frontmatter and nothing to approve. **An artifact exists
-or it doesn't** — that's the entire state machine, and it's readable with
-`ls`. Every session opens by telling you which stage the current branch is in
-and what's next; **`/sdlc`** re-answers that any time you ask.
+Built on a personal-scale AI-native SDLC: four stages (brief, plan, build,
+ship), each ending by committing an artifact the next stage reads. Run
+**`/sdlc`** for where the current branch stands; the stage table and rules are
+in `.claude/skills/sdlc/SKILL.md`.
 
 ## Prerequisites
 
@@ -186,40 +169,14 @@ to take that on).
 If this rule stops paying for itself on some project, delete the hook from
 `.claude/settings.json`. It's a default, not a law.
 
-## Starting a piece of work
+## Working on something
 
-The short version: **run `/sdlc`** and Claude tells you where the current
-branch stands and what to do next. The long version is below, once, so you
-know what it's driving.
-
-One slug threads through everything — pick a short kebab-case name (e.g.
-`csv-export`) and reuse it as the branch name and every artifact's filename.
-
-1. `git checkout -b <slug>` from the default branch.
-2. **Stage 1.** Talk the idea through with Claude and land it in
-   `brief/<slug>.md` (copy `brief/TEMPLATE.md`, or let Claude write it).
-   Problem, what done looks like, approach, out of scope. Commit.
-   *Keep it thin* — six honest lines beat two invented pages.
-3. **Stage 2.** Start a Claude Code session in **plan mode** referencing the
-   brief and iterate until the plan's right — see `plans/README.md` — then
-   commit it as `plans/<slug>.plan.md`.
-   *Unlock:* the plan is committed. Nothing gets implemented before that.
-4. **Stage 3.** Fresh session, auto mode: implement the work order and commit
-   it. `simple-code` applies from the first line. The commit ends the stage —
-   nothing gets verified or reviewed here.
-5. **Stage 4.** Fresh session again, in order: `CLAUDE.md`'s verification
-   command, the `verifier` subagent (re-checks the diff against the plan with
-   fresh context), `/review` (all four `REVIEW.md` passes, inline, no
-   subagent fan-out), `/security-review` if the diff touches a real boundary,
-   then push, open a PR, read it, merge it.
-
-Each of those is a **separate session**. A stage ends at a commit, that commit
-is the whole handoff, and the session-start hook re-derives where you are from
-disk — so the next stage starts for almost nothing, while dragging a finished
-stage's context along is paid for on every turn after it.
-
-Working on more than one of these at a time? See the `worktree` skill
-(`.claude/skills/worktree/SKILL.md`) instead of switching branches in place.
+Run `/sdlc` and Claude tells you where the current branch stands and what to
+do next. The instructions for each stage are in `.claude/skills/sdlc/stages/`,
+and the reasoning behind the process is in
+`.claude/skills/sdlc/session-economy.md`. Working on more than one thing at a
+time? Use the `worktree` skill (`.claude/skills/worktree/SKILL.md`) instead of
+switching branches in place.
 
 ## Repository layout
 
@@ -235,31 +192,6 @@ Working on more than one of these at a time? See the `worktree` skill
 | `.claude/settings.json` | all | Wires hooks into tool events |
 | `REVIEW.md` | 4. Ship | PR review policy — read by the CI workflow and by local `/review`, not by the built-in `/code-review` |
 | `.github/workflows/claude-review.yml` | 4. Ship | Optional CI that runs `REVIEW.md`'s passes on every PR |
-
-## Stage-by-stage notes
-
-**1. Brief.** The cheapest stage to be honest in. Write down what's actually
-wrong, what "done" means concretely enough to check later, and — most
-valuable of all — what's explicitly *out* of scope. Skip it only for changes
-genuinely too small to have a scope.
-
-**2. Plan.** Start every implementation in plan mode. Commit the plan before
-writing code; that's the artifact Stage 4 compares the diff against. If the
-implementation departs from the plan, update the plan in the same commit
-rather than letting them drift.
-
-**3. Build.** Run independent streams in separate git worktrees. For bug
-fixes, write and commit the failing test *before* the fix, and don't let the
-agent edit that test while fixing it. The stage ends at the commit; checking
-the work is the next session's job, because the session that wrote the code
-knows what it was *meant* to do — which is the assumption verification exists
-to break.
-
-**4. Ship.** Wrap verification in one command (`make test`, `npm test`, …)
-documented in `CLAUDE.md` with its expected healthy output. That command, then
-`verifier`, then `REVIEW.md`'s passes — via `/review` locally, and again via
-the CI workflow on the PR — then a PR you actually read before merging. Hooks
-gate anything hard to reverse — production deploys, protected-path edits.
 
 ## What this process deliberately leaves out
 

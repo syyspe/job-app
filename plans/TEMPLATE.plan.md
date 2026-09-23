@@ -28,5 +28,4 @@ here is hard to reverse — most changes aren't.
 
 ---
 
-**Next stage:** commit this plan *before* writing code. Run `/sdlc` for what
-follows it.
+**Next stage:** run `/sdlc`.

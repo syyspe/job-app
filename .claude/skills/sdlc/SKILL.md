@@ -14,21 +14,17 @@ branch are the state.**
 One short kebab-case slug (e.g. `csv-export`) names the branch and every
 artifact on it.
 
-| Stage | Artifact | Instructions | What unlocks the next stage |
-|---|---|---|---|
-| 1. Brief | `brief/<slug>.md` | `stages/1-brief.md` | Brief committed |
-| 2. Plan | `plans/<slug>.plan.md` | `stages/2-plan.md` | Plan committed **before** any code |
-| 3. Build | The code and its tests | `stages/3-build.md` | Code committed |
-| 4. Ship | Verification, review, and a PR | `stages/4-ship.md` | The user reads it and merges |
+| Stage | Artifact | Instructions | Ends when | Next session |
+|---|---|---|---|---|
+| 1. Brief | `brief/<slug>.md` | `stages/1-brief.md` | Brief committed | Stage 2 — in plan mode |
+| 2. Plan | `plans/<slug>.plan.md` | `stages/2-plan.md` | Plan committed **before** any code | Stage 3 — `/model sonnet`, auto mode |
+| 3. Build | The code and its tests | `stages/3-build.md` | Code committed | Stage 4 — still `/model sonnet` |
+| 4. Ship | Verification, review, and a PR | `stages/4-ship.md` | The user reads the PR and merges | — |
 
 Paths are relative to this skill's directory. **Read only the stage file you
-land in** — a session works one stage, and the other three are dead weight for
-the rest of it.
+land in.**
 
-Every boundary is a commit, which is why verification and `verifier` open
-Stage 4 instead of closing Stage 3: whether they've run is the one thing a
-fresh session can't read off disk, so nothing gates on it. Anything that has
-to be *remembered* to be true isn't state — only what's committed is.
+Why the process is shaped this way: `session-economy.md` in this directory.
 
 ## Work out where you are
 
@@ -48,9 +44,7 @@ Read it off the branch, in this order — first match wins:
    ```
 
    Output → Stage 4. Empty → Stage 3, not started. Date it from the commit
-   that *added* the plan, not the last to touch it: a build session amends the
-   plan in the same commit as the code it drifted from, and dating from that
-   would hide the very code it's meant to detect.
+   that *added* the plan, not the last one to touch it.
 
 The SessionStart hook (`.claude/hooks/session-start-check.sh`) runs the same
 rules once per session and names the stage file. Re-derive them here rather
@@ -63,22 +57,10 @@ skill instead of switching branches in place.
 
 ## Handing off between stages
 
-Three boundaries, and the default at all three is **end the session.**
-
-| Stage ends when | Next session |
-|---|---|
-| `brief/<slug>.md` committed | Stage 2 — Plan, in plan mode |
-| `plans/<slug>.plan.md` committed | Stage 3 — Build, `/model sonnet` |
-| Code committed | Stage 4 — Ship: verify, `verifier`, review, PR |
-
-At each one: say the stage is done, name the next action in one line, suggest
-a fresh session, and stop there. Don't take the next stage's first action in
-the same message, and don't offer to. Say it once — if the user would rather
-keep going, keep going.
-
-A finished stage's context is spent, and every later turn pays to resend it;
-`session-economy.md` in this directory has the full reasoning, including which
-model each stage is worth. Read it if a boundary looks like ceremony.
+At each "Ends when" in the table: say the stage is done, name the next action
+in one line, suggest a fresh session (with the table's model and mode), and
+stop there. Don't take the next stage's first action in the same message, and
+don't offer to. Say it once — if the user would rather keep going, keep going.
 
 ## Rules that don't bend
 

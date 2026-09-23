@@ -36,5 +36,4 @@ records that they stayed open.
 
 ---
 
-**Next stage:** commit this, then Stage 2 (Plan). Open a session in plan mode
-against this file and commit `plans/<slug>.plan.md` before writing any code.
+**Next stage:** run `/sdlc`.
