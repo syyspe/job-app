@@ -93,6 +93,9 @@ change. Run `npm test` after each file.
    then becomes a single `change(...)` call. `handleDelete` keeps its own
    `run` body, because it also collapses `expandedId`. The initial `load`
    effect stays as it is.
+   *As built:* this still came to 50 lines, so the five `change(...)`
+   handlers moved to a module-level `changeHandlers(change)` that the hook
+   spreads into its return value.
 3. **`useUsers`**: same pattern (`useApiAction` plus `change`).
    `handleResetPassword` doesn't reload, so it keeps calling `run` directly.
 4. **`ApplicationsView`**: move the sort, archived-filter and page state,
@@ -119,6 +122,10 @@ change. Run `npm test` after each file.
    - If `ApplicationFields` is still over 40, split it at a contiguous point
      in the field order (Company, Role, Date applied, Deadline | Status,
      Link, Notes) instead of changing the order.
+   - *As built:* it came to 45, so the fields were split into
+     `OpeningFields` (Company–Deadline) and `TrackingFields` (Status–Notes),
+     which `ApplicationForm` renders directly, with no `ApplicationFields`
+     wrapper left between them.
 6. **`UserForm`**: extract an unexported `RoleField({ value, onChange })`
    (the role select). This brings it to about 36 lines.
 7. **`ApplicationRow`**: extract the toggle `<button>` into an unexported

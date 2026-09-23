@@ -2,6 +2,26 @@ import type { ChangeEvent } from 'react'
 import { attachmentUrl } from '../lib/api.ts'
 import type { Attachment } from '../types.ts'
 
+interface AttachmentItemProps {
+  attachment: Attachment
+  onRemove: (id: number) => void
+}
+
+function AttachmentItem({ attachment, onRemove }: AttachmentItemProps) {
+  return (
+    <li className="attachment-item">
+      <a href={attachmentUrl(attachment.id)}>{attachment.originalName}</a>
+      <button
+        type="button"
+        className="button button-danger"
+        onClick={() => onRemove(attachment.id)}
+      >
+        Remove file
+      </button>
+    </li>
+  )
+}
+
 interface AttachmentListProps {
   attachments: Attachment[]
   onUpload: (file: File) => void
@@ -25,18 +45,11 @@ export function AttachmentList({
     <div>
       <ul className="attachment-list">
         {attachments.map((attachment) => (
-          <li key={attachment.id} className="attachment-item">
-            <a href={attachmentUrl(attachment.id)}>
-              {attachment.originalName}
-            </a>
-            <button
-              type="button"
-              className="button button-danger"
-              onClick={() => onRemove(attachment.id)}
-            >
-              Remove file
-            </button>
-          </li>
+          <AttachmentItem
+            key={attachment.id}
+            attachment={attachment}
+            onRemove={onRemove}
+          />
         ))}
       </ul>
       <label className="button">

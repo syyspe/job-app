@@ -130,3 +130,16 @@ test('a rejected change shows the error from the API', async () => {
     'cannot demote the last admin',
   )
 })
+
+test('a 401 while loading users shows the session-expired toast and calls onUnauthorized', async () => {
+  const onUnauthorized = vi.fn()
+  stubFetch(
+    () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }),
+  )
+  renderView(onUnauthorized)
+
+  await waitFor(() => expect(onUnauthorized).toHaveBeenCalled())
+  expect(screen.getByRole('alert')).toHaveTextContent(
+    'Your session expired — please log in again',
+  )
+})

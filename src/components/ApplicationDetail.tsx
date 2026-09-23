@@ -24,6 +24,33 @@ function toInput(application: Application): ApplicationInput {
   }
 }
 
+interface DetailActionsProps {
+  archived: boolean
+  onSetArchived: (archived: boolean) => void
+  onDelete: () => void
+}
+
+function DetailActions({ archived, onSetArchived, onDelete }: DetailActionsProps) {
+  return (
+    <>
+      <button
+        type="button"
+        className="button"
+        onClick={() => onSetArchived(!archived)}
+      >
+        {archived ? 'Unarchive' : 'Archive'}
+      </button>
+      <button
+        type="button"
+        className="button button-danger action-end"
+        onClick={onDelete}
+      >
+        Delete application
+      </button>
+    </>
+  )
+}
+
 export function ApplicationDetail({
   application,
   onUpdate,
@@ -38,22 +65,11 @@ export function ApplicationDetail({
       submitLabel="Save"
       onSubmit={onUpdate}
       actions={
-        <>
-          <button
-            type="button"
-            className="button"
-            onClick={() => onSetArchived(!application.archived)}
-          >
-            {application.archived ? 'Unarchive' : 'Archive'}
-          </button>
-          <button
-            type="button"
-            className="button button-danger action-end"
-            onClick={onDelete}
-          >
-            Delete application
-          </button>
-        </>
+        <DetailActions
+          archived={application.archived}
+          onSetArchived={onSetArchived}
+          onDelete={onDelete}
+        />
       }
     >
       <p className="timestamps">

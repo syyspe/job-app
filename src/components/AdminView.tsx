@@ -1,37 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { UserForm } from './UserForm.tsx'
 import { UserList } from './UserList.tsx'
 import {
-  UnauthorizedError,
   createUser,
   deleteUser,
   listUsers,
   resetUserPassword,
   setUserRole,
 } from '../lib/api.ts'
-import { useToast } from '../lib/toast.ts'
+import { useApiAction } from '../lib/apiAction.ts'
 import type { Role, User, UserInput } from '../types.ts'
 
 function useUsers(onUnauthorized: () => void) {
   const [users, setUsers] = useState<User[]>([])
-  const { showSuccess, showError } = useToast()
-
-  const run = useCallback(
-    async (task: () => Promise<void>, successMessage?: string) => {
-      try {
-        await task()
-        if (successMessage) showSuccess(successMessage)
-      } catch (error) {
-        if (error instanceof UnauthorizedError) {
-          showError('Your session expired — please log in again')
-          onUnauthorized()
-          return
-        }
-        showError(error instanceof Error ? error.message : 'Something went wrong')
-      }
-    },
-    [onUnauthorized, showSuccess, showError],
-  )
+  const run = useApiAction(onUnauthorized)
 
   async function reload() {
     setUsers(await listUsers())
@@ -41,18 +23,11 @@ function useUsers(onUnauthorized: () => void) {
     void run(reload)
   }, [run])
 
-  async function handleCreate(input: UserInput) {
+  async function change(call: () => Promise<unknown>, message: string) {
     await run(async () => {
-      await createUser(input)
+      await call()
       await reload()
-    }, 'User added')
-  }
-
-  async function handleSetRole(id: number, role: Role) {
-    await run(async () => {
-      await setUserRole(id, role)
-      await reload()
-    }, 'Role changed')
+    }, message)
   }
 
   async function handleResetPassword(id: number, password: string) {
@@ -61,14 +36,14 @@ function useUsers(onUnauthorized: () => void) {
     }, 'Password reset')
   }
 
-  async function handleDelete(id: number) {
-    await run(async () => {
-      await deleteUser(id)
-      await reload()
-    }, 'User deleted')
+  return {
+    users,
+    handleCreate: (input: UserInput) => change(() => createUser(input), 'User added'),
+    handleSetRole: (id: number, role: Role) =>
+      change(() => setUserRole(id, role), 'Role changed'),
+    handleResetPassword,
+    handleDelete: (id: number) => change(() => deleteUser(id), 'User deleted'),
   }
-
-  return { users, handleCreate, handleSetRole, handleResetPassword, handleDelete }
 }
 
 interface AdminViewProps {

@@ -25,6 +25,32 @@ function EmptyState({ hiddenArchivedCount }: { hiddenArchivedCount: number }) {
   )
 }
 
+interface RowSummaryProps {
+  application: Application
+  expanded: boolean
+  onToggle: () => void
+}
+
+function RowSummary({ application, expanded, onToggle }: RowSummaryProps) {
+  return (
+    <button
+      type="button"
+      className="row-button"
+      aria-expanded={expanded}
+      onClick={onToggle}
+    >
+      <span className="row-company">{application.company}</span>
+      <span className="row-role">{application.role}</span>
+      <span className="row-status">{STATUS_LABELS[application.status]}</span>
+      {application.deadline && (
+        <span className="row-deadline">
+          due {formatDate(application.deadline)}
+        </span>
+      )}
+    </button>
+  )
+}
+
 interface ApplicationRowProps {
   application: Application
   expanded: boolean
@@ -52,21 +78,7 @@ function ApplicationRow({
       data-status={application.status}
       data-archived={application.archived}
     >
-      <button
-        type="button"
-        className="row-button"
-        aria-expanded={expanded}
-        onClick={onToggle}
-      >
-        <span className="row-company">{application.company}</span>
-        <span className="row-role">{application.role}</span>
-        <span className="row-status">{STATUS_LABELS[application.status]}</span>
-        {application.deadline && (
-          <span className="row-deadline">
-            due {formatDate(application.deadline)}
-          </span>
-        )}
-      </button>
+      <RowSummary application={application} expanded={expanded} onToggle={onToggle} />
       {expanded && (
         <ApplicationDetail
           application={application}
