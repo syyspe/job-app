@@ -33,6 +33,11 @@ the default for all new code.
 | Nesting | ≤ 2 levels | Use a guard clause / early return instead of a 3rd level. |
 | Cyclomatic complexity | ≤ 10 | Split the function. |
 
+`npm run lint` enforces all five as errors (oxlint, configured in
+`.oxlintrc.json`). Lengths are counted without blank lines and comments.
+Test files (`*.test.ts`, `*.test.tsx`, `e2e/*.spec.ts`) are exempt from the
+two length rules only; every other limit still applies to them.
+
 Never suppress a limit or add a lint-disable to get past it — restructure
 instead. Hitting a limit is a signal the unit is doing too much, not a
 formatting problem.
@@ -72,3 +77,5 @@ Name things for what they mean, not how they're implemented.
   only covers the parameter count. The body still follows every other limit.
   It doesn't apply when you choose the signature, such as your own
   callbacks, or props you could bundle into an object.
+  An exemption is a scoped `overrides` entry in `.oxlintrc.json` naming the
+  file, never an inline lint-disable.

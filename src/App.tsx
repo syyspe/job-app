@@ -11,11 +11,9 @@ import './App.css'
 import './applications.css'
 import './admin.css'
 
-function App() {
+function useCurrentUser() {
   const [user, setUser] = useState<User | null>(null)
-  const [view, setView] = useState<View>('applications')
   const [loaded, setLoaded] = useState(false)
-  const { showSuccess, showError } = useToast()
 
   useEffect(() => {
     async function load() {
@@ -28,6 +26,14 @@ function App() {
     }
     void load()
   }, [])
+
+  return { user, setUser, loaded }
+}
+
+function App() {
+  const { user, setUser, loaded } = useCurrentUser()
+  const [view, setView] = useState<View>('applications')
+  const { showSuccess, showError } = useToast()
 
   async function handleLogin(username: string, password: string) {
     try {

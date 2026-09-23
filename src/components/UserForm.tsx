@@ -6,6 +6,26 @@ import type { Role, UserInput } from '../types.ts'
 
 const emptyInput: UserInput = { username: '', password: '', role: 'basic' }
 
+interface RoleFieldProps {
+  value: Role
+  onChange: (value: Role) => void
+}
+
+function RoleField({ value, onChange }: RoleFieldProps) {
+  return (
+    <label>
+      Role
+      <select value={value} onChange={(e) => onChange(e.target.value as Role)}>
+        {ROLES.map((role) => (
+          <option key={role} value={role}>
+            {ROLE_LABELS[role]}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
 interface UserFormProps {
   onSubmit: (input: UserInput) => void
 }
@@ -39,19 +59,10 @@ export function UserForm({ onSubmit }: UserFormProps) {
           required
         />
       </label>
-      <label>
-        Role
-        <select
-          value={input.role}
-          onChange={(e) => setInput({ ...input, role: e.target.value as Role })}
-        >
-          {ROLES.map((role) => (
-            <option key={role} value={role}>
-              {ROLE_LABELS[role]}
-            </option>
-          ))}
-        </select>
-      </label>
+      <RoleField
+        value={input.role}
+        onChange={(role) => setInput({ ...input, role })}
+      />
       <div className="form-actions">
         <button type="submit" className="button button-primary">
           Add user

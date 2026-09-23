@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ChangeEvent, FormEvent, ReactNode } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { STATUS_LABELS } from '../lib/status.ts'
 import { STATUSES } from '../types.ts'
 import type { ApplicationInput, Status } from '../types.ts'
@@ -36,6 +36,110 @@ function TextField({ label, value, onChange, type, required }: TextFieldProps) {
   )
 }
 
+function withDateApplied(
+  input: ApplicationInput,
+  dateApplied: string,
+): ApplicationInput {
+  const applyingDraft = input.status === 'draft' && dateApplied !== ''
+  return {
+    ...input,
+    dateApplied,
+    status: applyingDraft ? 'applied' : input.status,
+  }
+}
+
+interface StatusFieldProps {
+  value: Status
+  onChange: (value: Status) => void
+}
+
+function StatusField({ value, onChange }: StatusFieldProps) {
+  return (
+    <label>
+      Status
+      <select value={value} onChange={(e) => onChange(e.target.value as Status)}>
+        {STATUSES.map((status) => (
+          <option key={status} value={status}>
+            {STATUS_LABELS[status]}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+interface NotesFieldProps {
+  value: string
+  onChange: (value: string) => void
+}
+
+function NotesField({ value, onChange }: NotesFieldProps) {
+  return (
+    <label>
+      Notes
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} />
+    </label>
+  )
+}
+
+interface FieldsProps {
+  input: ApplicationInput
+  onChange: (input: ApplicationInput) => void
+}
+
+function OpeningFields({ input, onChange }: FieldsProps) {
+  return (
+    <>
+      <TextField
+        label="Company"
+        value={input.company}
+        onChange={(value) => onChange({ ...input, company: value })}
+        required
+      />
+      <TextField
+        label="Role"
+        value={input.role}
+        onChange={(value) => onChange({ ...input, role: value })}
+        required
+      />
+      <TextField
+        label="Date applied"
+        type="date"
+        value={input.dateApplied}
+        onChange={(value) => onChange(withDateApplied(input, value))}
+        required={input.status !== 'draft'}
+      />
+      <TextField
+        label="Deadline"
+        type="date"
+        value={input.deadline}
+        onChange={(value) => onChange({ ...input, deadline: value })}
+      />
+    </>
+  )
+}
+
+function TrackingFields({ input, onChange }: FieldsProps) {
+  return (
+    <>
+      <StatusField
+        value={input.status}
+        onChange={(value) => onChange({ ...input, status: value })}
+      />
+      <TextField
+        label="Link"
+        type="url"
+        value={input.link}
+        onChange={(value) => onChange({ ...input, link: value })}
+      />
+      <NotesField
+        value={input.notes}
+        onChange={(value) => onChange({ ...input, notes: value })}
+      />
+    </>
+  )
+}
+
 interface ApplicationFormProps {
   initial?: ApplicationInput
   submitLabel: string
@@ -59,73 +163,10 @@ export function ApplicationForm({
     if (!initial) setInput(emptyInput)
   }
 
-  function handleDateChange(event: ChangeEvent<HTMLInputElement>) {
-    const dateApplied = event.target.value
-    const applyingDraft = input.status === 'draft' && dateApplied !== ''
-    setInput({
-      ...input,
-      dateApplied,
-      status: applyingDraft ? 'applied' : input.status,
-    })
-  }
-
-  function handleStatusChange(event: ChangeEvent<HTMLSelectElement>) {
-    setInput({ ...input, status: event.target.value as Status })
-  }
-
-  function handleNotesChange(event: ChangeEvent<HTMLTextAreaElement>) {
-    setInput({ ...input, notes: event.target.value })
-  }
-
   return (
     <form onSubmit={handleSubmit}>
-      <TextField
-        label="Company"
-        value={input.company}
-        onChange={(value) => setInput({ ...input, company: value })}
-        required
-      />
-      <TextField
-        label="Role"
-        value={input.role}
-        onChange={(value) => setInput({ ...input, role: value })}
-        required
-      />
-      <label>
-        Date applied
-        <input
-          type="date"
-          value={input.dateApplied}
-          onChange={handleDateChange}
-          required={input.status !== 'draft'}
-        />
-      </label>
-      <TextField
-        label="Deadline"
-        type="date"
-        value={input.deadline}
-        onChange={(value) => setInput({ ...input, deadline: value })}
-      />
-      <label>
-        Status
-        <select value={input.status} onChange={handleStatusChange}>
-          {STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {STATUS_LABELS[status]}
-            </option>
-          ))}
-        </select>
-      </label>
-      <TextField
-        label="Link"
-        type="url"
-        value={input.link}
-        onChange={(value) => setInput({ ...input, link: value })}
-      />
-      <label>
-        Notes
-        <textarea value={input.notes} onChange={handleNotesChange} />
-      </label>
+      <OpeningFields input={input} onChange={setInput} />
+      <TrackingFields input={input} onChange={setInput} />
       {children}
       <div className="form-actions">
         <button type="submit" className="button button-primary">
