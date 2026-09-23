@@ -19,8 +19,8 @@ The required workflow for any new behavior, not just bug fixes:
 3. **Refactor** — simplify without changing behavior, re-running tests
    after each step.
 
-This is the same discipline the root `README.md` (Stage 3) and
-`plans/TEMPLATE.plan.md` already name for bug fixes — this skill makes it
+This is the same discipline `.claude/skills/sdlc/stages/3-build.md` already
+names for bug fixes — this skill makes it
 the default for all new code.
 
 ## Limits

@@ -71,11 +71,11 @@ don't offer to. Say it once — if the user would rather keep going, keep going.
 - One session, one stage. A stage ends where the table above says it ends,
   and the next stage's first action belongs to the next session. Suggest the
   handoff instead of starting the work and mentioning the handoff afterwards.
-- Don't run several *stages* together unasked. Report where things stand
-  compactly — a status line and the next action — then offer to move to the
-  next stage, and do it once the user agrees. This governs stage transitions,
-  not the steps inside a stage: Stage 4's steps run back to back without
-  checking in between.
+- Don't run several *stages* together unasked. At a boundary, report where
+  things stand compactly — a status line and the next action — and hand off;
+  move on in the same session only if the user asks to. This governs stage
+  transitions, not the steps inside a stage: Stage 4's steps run back to back
+  without checking in between.
 - For a genuinely trivial change (typo, version bump, one-line fix with an
   obvious test), say so and go straight to a branch and a PR. Skipping the
   brief is a judgment call to make out loud. Skipping the plan on anything
