@@ -35,7 +35,7 @@ Presentational components, each with a test beside it. By surface:
 
 - **Login** — `LoginForm`.
 - **Applications** — `ApplicationsView` (with its local `useApplications`
-  hook) over `ApplicationList`, `ApplicationDetail`, `ApplicationForm` and
+  hook for the data and `useListView` for sort, archived filter and page) over `ApplicationList`, `ApplicationDetail`, `ApplicationForm` and
   `ApplicationSort`, with `AttachmentList` in the detail and
   `ArchivedToggle`/`Pagination` at the foot of the list.
 - **Admin** — `AdminView` (with its local `useUsers` hook) plus `UserForm`,
@@ -48,6 +48,9 @@ Presentational components, each with a test beside it. By surface:
 - `api.ts` — every `fetch` against `/api`. Components don't call `fetch`
   themselves. Sends `credentials: 'same-origin'` on every call and throws
   `UnauthorizedError` on a 401.
+- `apiAction.ts` — `useApiAction(onUnauthorized)`, the `run` wrapper both
+  data hooks share: it shows the success toast, and on `UnauthorizedError`
+  shows the session-expired toast and calls `onUnauthorized`.
 - `paging.ts` — `paginate`, the pure one-page-at-a-time slice. The page size
   comes from `GET /api/config`; a null size means one page holding
   everything, which is what the list shows until that call answers.
