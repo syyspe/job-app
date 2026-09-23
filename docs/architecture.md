@@ -35,7 +35,8 @@ Presentational components, each with a test beside it. By surface:
 
 - **Login** — `LoginForm`.
 - **Applications** — `ApplicationsView` (with its local `useApplications`
-  hook for the data and `useListView` for sort, archived filter and page) over `ApplicationList`, `ApplicationDetail`, `ApplicationForm` and
+  hook for the data and `useListView` for sort, archived filter and page)
+  over `ApplicationList`, `ApplicationDetail`, `ApplicationForm` and
   `ApplicationSort`, with `AttachmentList` in the detail and
   `ArchivedToggle`/`Pagination` at the foot of the list.
 - **Admin** — `AdminView` (with its local `useUsers` hook) plus `UserForm`,
