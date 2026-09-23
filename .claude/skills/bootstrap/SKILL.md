@@ -279,25 +279,10 @@ Runs once the setup PR is merged and the default branch is pulled. Setup was
 not the finish line; it was the thing that had to happen before Stage 1 —
 so don't end the session there, walk them into the loop.
 
-**First**, show the loop in one screen (adjust nothing; this is the same
-map `CLAUDE.md` and the `sdlc` skill carry):
-
-```
-1. Brief  brief/<slug>.md         problem, done-looks-like, out of scope
-2. Plan   plans/<slug>.plan.md    committed BEFORE any code
-3. Build  code + tests            implement the work order, commit it
-4. Ship   verify → review → PR    checked with fresh eyes, then you merge
-```
-
-Say the three things that make it make sense: one kebab-case slug names the
-branch and every artifact on it; each stage ends by committing its artifact,
-and that commit is what starts the next stage; and the default branch only
-ever moves by merged PR — the setup PR they just merged was the first
-example. Add the one thing that is easy to miss: **there is nothing to
-approve.** No `status:` flags, no sign-off lines — an artifact exists or it
-doesn't, and that's the whole state. Mention that `/sdlc` re-prints this and
-reports where any branch stands, and that the session start message will tell
-them the same thing unprompted.
+**First**, show the stage table from `.claude/skills/sdlc/SKILL.md` and its
+"Rules that don't bend", plus that the default branch moves only by merged PR
+(the setup PR they just merged was the first). Mention that `/sdlc` re-prints
+this and reports where any branch stands.
 
 **Then** ask one question, per the one-question-at-a-time rule: *what's the
 first thing you want to build?*
@@ -308,17 +293,11 @@ From their answer:
 2. `git checkout -b <slug>` from the freshly pulled default branch (so the
    merged setup is underneath it), then copy `brief/TEMPLATE.md` to
    `brief/<slug>.md`.
-3. Interview them through the template's sections — Problem, What done looks
-   like, Approach, Out of scope, Open questions — one question per message.
-   Write what they actually said; leave a section thin, or delete it,
-   rather than inventing requirements to fill it. Set the slug and today's
+3. Follow `.claude/skills/sdlc/stages/1-brief.md`. Set the slug and today's
    date in the frontmatter.
 4. Commit it.
 
-**Then stop.** Tell them the brief is committed and Stage 2 (Plan) is what
-comes next — in a fresh session, in plan mode, against that file. Don't write
-the plan now, however obvious it looks: plan mode with a clean context is the
-point, not a formality.
+**Then stop** and hand off: `.claude/skills/sdlc/SKILL.md` "Handing off".
 
 If they'd rather not start anything yet, that's fine — point at `/sdlc` for
 whenever they do, and end there.

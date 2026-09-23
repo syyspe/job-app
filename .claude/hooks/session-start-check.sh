@@ -27,9 +27,7 @@ fi
 HOWTO="Orientation, not a script to recite: if the user opens with something \
 open-ended (what next, let's continue, hi), lead with the stage and next \
 action in at most two lines. Otherwise hold this as context and answer what \
-was asked. The line above is the imperative only — the sdlc skill has the full \
-loop map, the exact commands, and the reasoning behind each stage. Read it \
-before departing from the next action named here."
+was asked. Rules and reasoning: the sdlc skill."
 
 emit() {
   MSG="$1" python3 -c 'import json, os
@@ -56,8 +54,7 @@ case "$slug" in
     emit "Loop status: on the default branch ($slug) — no work stream checked out.
 
 Next: Stage 1 (Brief). Pick a short kebab-case slug, run git checkout -b
-<slug>, then write brief/<slug>.md from brief/TEMPLATE.md. That one slug names
-the branch and the plan that follows it.
+<slug>, then write brief/<slug>.md from brief/TEMPLATE.md.
 
 $HOWTO"
     ;;
@@ -104,15 +101,12 @@ elif [ ! -f "$plan" ]; then
   stage="Stage 2 (Plan) — brief committed, no plan yet."
   next="call the EnterPlanMode tool now, as your first action. Read $brief and
 iterate, then write $plan from plans/TEMPLATE.plan.md and commit it BEFORE any
-code. Stop there — approving ExitPlanMode approves the plan, it is not a
-go-ahead to build in this session. Full instructions:
-.claude/skills/sdlc/stages/2-plan.md"
+code. Full instructions: .claude/skills/sdlc/stages/2-plan.md"
 elif [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   stage="Stage 3 (Build) — plan committed, work in progress."
   next="finish $plan's work order and commit it; if the implementation departed
 from the plan, update $plan in the same commit. That commit ends the stage.
-Verification, verifier, /code-review and the PR are Stage 4 — don't run them
-here. Full instructions: .claude/skills/sdlc/stages/3-build.md"
+Full instructions: .claude/skills/sdlc/stages/3-build.md"
 elif [ -z "$code" ]; then
   stage="Stage 3 (Build) — plan committed, no code yet."
   next="implement $plan's work order and commit it — simple-code applies from
@@ -120,11 +114,7 @@ the first line. That commit is this session's whole job and ends the stage.
 Full instructions: .claude/skills/sdlc/stages/3-build.md"
 else
   stage="Stage 4 (Ship) — code committed since the plan."
-  next="read .claude/skills/sdlc/stages/4-ship.md and run its steps in order,
-as one continuous sequence, without stopping to ask in between: the
-verification command from CLAUDE.md, the verifier subagent against $plan,
-/code-review, /security-review if the diff touches a real boundary, then git
-push -u origin $slug && gh pr create. The user reviews and merges."
+  next="read .claude/skills/sdlc/stages/4-ship.md and run its steps in order."
 fi
 
 emit "Loop status — branch: $slug
