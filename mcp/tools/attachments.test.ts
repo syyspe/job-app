@@ -114,3 +114,61 @@ test('read_attachment on an unknown id names the id', async () => {
   expect(result.isError).toBe(true)
   expect(textOf(result)).toContain('no attachment with id 9999')
 })
+
+test('delete_attachment removes the attachment from its application', async () => {
+  const attached = await attach('cv.pdf', 'x')
+
+  const result = await call('delete_attachment', { id: attached.id })
+
+  expect(result.isError).toBeFalsy()
+  const application = jsonOf<Application>(
+    await call('get_application', { id: attached.applicationId }),
+  )
+  expect(application.attachments).toEqual([])
+})
+
+test('delete_attachment on an unknown id names the id', async () => {
+  const result = await call('delete_attachment', { id: 9999 })
+
+  expect(result.isError).toBe(true)
+  expect(textOf(result)).toContain('no attachment with id 9999')
+})
+
+test('replace_attachment swaps the file in place and keeps the id', async () => {
+  const attached = await attach('cv.pdf', 'old cv')
+
+  const result = await call('replace_attachment', {
+    id: attached.id,
+    path: writeLocalFile('cv-2026.txt', 'new cv\n'),
+  })
+
+  const replaced = jsonOf<Attachment>(result)
+  expect(replaced.id).toBe(attached.id)
+  expect(replaced.originalName).toBe('cv-2026.txt')
+  expect(replaced.mimeType).toBe('text/plain')
+  expect(textOf(await call('read_attachment', { id: attached.id }))).toBe('new cv\n')
+  const application = jsonOf<Application>(
+    await call('get_application', { id: attached.applicationId }),
+  )
+  expect(application.attachments.map((one) => one.id)).toEqual([attached.id])
+})
+
+test('replace_attachment on an unknown id names the id', async () => {
+  const result = await call('replace_attachment', {
+    id: 9999,
+    path: writeLocalFile('cv.pdf', 'x'),
+  })
+
+  expect(result.isError).toBe(true)
+  expect(textOf(result)).toContain('no attachment with id 9999')
+})
+
+test('replace_attachment on a missing path names the path', async () => {
+  const attached = await attach('cv.pdf', 'x')
+  const missing = join(harness.root, 'nope.pdf')
+
+  const result = await call('replace_attachment', { id: attached.id, path: missing })
+
+  expect(result.isError).toBe(true)
+  expect(textOf(result)).toContain(`no file at ${missing}`)
+})

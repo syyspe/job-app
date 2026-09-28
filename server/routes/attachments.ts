@@ -49,8 +49,9 @@ function uploadHandler(db: Database.Database) {
 
     const result = db
       .prepare(
-        `INSERT INTO attachments (application_id, stored_name, original_name, mime_type)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO attachments
+           (application_id, stored_name, original_name, mime_type, uploaded_at)
+         VALUES (?, ?, ?, ?, datetime('now'))`,
       )
       .run(applicationId, req.file.filename, req.file.originalname, req.file.mimetype)
 
@@ -82,6 +83,38 @@ function downloadHandler(db: Database.Database, uploadsDir: string) {
     }
 
     res.download(join(uploadsDir, row.stored_name), row.original_name)
+  }
+}
+
+function checkAttachmentOwned(db: Database.Database) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!findOwnedAttachment(db, Number(req.params.id), req.userId)) {
+      res.status(404).json({ error: 'not found' })
+      return
+    }
+    next()
+  }
+}
+
+function replaceHandler(db: Database.Database, uploadsDir: string) {
+  return (req: Request, res: Response) => {
+    const id = Number(req.params.id)
+    if (!req.file) {
+      res.status(400).json({ error: 'file is required' })
+      return
+    }
+
+    const old = findOwnedAttachment(db, id, req.userId) as AttachmentRow
+    db.prepare(
+      `UPDATE attachments
+          SET stored_name = ?, original_name = ?, mime_type = ?, uploaded_at = datetime('now')
+        WHERE id = ?`,
+    ).run(req.file.filename, req.file.originalname, req.file.mimetype, id)
+    unlinkIfExists(join(uploadsDir, old.stored_name))
+    touchApplication(db, old.application_id)
+
+    const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as AttachmentRow
+    res.json(toAttachment(row))
   }
 }
 
@@ -118,6 +151,12 @@ export function createAttachmentsRouter(
     uploadHandler(db),
   )
   router.get('/attachments/:id', downloadHandler(db, uploadsDir))
+  router.put(
+    '/attachments/:id',
+    checkAttachmentOwned(db),
+    upload.single('file'),
+    replaceHandler(db, uploadsDir),
+  )
   router.delete('/attachments/:id', removeHandler(db, uploadsDir))
 
   return router

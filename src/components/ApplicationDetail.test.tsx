@@ -24,6 +24,7 @@ const application: Application = {
       storedName: 'resume.pdf',
       originalName: 'resume.pdf',
       mimeType: 'application/pdf',
+      uploadedAt: '2026-01-15 09:00:00',
     },
   ],
 }

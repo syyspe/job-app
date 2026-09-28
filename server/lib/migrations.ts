@@ -29,8 +29,16 @@ export function migrateUserRole(db: Database.Database): void {
   db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'basic'`)
 }
 
+export function migrateAttachmentUploadedAt(db: Database.Database): void {
+  const columns = db.pragma('table_info(attachments)') as { name: string }[]
+  if (columns.some((column) => column.name === 'uploaded_at')) return
+
+  db.exec(`ALTER TABLE attachments ADD COLUMN uploaded_at TEXT NOT NULL DEFAULT ''`)
+}
+
 export function migrate(db: Database.Database): void {
   migrateApplicationDates(db)
   migrateApplicationArchived(db)
   migrateUserRole(db)
+  migrateAttachmentUploadedAt(db)
 }

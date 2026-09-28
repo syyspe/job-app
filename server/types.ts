@@ -29,6 +29,7 @@ export interface Attachment {
   storedName: string
   originalName: string
   mimeType: string
+  uploadedAt: string
 }
 
 export interface Application {
