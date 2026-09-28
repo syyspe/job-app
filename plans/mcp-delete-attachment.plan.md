@@ -51,6 +51,9 @@ The brief's open question is settled: **existing attachments get
   - New `remove(path): Promise<void>` sends DELETE through `send`, so it gets
     the same re-login and `ApiError` handling. It is named `remove` because
     `delete` is a keyword.
+  - Build note: `remove` pushed `createApiClient` past the 40-line limit, so
+    the session cookie and 401 re-login moved out into
+    `createSessionSender(config)`, which returns the `send` it uses.
 - `mcp/tools/attachments.ts`:
   - Generalise `downloadAttachment`'s 404 mapping into
     `namingMissingAttachment<T>(id, request: () => Promise<T>)`, which rethrows
@@ -114,6 +117,8 @@ The brief's open question is settled: **existing attachments get
   - `replace_attachment` on a missing local path names the path.
 - Updated: `src/components/AttachmentList.test.tsx` and any other fixtures,
   for the new field.
+- Updated: `mcp/server.test.ts`, which asserts the exact tool list — now nine
+  tools. (Added during the build; the plan originally missed it.)
 - Verification command: `npm test` (it must show no `failed` line), then
   `npm run lint` and `npm run build`.
 - Manual check, optional: restart Claude Desktop (it caches the tool list per

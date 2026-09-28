@@ -6,6 +6,7 @@ export interface AttachmentRow {
   stored_name: string
   original_name: string
   mime_type: string
+  uploaded_at: string
 }
 
 export function toAttachment(row: AttachmentRow): Attachment {
@@ -15,5 +16,6 @@ export function toAttachment(row: AttachmentRow): Attachment {
     storedName: row.stored_name,
     originalName: row.original_name,
     mimeType: row.mime_type,
+    uploadedAt: row.uploaded_at,
   }
 }

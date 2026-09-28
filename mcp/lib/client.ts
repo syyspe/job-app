@@ -12,8 +12,9 @@ export interface ApiFile {
 export interface ApiClient {
   getJson<T>(path: string): Promise<T>
   sendJson<T>(method: 'POST' | 'PUT', path: string, body: unknown): Promise<T>
-  sendForm<T>(path: string, form: FormData): Promise<T>
+  sendForm<T>(method: 'POST' | 'PUT', path: string, form: FormData): Promise<T>
   getFile(path: string): Promise<ApiFile>
+  remove(path: string): Promise<void>
 }
 
 export class ApiError extends Error {
@@ -87,7 +88,9 @@ async function readFile(response: Response): Promise<ApiFile> {
   }
 }
 
-export function createApiClient(config: ApiConfig): ApiClient {
+type Send = (path: string, spec: RequestSpec) => Promise<Response>
+
+function createSessionSender(config: ApiConfig): Send {
   let cookie: string | null = null
 
   async function sessionCookie(): Promise<string> {
@@ -111,6 +114,12 @@ export function createApiClient(config: ApiConfig): ApiClient {
     return checked(await sendWithSession(path, spec))
   }
 
+  return send
+}
+
+export function createApiClient(config: ApiConfig): ApiClient {
+  const send = createSessionSender(config)
+
   return {
     async getJson<T>(path: string): Promise<T> {
       return readJson<T>(await send(path, {}))
@@ -126,12 +135,16 @@ export function createApiClient(config: ApiConfig): ApiClient {
       )
     },
 
-    async sendForm<T>(path: string, form: FormData): Promise<T> {
-      return readJson<T>(await send(path, { method: 'POST', body: form }))
+    async sendForm<T>(method: 'POST' | 'PUT', path: string, form: FormData): Promise<T> {
+      return readJson<T>(await send(path, { method, body: form }))
     },
 
     async getFile(path: string): Promise<ApiFile> {
       return readFile(await send(path, {}))
+    },
+
+    async remove(path: string): Promise<void> {
+      await send(path, { method: 'DELETE' })
     },
   }
 }

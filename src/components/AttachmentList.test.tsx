@@ -11,6 +11,7 @@ const attachments: Attachment[] = [
     storedName: 'a1.txt',
     originalName: 'resume.txt',
     mimeType: 'text/plain',
+    uploadedAt: '2026-01-15 09:00:00',
   },
   {
     id: 2,
@@ -18,6 +19,7 @@ const attachments: Attachment[] = [
     storedName: 'a2.txt',
     originalName: 'cover-letter.txt',
     mimeType: 'text/plain',
+    uploadedAt: '2026-01-15 09:00:00',
   },
 ]
 

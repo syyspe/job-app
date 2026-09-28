@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import {
   migrateApplicationArchived,
   migrateApplicationDates,
+  migrateAttachmentUploadedAt,
   migrateUserRole,
 } from './migrations.ts'
 
@@ -34,6 +35,15 @@ beforeEach(() => {
       link         TEXT NOT NULL DEFAULT '',
       notes        TEXT NOT NULL DEFAULT ''
     );
+
+    CREATE TABLE attachments (
+      id             INTEGER PRIMARY KEY AUTOINCREMENT,
+      application_id INTEGER NOT NULL
+                     REFERENCES applications(id) ON DELETE CASCADE,
+      stored_name    TEXT NOT NULL,
+      original_name  TEXT NOT NULL,
+      mime_type      TEXT NOT NULL
+    );
   `)
   db.prepare(
     `INSERT INTO applications (id, company, role, date_applied, status, link, notes)
@@ -41,6 +51,10 @@ beforeEach(() => {
   ).run()
   db.prepare(
     `INSERT INTO users (id, username, password_hash) VALUES (1, 'testuser', 'hash')`,
+  ).run()
+  db.prepare(
+    `INSERT INTO attachments (id, application_id, stored_name, original_name, mime_type)
+     VALUES (1, 1, 'a1.pdf', 'cv.pdf', 'application/pdf')`,
   ).run()
 })
 
@@ -117,4 +131,26 @@ test('migrating the user role twice is a no-op the second time', () => {
   expect(() => migrateUserRole(db)).not.toThrow()
   const user = db.prepare('SELECT role FROM users WHERE id = 1').get() as { role: string }
   expect(user.role).toBe('admin')
+})
+
+test('migrating a legacy database gives existing attachments an empty uploaded_at', () => {
+  migrateAttachmentUploadedAt(db)
+
+  const attachment = db.prepare('SELECT * FROM attachments WHERE id = 1').get() as {
+    original_name: string
+    uploaded_at: string
+  }
+  expect(attachment.original_name).toBe('cv.pdf')
+  expect(attachment.uploaded_at).toBe('')
+})
+
+test('migrating uploaded_at twice is a no-op the second time', () => {
+  migrateAttachmentUploadedAt(db)
+  db.prepare(`UPDATE attachments SET uploaded_at = '2026-01-01 00:00:00' WHERE id = 1`).run()
+
+  expect(() => migrateAttachmentUploadedAt(db)).not.toThrow()
+  const attachment = db.prepare('SELECT uploaded_at FROM attachments WHERE id = 1').get() as {
+    uploaded_at: string
+  }
+  expect(attachment.uploaded_at).toBe('2026-01-01 00:00:00')
 })

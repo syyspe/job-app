@@ -39,7 +39,8 @@ const SCHEMA = `
                    REFERENCES applications(id) ON DELETE CASCADE,
     stored_name    TEXT NOT NULL,
     original_name  TEXT NOT NULL,
-    mime_type      TEXT NOT NULL
+    mime_type      TEXT NOT NULL,
+    uploaded_at    TEXT NOT NULL DEFAULT ''
   );
 `
 
