@@ -46,10 +46,12 @@ error's **own message** through verbatim, so the handler stays one rule.
   on a 5xx only. It takes `{ method, path }` rather than a `Request`, so it is
   testable without an HTTP round trip. Nothing here writes to stdout.
 - `server/middleware/errors.ts` — one rule replaces the two-branch special
-  case: resolve a status from the error (`MulterError` → 400, `HttpError` →
-  its status, anything carrying a numeric `status` → that status, else 500),
-  log it, then answer a 4xx with the error's own message and anything else
-  with `500 {"error":"internal server error"}` as today.
+  case: resolve a status from the error (`MulterError` → 400, anything
+  carrying a numeric `status` → that status, else 500), log it, then answer a
+  4xx with the error's own message and anything else with
+  `500 {"error":"internal server error"}` as today. **As built there is no
+  separate `HttpError` branch** — `HttpError` carries a numeric `status`, so
+  the generic rule is what honours it, and a branch for it would be dead.
 - `server/middleware/contentType.ts` — **new.** Throws
   `new HttpError(415, ...)` naming the rejected type when a request carries a
   `Content-Type` that is neither `application/json` nor `multipart/form-data`
@@ -88,7 +90,14 @@ code exists.
 4. The content-type guard and its mount in `app.ts`. Cover it from
    `server/routes/auth.test.ts`: form-urlencoded → 415, `text/plain` → 415,
    and the existing JSON logins still pass.
-5. `loginHandler`, `meHandler`, `requireAdmin`.
+5. `loginHandler`, `meHandler`, `requireAdmin`. **Found while building:**
+   `sessions.user_id` is `ON DELETE CASCADE` and `openDatabase` sets
+   `foreign_keys = ON`, so deleting a user takes their sessions with it and
+   the brief's "session pointing at a deleted user" cannot be reached through
+   the API — only by an out-of-band row delete. The 401s are kept (they also
+   make the `as UserRow` / `as { role: string }` casts honest), and their two
+   tests turn foreign keys off to create the orphan, since deleting the user
+   with them on makes the test pass at `requireSession` and assert nothing.
 6. A 413 case — `POST /api/applications` with a >100kb JSON body — in
    `server/routes/applications.test.ts`, where that route's other cases
    already live.
@@ -102,11 +111,12 @@ code exists.
   each asserting both the response and the logged line.
 - Updated: `server/routes/auth.test.ts` — form-urlencoded login → 415,
   `text/plain` → 415, no body → 401 `invalid credentials`, body `null` → 400,
-  and `/api/me` with a session whose user row was deleted (`DELETE FROM users
-  WHERE id = ?` against the test db) → 401.
+  and `/api/me` with a session whose user row was deleted → 401 (the delete
+  runs with `foreign_keys = OFF`; see the work order's step 5).
 - Updated: `server/routes/applications.test.ts` — a >100kb JSON body → 413.
 - Updated: `server/routes/users.test.ts` — an admin route reached with a
-  session whose user row was deleted → 401, not a crash.
+  session whose user row was deleted → 401, not a crash (same
+  `foreign_keys = OFF` delete).
 - Verification command: `npm test` — expect `Test Files N passed / Tests N
   passed` and no `failed` line. Then `npm run lint` and `npm run build`. E2E is
   unaffected and not part of this gate.

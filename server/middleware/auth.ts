@@ -33,7 +33,12 @@ export function requireAdmin(db: Database.Database) {
   return (req: Request, res: Response, next: NextFunction) => {
     const user = db
       .prepare('SELECT role FROM users WHERE id = ?')
-      .get(req.userId) as { role: string }
+      .get(req.userId) as { role: string } | undefined
+
+    if (!user) {
+      res.status(401).json({ error: 'unauthorized' })
+      return
+    }
 
     if (user.role !== 'admin') {
       res.status(403).json({ error: 'forbidden' })

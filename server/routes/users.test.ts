@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import type { Database as Db } from 'better-sqlite3'
 import type { Server } from 'node:http'
 import { openDatabase } from '../db/index.ts'
 import { createApp } from '../app.ts'
@@ -20,6 +21,7 @@ const ROUTES = [
 
 let root: string
 let uploadsDir: string
+let db: Db
 let server: Server
 let baseUrl: string
 let adminId: number
@@ -30,7 +32,7 @@ let basicCookie: string
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'job-app-test-'))
   uploadsDir = join(root, 'uploads')
-  const db = openDatabase(join(root, 'app.db'))
+  db = openDatabase(join(root, 'app.db'))
   adminId = seedUser(db, 'admin-user', 'admin-password')
   basicId = createUser(db, 'basic-user', 'basic-password')
   const app = createApp(db, uploadsDir)
@@ -268,4 +270,16 @@ test("deleting a user takes their applications, attachments and files with it", 
   const applications = (await applicationsRes.json()) as Application[]
   expect(applications).toHaveLength(1)
   expect(applications[0].attachments).toHaveLength(1)
+})
+
+test('an admin route answers 401 when the session points at a deleted user', async () => {
+  // sessions.user_id cascades on delete, so an orphan session only exists if
+  // the row went out of band — which is the state this answers 401 for.
+  db.pragma('foreign_keys = OFF')
+  db.prepare('DELETE FROM users WHERE id = ?').run(adminId)
+  db.pragma('foreign_keys = ON')
+
+  const res = await fetch(`${baseUrl}/api/users`, { headers: { Cookie: adminCookie } })
+  expect(res.status).toBe(401)
+  expect(await res.json()).toEqual({ error: 'unauthorized' })
 })
