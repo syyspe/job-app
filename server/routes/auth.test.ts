@@ -135,6 +135,18 @@ test('a login whose body is null is a 400 from the parser', async () => {
   expect(res.status).toBe(400)
 })
 
+test('a login whose body is malformed JSON answers the parser message', async () => {
+  const res = await fetch(`${baseUrl}/api/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{bad',
+  })
+  expect(res.status).toBe(400)
+  // The exact text comes from JSON.parse and moves with V8; what matters is
+  // that it is the parser's message and not the generic 500 body.
+  expect(((await res.json()) as { error: string }).error).toMatch(/JSON/)
+})
+
 test('/me answers 401 when the session points at a deleted user', async () => {
   const loginRes = await fetch(`${baseUrl}/api/login`, {
     method: 'POST',
