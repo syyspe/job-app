@@ -10,7 +10,8 @@ const COOKIE_OPTIONS = { httpOnly: true, sameSite: 'lax' as const, path: '/' }
 
 function loginHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
-    const body = req.body as Record<string, unknown>
+    // Express 5 leaves req.body undefined when no parser matched the request.
+    const body = (req.body ?? {}) as Record<string, unknown>
     const username = typeof body.username === 'string' ? body.username : ''
     const password = typeof body.password === 'string' ? body.password : ''
 
@@ -56,7 +57,13 @@ function meHandler(db: Database.Database) {
 
     const row = db
       .prepare('SELECT * FROM users WHERE id = ?')
-      .get(session.user_id) as UserRow
+      .get(session.user_id) as UserRow | undefined
+
+    if (!row) {
+      res.status(401).json({ error: 'unauthorized' })
+      return
+    }
+
     res.json(toUser(row))
   }
 }

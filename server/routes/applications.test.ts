@@ -230,3 +230,19 @@ test('a second user cannot see, update, or delete the first user\'s application'
   })
   expect(deleteRes.status).toBe(404)
 })
+
+test('a JSON body over the parser limit answers 413', async () => {
+  const res = await fetch(`${baseUrl}/api/applications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: cookie },
+    body: JSON.stringify({
+      company: 'Acme',
+      role: 'Engineer',
+      dateApplied: '2026-01-01',
+      status: 'applied',
+      link: '',
+      notes: 'x'.repeat(150_000),
+    }),
+  })
+  expect(res.status).toBe(413)
+})

@@ -8,6 +8,7 @@ import { createAuthRouter } from './routes/auth.ts'
 import { createConfigRouter } from './routes/config.ts'
 import { createUsersRouter } from './routes/users.ts'
 import { requireAdmin, requireSession } from './middleware/auth.ts'
+import { requireParsableBody } from './middleware/contentType.ts'
 import { jsonErrorHandler } from './middleware/errors.ts'
 import { DEFAULT_PAGE_SIZE } from './lib/config.ts'
 
@@ -20,6 +21,7 @@ export function createApp(
 ): ExpressApp {
   const app = express()
   app.use(express.json())
+  app.use('/api', requireParsableBody)
   app.use('/api', createAuthRouter(db))
   app.use('/api', requireSession(db))
   app.use('/api', createConfigRouter(pageSize))
