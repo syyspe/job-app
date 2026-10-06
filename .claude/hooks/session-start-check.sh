@@ -57,8 +57,9 @@ case "$slug" in
   main | master | HEAD)
     emit "Loop status: on the default branch ($slug) — no work stream checked out.
 
-Next: Stage 1 (Brief). Pick a short kebab-case slug, run git checkout -b
-<slug>, then write brief/<slug>.md from brief/TEMPLATE.md.
+Next: Stage 1 (Brief). Pick a slug — next sequence number plus a short
+kebab-case name, e.g. 007-csv-export (the sdlc skill says how to number it) —
+run git checkout -b <slug>, then write brief/<slug>.md from brief/TEMPLATE.md.
 
 $HOWTO"
     ;;

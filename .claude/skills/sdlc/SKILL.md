@@ -11,8 +11,19 @@ ending by committing an artifact whose commit initiates the next stage. There
 is no separate state to track and nothing to approve — **the artifacts on the
 branch are the state.**
 
-One short kebab-case slug (e.g. `csv-export`) names the branch and every
-artifact on it.
+One slug names the branch and every artifact on it: a three-digit sequence
+number plus a short kebab-case name (e.g. `007-csv-export`), so `brief/` and
+`plans/` list in the order the work was started. The number is one more than
+the highest already taken — by a brief on the default branch or by any
+branch, local or remote, so parallel streams don't collide:
+
+```bash
+git fetch --quiet origin
+{ git ls-tree --name-only origin/HEAD brief/; git branch -a --format='%(refname:short)'; } \
+  | sed -nE 's#^(.*/)?([0-9]{3})-.*#\2#p' | sort -n | tail -1
+```
+
+No output → `001`.
 
 | Stage | Artifact | Instructions | Ends when | Next session |
 |---|---|---|---|---|
@@ -53,7 +64,8 @@ rules once per session and names the stage file. Re-derive them here rather
 than trusting a stale reading from the top of the conversation — a commit
 landing mid-session moves the branch to the next stage.
 
-**Stage 0 — nothing started.** Agree a slug with the user, then
+**Stage 0 — nothing started.** Take the next number, agree the name part of
+the slug with the user, then
 `git checkout -b <slug>`. Running two streams at once? Use the `worktree`
 skill instead of switching branches in place.
 
@@ -77,6 +89,7 @@ don't offer to. Say it once — if the user would rather keep going, keep going.
   transitions, not the steps inside a stage: Stage 4's steps run back to back
   without checking in between.
 - For a genuinely trivial change (typo, version bump, one-line fix with an
-  obvious test), say so and go straight to a branch and a PR. Skipping the
+  obvious test), say so and go straight to a branch and a PR — its branch
+  name takes no number, since it leaves no artifacts to order. Skipping the
   brief is a judgment call to make out loud. Skipping the plan on anything
   larger than that is not.
