@@ -16,12 +16,12 @@ themselves, in a new terminal tab.
 
 Worktrees live as **sibling directories** to the main repo, never nested
 inside it: for a repo checked out at `.../my-project`, a worktree for
-slug `csv-export` goes at `.../my-project-csv-export`.
+slug `007-csv-export` goes at `.../my-project-007-csv-export`.
 
 Get the repo's directory name with `basename "$(git rev-parse
 --show-toplevel)"`, and the slug from what the user's working on (ask if
 it's not obvious — reuse an existing `brief/`/`plans/` slug if there is
-one).
+one; a new one takes the next number, per the sdlc skill).
 
 ## Creating it
 

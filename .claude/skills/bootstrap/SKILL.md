@@ -290,7 +290,8 @@ first thing you want to build?*
 
 From their answer:
 
-1. Propose a slug derived from it and confirm it.
+1. Propose a slug derived from it — numbered `001-`, per the slug rule in
+   `.claude/skills/sdlc/SKILL.md` — and confirm it.
 2. `git checkout -b <slug>` from the freshly pulled default branch (so the
    merged setup is underneath it), then copy `brief/TEMPLATE.md` to
    `brief/<slug>.md`.
