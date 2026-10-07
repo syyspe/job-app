@@ -15,6 +15,15 @@ date: <YYYY-MM-DD>
 1. ...
 2. ...
 
+## Contracts
+
+- Errors: `<the error contract, if this plan decides it — see the
+  error-handling skill>`
+- Logging: `<the logging contract, decided with it — see the logging skill>`
+
+Delete this section unless `CLAUDE.md` still says these are not decided and
+this plan adds the first boundary.
+
 ## Tests
 
 - New: `<test to add>`

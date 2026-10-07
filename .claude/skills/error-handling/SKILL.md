@@ -69,8 +69,8 @@ Everywhere else, let errors propagate.
   and don't assume — Express 4 and 5 differ here, for example.
 - **Clean up in `finally`/`with`/`using`/`defer`**, not in each catch branch.
 - **Never leak internals to the caller**: no stack traces, SQL, file paths or
-  library error text in a response for a server fault. Never log secrets, tokens,
-  passwords or whole request bodies.
+  library error text in a response for a server fault. What never goes in a
+  log is the `logging` skill's list.
 
 ## The project's error contract
 
@@ -81,7 +81,10 @@ them, so the 30th endpoint fails the same way as the first. It lives on the
 - the shape the caller gets (response body, exit codes, UI message)
 - the error type code throws to choose a caller's-fault status
 - where the single edge-out handler lives
-- what is logged, where, and at what level
+
+How failures are logged — format, levels, the request ID that ties a
+response to its log line — is the `Logging:` contract, decided in the same
+plan; see the `logging` skill.
 
 **Pick a standard over a home-made shape.** For an HTTP JSON API that's RFC
 9457 `application/problem+json`, or the framework's built-in error response
@@ -89,8 +92,8 @@ if it has one. For a CLI it's exit codes 0/1/2 with messages on stderr.
 
 **When it's decided:** in the plan that adds the project's first boundary, if
 `CLAUDE.md` still says the contract isn't decided. That plan writes the
-contract into its Approach, and the build commit records it on the `Errors:`
-line. If the build creates the edge-out handler, the same commit includes it.
+contract into its Contracts section, and the build commit records it on the
+`Errors:` line. If the build creates the edge-out handler, the same commit includes it.
 After that, every change follows the contract. Changing the contract needs its
 own brief, and the change applies everywhere, not just to new code.
 

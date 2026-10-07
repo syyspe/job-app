@@ -65,6 +65,9 @@ with no `failed` line. Playwright: `N passed`.
   CLI entry points (`server/index.ts`, `server/seed.ts`, `mcp/index.ts`)
   report missing or invalid configuration as one stderr line and exit 2,
   with no stack.
+- Logging: not decided yet — `brief/030-logging-contract.md` decides it and
+  replaces this line; see the `logging` skill. Until then, `logError` stays
+  the only way server code logs an error.
 
 ## Architecture
 
@@ -152,7 +155,8 @@ need goes in `server/lib/` — never import one router from another.
   limits and no-cleverness/no-defensive-code rules are active from the
   first line, not a checklist for after `verifier` or review catches
   something. `error-handling` applies the same way to any code that can
-  fail, and the `Errors:` line above is the contract it keeps consistent.
+  fail, and the `Errors:` line above is the contract it keeps consistent;
+  `logging` likewise for anything that logs, against the `Logging:` line.
 - Hooks in `.claude/hooks/` are hard guardrails, not suggestions — if one
   blocks you, that's a signal to stop and check with me, not to work
   around it.
