@@ -11,9 +11,15 @@ function statusOf(error: Error): number {
   return typeof status === 'number' ? status : 500
 }
 
+// express.json()'s parse error quotes the body, which can hold a password.
+function loggableMessage(error: Error): string {
+  const { type } = error as { type?: unknown }
+  return type === 'entity.parse.failed' ? 'malformed JSON body' : error.message
+}
+
 function logFailure(log: Logger, status: number, error: Error): void {
   if (status < 500) {
-    log.info('request failed', { status, error: error.message })
+    log.info('request failed', { status, error: loggableMessage(error) })
     return
   }
   // inspect, not .stack: it prints the cause chain too.

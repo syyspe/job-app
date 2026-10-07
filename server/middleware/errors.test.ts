@@ -86,6 +86,17 @@ test("an error carrying a 400 status answers the parser's own message", async ()
   expect(await res.json()).toMatchObject({ error: 'Unexpected end of JSON input' })
 })
 
+test("a body parse error answers the parser's message but keeps the body out of the log", async () => {
+  const message = `Unexpected token 'h', ..."password":hunter2}" is not valid JSON`
+  await serveThrowing(Object.assign(new Error(message), { status: 400, type: 'entity.parse.failed' }))
+
+  const res = await fetch(`${baseUrl}/boom`)
+  expect(res.status).toBe(400)
+  expect(await res.json()).toMatchObject({ error: message })
+  expect(failures()).toEqual([expect.objectContaining({ status: 400, error: 'malformed JSON body' })])
+  expect(lines.join('')).not.toContain('hunter2')
+})
+
 test('a plain Error answers a generic 500 and logs one error line with stack and cause', async () => {
   const cause = Object.assign(new Error('no such file'), { code: 'ENOENT' })
   await serveThrowing(new Error('column widget does not exist', { cause }))
