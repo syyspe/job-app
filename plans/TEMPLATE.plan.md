@@ -19,6 +19,8 @@ date: <YYYY-MM-DD>
 
 - New: `<test to add>`
 - Updated: `<test to update>`
+- Failure cases: `<each way a new boundary can fail, and what the caller
+  gets — see the error-handling skill; delete if nothing new can fail>`
 - Verification command: `<the command from CLAUDE.md that must pass>`
 
 ## Risks / rollback

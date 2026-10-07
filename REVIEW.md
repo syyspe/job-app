@@ -34,7 +34,11 @@ file directly, so it needs nothing restated.
 Every PR gets four passes, in this order:
 
 1. **Bugs** — logic errors, regressions, edge cases, off-by-ones, unhandled
-   error paths. Cross-reference against `plans/<branch>.plan.md` if one
+   error paths. Check errors against the `Errors:` contract in `CLAUDE.md`
+   and `.claude/skills/error-handling/SKILL.md`: input a caller controls
+   that can produce a 5xx or crash, a swallowed or double-logged error, a
+   failure response shaped outside the contract, a new boundary without
+   failure-case tests. Cross-reference against `plans/<branch>.plan.md` if one
    exists: does the diff match what was planned?
 2. **Security** — injection risks, auth gaps, secrets or credentials
    committed, unsafe deserialization, missing validation on anything that
