@@ -5,5 +5,6 @@ export interface RequestLine {
 
 export function logError(request: RequestLine, status: number, error: Error): void {
   console.error(`${request.method} ${request.path} ${status} ${error.message}`)
-  if (status >= 500) console.error(error.stack)
+  // The Error itself, not .stack: console.error prints its cause chain too.
+  if (status >= 500) console.error(error)
 }
