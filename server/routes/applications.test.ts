@@ -118,6 +118,7 @@ test('rejects an empty required field with 400', async () => {
     }),
   })
   expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ error: 'company is required' })
 })
 
 test('accepts a draft with no date', async () => {

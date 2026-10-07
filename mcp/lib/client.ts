@@ -47,10 +47,13 @@ async function fetchOrExplain(
 ): Promise<Response> {
   try {
     return await fetch(`${baseUrl}${path}`, spec)
-  } catch {
+  } catch (error) {
+    // fetch rejects with a TypeError when the network request itself fails.
+    if (!(error instanceof TypeError)) throw error
     throw new Error(
       `cannot reach the job-applications API at ${baseUrl} — ` +
         'is it running? (npm run dev:server)',
+      { cause: error },
     )
   }
 }

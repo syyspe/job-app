@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import type Database from 'better-sqlite3'
 import { readSessionCookie } from '../lib/cookies.ts'
+import { HttpError } from '../lib/httpError.ts'
 
 declare global {
   namespace Express {
@@ -11,7 +12,7 @@ declare global {
 }
 
 export function requireSession(db: Database.Database) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     const token = readSessionCookie(req.headers.cookie)
     const session = token
       ? (db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token) as
@@ -19,10 +20,7 @@ export function requireSession(db: Database.Database) {
           | undefined)
       : undefined
 
-    if (!session) {
-      res.status(401).json({ error: 'unauthorized' })
-      return
-    }
+    if (!session) throw new HttpError(401, 'unauthorized')
 
     req.userId = session.user_id
     next()
@@ -30,20 +28,13 @@ export function requireSession(db: Database.Database) {
 }
 
 export function requireAdmin(db: Database.Database) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     const user = db
       .prepare('SELECT role FROM users WHERE id = ?')
       .get(req.userId) as { role: string } | undefined
 
-    if (!user) {
-      res.status(401).json({ error: 'unauthorized' })
-      return
-    }
-
-    if (user.role !== 'admin') {
-      res.status(403).json({ error: 'forbidden' })
-      return
-    }
+    if (!user) throw new HttpError(401, 'unauthorized')
+    if (user.role !== 'admin') throw new HttpError(403, 'forbidden')
 
     next()
   }

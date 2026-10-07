@@ -20,7 +20,7 @@ async function namingMissingAttachment<T>(id: number, request: () => Promise<T>)
     return await request()
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
-      throw new Error(`no attachment with id ${id}`)
+      throw new Error(`no attachment with id ${id}`, { cause: error })
     }
     throw error
   }
