@@ -20,6 +20,13 @@ export function jsonErrorHandler(
   const status = statusOf(error)
   logError(req, status, error)
 
+  // A response already under way can't change its status; cut it off so the
+  // client sees a failed transfer rather than a truncated one.
+  if (res.headersSent) {
+    res.destroy()
+    return
+  }
+
   if (status >= 400 && status < 500) {
     res.status(status).json({ error: error.message })
     return

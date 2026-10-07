@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, expect, test, vi } from 'vitest'
+import { format } from 'node:util'
 import { logError } from './logging.ts'
 
 afterEach(() => {
@@ -23,5 +24,16 @@ test('a 5xx logs the stack as well', () => {
 
   expect(spy).toHaveBeenCalledTimes(2)
   expect(spy).toHaveBeenNthCalledWith(1, 'GET /api/applications 500 it broke')
-  expect(spy).toHaveBeenNthCalledWith(2, error.stack)
+  expect(spy).toHaveBeenNthCalledWith(2, error)
+})
+
+test("a 5xx's log shows the error it wraps", () => {
+  const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const cause = Object.assign(new Error('no such file'), { code: 'ENOENT' })
+
+  logError({ method: 'GET', path: '/api/attachments/1' }, 500, new Error('cannot send', { cause }))
+
+  const written = format(spy.mock.calls[1][0])
+  expect(written).toContain('[cause]: Error: no such file')
+  expect(written).toContain("code: 'ENOENT'")
 })

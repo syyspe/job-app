@@ -366,6 +366,7 @@ test('an upload whose directory cannot be created is a 500, and the server keeps
     headers: { Cookie: blockedCookie },
   })
   await new Promise<void>((resolve) => blocked.close(() => resolve()))
+  db.close()
 
   expect(res.status).toBe(500)
   expect(await res.json()).toEqual({ error: 'internal server error' })

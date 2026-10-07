@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import express from 'express'
 import multer from 'multer'
+import type { RequestHandler } from 'express'
 import type { Server } from 'node:http'
 import { jsonErrorHandler } from './errors.ts'
 import { HttpError } from '../lib/httpError.ts'
@@ -11,10 +12,17 @@ let baseUrl: string
 let logged: ReturnType<typeof vi.spyOn>
 
 async function serveThrowing(error: Error): Promise<void> {
-  const app = express()
-  app.get('/boom', () => {
+  await serve(() => {
     throw error
   })
+}
+
+async function serve(route: RequestHandler): Promise<void> {
+  const app = express()
+  // Under 'test' Express's fallback handler stays silent; this makes anything
+  // escaping jsonErrorHandler show up as an extra console.error call.
+  app.set('env', 'production')
+  app.get('/boom', route)
   app.use(jsonErrorHandler)
   server = app.listen(0)
   await new Promise<void>((resolve) => server.once('listening', resolve))
@@ -69,5 +77,16 @@ test('a plain Error answers a generic 500 and logs the stack', async () => {
   expect(res.status).toBe(500)
   expect(await res.json()).toEqual({ error: 'internal server error' })
   expect(logged).toHaveBeenCalledWith('GET /boom 500 column widget does not exist')
-  expect(logged).toHaveBeenCalledWith(error.stack)
+  expect(logged).toHaveBeenCalledWith(error)
+})
+
+test('an error after the response has started cuts the transfer off, logged once', async () => {
+  await serve((_req, res) => {
+    res.write('partial')
+    throw new Error('read failed mid-stream')
+  })
+
+  await expect(fetch(`${baseUrl}/boom`).then((res) => res.text())).rejects.toThrow()
+  expect(logged).toHaveBeenCalledTimes(2)
+  expect(logged).toHaveBeenNthCalledWith(1, 'GET /boom 500 read failed mid-stream')
 })
