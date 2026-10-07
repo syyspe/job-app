@@ -112,11 +112,19 @@ Helpers with no Express dependency:
 - `users.ts` — `setUserRole` and `adminCount`, needed by both the seed and
   the users router.
 - `config.ts` — `parsePageSize`, which reads `PAGE_SIZE` at startup and
-  throws on anything that isn't a whole number of at least 1.
+  throws on anything that isn't a whole number of at least 1; and
+  `parseLogLevel`, which does the same for `LOG_LEVEL`.
+- `logger.ts` — `createLogger`, the no-dependency JSON-lines logger.
+  `server/index.ts` builds the one instance; `child` binds fields such as the
+  request ID.
 
 ### `server/middleware/`
 
-- `errors.ts` — the error handler.
+- `requestLogging.ts` — mounted first: gives each request a UUID
+  (`X-Request-Id`, `res.locals.requestId`), a child logger on
+  `res.locals.log`, and one `request finished` line.
+- `errors.ts` — the error handler. It logs each failure once, through
+  `res.locals.log`.
 - `auth.ts` — `requireSession`, `requireAdmin`.
 
 ### Everything else under `server/`

@@ -1,11 +1,12 @@
 // @vitest-environment node
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test } from 'vitest'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Server } from 'node:http'
 import { openDatabase } from '../db/index.ts'
 import { createApp } from '../app.ts'
+import { createLogger } from '../lib/logger.ts'
 import { createUser } from '../lib/seed.ts'
 import { loginAs } from '../test/auth.ts'
 import type { Application, Attachment } from '../types.ts'
@@ -15,6 +16,7 @@ let uploadsDir: string
 let server: Server
 let baseUrl: string
 let cookie: string
+let logLines: string[]
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'job-app-test-'))
@@ -22,7 +24,9 @@ beforeEach(async () => {
   uploadsDir = join(root, 'uploads')
   const db = openDatabase(dbPath)
   createUser(db, 'testuser', 'test-password')
-  const app = createApp(db, uploadsDir)
+  logLines = []
+  const logger = createLogger('info', (line) => logLines.push(line))
+  const app = createApp(db, uploadsDir, { logger })
   server = app.listen(0)
   await new Promise<void>((resolve) => server.once('listening', resolve))
   const address = server.address()
@@ -321,19 +325,18 @@ test('replacing an unknown attachment is rejected and leaves no file behind', as
 test('downloading an attachment whose file is gone is a generic 500 that names it in the log', async () => {
   const attachment = await uploadResume((await createApplication()).id)
   rmSync(join(uploadsDir, attachment.storedName))
-  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
   const res = await fetch(`${baseUrl}/api/attachments/${attachment.id}`, {
     headers: { Cookie: cookie },
   })
-  const logged = consoleError.mock.calls.map((call) => call[0])
-  consoleError.mockRestore()
+  const failed = logLines.map((line) => JSON.parse(line)).filter((entry) => entry.level === 'error')
 
   expect(res.status).toBe(500)
   const body = await res.text()
-  expect(JSON.parse(body)).toEqual({ error: 'internal server error' })
+  expect(JSON.parse(body)).toMatchObject({ error: 'internal server error' })
   expect(body).not.toContain(uploadsDir)
-  expect(logged[0]).toContain(
+  expect(failed).toHaveLength(1)
+  expect(failed[0].error).toBe(
     `cannot send attachment ${attachment.id} (${attachment.storedName})`,
   )
 })
@@ -354,14 +357,12 @@ test('an upload whose directory cannot be created is a 500, and the server keeps
     body: JSON.stringify({ company: 'Acme', role: 'Engineer', status: 'draft' }),
   })
   const application = (await applicationRes.json()) as Application
-  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 
   const res = await fetch(`${blockedUrl}/api/applications/${application.id}/attachments`, {
     method: 'POST',
     headers: { Cookie: blockedCookie },
     body: resumeFile(),
   })
-  consoleError.mockRestore()
   const followUp = await fetch(`${blockedUrl}/api/applications`, {
     headers: { Cookie: blockedCookie },
   })
@@ -369,6 +370,6 @@ test('an upload whose directory cannot be created is a 500, and the server keeps
   db.close()
 
   expect(res.status).toBe(500)
-  expect(await res.json()).toEqual({ error: 'internal server error' })
+  expect(await res.json()).toMatchObject({ error: 'internal server error' })
   expect(followUp.status).toBe(200)
 })

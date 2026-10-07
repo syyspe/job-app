@@ -51,23 +51,37 @@ with no `failed` line. Playwright: `N passed`.
   undeclared `test` is a type error at build time, not a runtime surprise.
 - Query by accessible role/name in tests (`getByRole`), not by CSS class or
   test id, unless there's no accessible handle.
-- Errors: the API answers every failure as JSON `{"error": "<message>"}`.
+- Errors: the API answers every failure as JSON `{"error": "<message>",
+  "requestId": "<id>"}`, the `requestId` matching the `X-Request-Id` header.
   New and changed server code throws `HttpError(status, message)`
   (`server/lib/httpError.ts`) for a client error, and doesn't write
   `res.status(...).json(...)` by hand. `jsonErrorHandler`
   (`server/middleware/errors.ts`, mounted last in `app.ts`) is the single
   edge-out handler: an error's own 4xx `status` gets passed through with its
   message, and anything else becomes `500 {"error": "internal server
-  error"}`. `logError` (`server/lib/logging.ts`) writes one stderr line per
-  error, plus the stack for a 5xx. On the client, `checkOk` in
-  `src/lib/api.ts` turns `{error}` into a thrown `Error` and a 401 into
-  `UnauthorizedError`. `mcp/` tools signal failure by throwing.
-  CLI entry points (`server/index.ts`, `server/seed.ts`, `mcp/index.ts`)
-  report missing or invalid configuration as one stderr line and exit 2,
-  with no stack.
-- Logging: not decided yet — `brief/030-logging-contract.md` decides it and
-  replaces this line; see the `logging` skill. Until then, `logError` stays
-  the only way server code logs an error.
+  error"}`. `jsonErrorHandler` logs it through the request's logger. On the
+  client, `checkOk` in `src/lib/api.ts` turns `{error}` into a thrown `Error`
+  and a 401 into `UnauthorizedError`. `mcp/` tools signal failure by
+  throwing. CLI entry points (`server/index.ts`, `server/seed.ts`,
+  `mcp/index.ts`) report missing or invalid configuration as one stderr line
+  and exit 2, with no stack.
+- Logging: `createLogger` (`server/lib/logger.ts`, no dependency) is built
+  once in `server/index.ts` and passed to `createApp`; nothing else
+  constructs one except tests. It writes JSON lines `{time, level, msg,
+  ...fields}` to stdout, at the level `LOG_LEVEL` sets
+  (`debug|info|warn|error|silent`, default `info`; invalid → exit 2).
+  `requestLogging` (`server/middleware/requestLogging.ts`, mounted first)
+  generates a UUID per request — incoming headers ignored — returns it as
+  `X-Request-Id`, puts a child logger carrying it on `res.locals.log`, and
+  writes one `request finished` info line (method, path without query,
+  status, durationMs). Request-scoped code logs only through
+  `res.locals.log`. Errors are logged once, by `jsonErrorHandler`: a 4xx at
+  `info` without a stack, a 5xx at `error` with `err` (the inspected error,
+  stack and cause chain). Messages are fixed strings, variable data goes in
+  fields; log IDs, never bodies, headers, cookies, passwords or usernames.
+  Outside the logger: CLI config errors (`server/seed.ts`, `server/index.ts`
+  before the logger exists) stay one plain stderr line + exit 2, and `mcp/`
+  is outside this contract — stdout is its JSON-RPC channel.
 
 ## Architecture
 
