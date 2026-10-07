@@ -60,7 +60,9 @@ test('a wrong password and an unknown username give the same 401', async () => {
   })
   expect(wrongPassword.status).toBe(401)
   expect(unknownUser.status).toBe(401)
-  expect(await wrongPassword.json()).toEqual(await unknownUser.json())
+  const wrongBody = (await wrongPassword.json()) as { error: string }
+  const unknownBody = (await unknownUser.json()) as { error: string }
+  expect(wrongBody.error).toBe(unknownBody.error)
 })
 
 test('/me returns the user with the cookie and 401 without', async () => {
@@ -106,7 +108,7 @@ test('a form-urlencoded login is refused as an unsupported content type', async 
     body: 'username=testuser&password=test-password',
   })
   expect(res.status).toBe(415)
-  expect((await res.json()) as { error: string }).toEqual({
+  expect((await res.json()) as { error: string }).toMatchObject({
     error: 'unsupported content type: application/x-www-form-urlencoded',
   })
 })
@@ -123,7 +125,7 @@ test('a text/plain login is refused as an unsupported content type', async () =>
 test('a login with no body at all is a failed credentials check', async () => {
   const res = await fetch(`${baseUrl}/api/login`, { method: 'POST' })
   expect(res.status).toBe(401)
-  expect(await res.json()).toEqual({ error: 'invalid credentials' })
+  expect(await res.json()).toMatchObject({ error: 'invalid credentials' })
 })
 
 test('a login whose body is null is a 400 from the parser', async () => {
@@ -144,7 +146,11 @@ test('a login whose body is malformed JSON answers the parser message', async ()
   expect(res.status).toBe(400)
   // The exact text comes from JSON.parse and moves with V8; what matters is
   // that it is the parser's message and not the generic 500 body.
-  expect(((await res.json()) as { error: string }).error).toMatch(/JSON/)
+  const body = (await res.json()) as { error: string; requestId: string }
+  expect(body.error).toMatch(/JSON/)
+  // requestLogging runs before express.json(), so a parse failure still has an ID.
+  expect(body.requestId).toBe(res.headers.get('X-Request-Id'))
+  expect(body.requestId).toMatch(/^[0-9a-f-]{36}$/)
 })
 
 test('/me answers 401 when the session points at a deleted user', async () => {
@@ -162,5 +168,5 @@ test('/me answers 401 when the session points at a deleted user', async () => {
 
   const res = await fetch(`${baseUrl}/api/me`, { headers: { Cookie: cookie } })
   expect(res.status).toBe(401)
-  expect(await res.json()).toEqual({ error: 'unauthorized' })
+  expect(await res.json()).toMatchObject({ error: 'unauthorized' })
 })

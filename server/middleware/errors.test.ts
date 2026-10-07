@@ -5,11 +5,14 @@ import multer from 'multer'
 import type { RequestHandler } from 'express'
 import type { Server } from 'node:http'
 import { jsonErrorHandler } from './errors.ts'
+import { requestLogging } from './requestLogging.ts'
 import { HttpError } from '../lib/httpError.ts'
+import { createLogger } from '../lib/logger.ts'
 
 let server: Server
 let baseUrl: string
-let logged: ReturnType<typeof vi.spyOn>
+let lines: string[]
+let escaped: ReturnType<typeof vi.spyOn>
 
 async function serveThrowing(error: Error): Promise<void> {
   await serve(() => {
@@ -20,8 +23,9 @@ async function serveThrowing(error: Error): Promise<void> {
 async function serve(route: RequestHandler): Promise<void> {
   const app = express()
   // Under 'test' Express's fallback handler stays silent; this makes anything
-  // escaping jsonErrorHandler show up as an extra console.error call.
+  // escaping jsonErrorHandler show up as a console.error call.
   app.set('env', 'production')
+  app.use(requestLogging(createLogger('info', (line) => lines.push(line))))
   app.get('/boom', route)
   app.use(jsonErrorHandler)
   server = app.listen(0)
@@ -31,22 +35,37 @@ async function serve(route: RequestHandler): Promise<void> {
   baseUrl = `http://localhost:${port}`
 }
 
+function failures(): Record<string, unknown>[] {
+  return lines.map((line) => JSON.parse(line)).filter((entry) => entry.msg === 'request failed')
+}
+
 beforeEach(() => {
-  logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+  lines = []
+  escaped = vi.spyOn(console, 'error').mockImplementation(() => {})
 })
 
 afterEach(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()))
+  expect(escaped).not.toHaveBeenCalled()
   vi.restoreAllMocks()
 })
 
-test('an HttpError answers its own status and message', async () => {
+test('an HttpError answers its own status and message, with the request ID', async () => {
   await serveThrowing(new HttpError(415, 'unsupported content type: text/plain'))
 
   const res = await fetch(`${baseUrl}/boom`)
+  const requestId = res.headers.get('X-Request-Id')
   expect(res.status).toBe(415)
-  expect(await res.json()).toEqual({ error: 'unsupported content type: text/plain' })
-  expect(logged).toHaveBeenCalledWith('GET /boom 415 unsupported content type: text/plain')
+  expect(await res.json()).toEqual({ error: 'unsupported content type: text/plain', requestId })
+  expect(failures()).toEqual([
+    expect.objectContaining({
+      level: 'info',
+      status: 415,
+      error: 'unsupported content type: text/plain',
+      requestId,
+    }),
+  ])
+  expect(failures()[0]).not.toHaveProperty('err')
 })
 
 test('a MulterError answers 400 with its message', async () => {
@@ -55,8 +74,7 @@ test('a MulterError answers 400 with its message', async () => {
 
   const res = await fetch(`${baseUrl}/boom`)
   expect(res.status).toBe(400)
-  expect(await res.json()).toEqual({ error: error.message })
-  expect(logged).toHaveBeenCalledWith(`GET /boom 400 ${error.message}`)
+  expect(await res.json()).toMatchObject({ error: error.message })
 })
 
 test("an error carrying a 400 status answers the parser's own message", async () => {
@@ -65,19 +83,25 @@ test("an error carrying a 400 status answers the parser's own message", async ()
 
   const res = await fetch(`${baseUrl}/boom`)
   expect(res.status).toBe(400)
-  expect(await res.json()).toEqual({ error: 'Unexpected end of JSON input' })
-  expect(logged).toHaveBeenCalledWith('GET /boom 400 Unexpected end of JSON input')
+  expect(await res.json()).toMatchObject({ error: 'Unexpected end of JSON input' })
 })
 
-test('a plain Error answers a generic 500 and logs the stack', async () => {
-  const error = new Error('column widget does not exist')
-  await serveThrowing(error)
+test('a plain Error answers a generic 500 and logs one error line with stack and cause', async () => {
+  const cause = Object.assign(new Error('no such file'), { code: 'ENOENT' })
+  await serveThrowing(new Error('column widget does not exist', { cause }))
 
   const res = await fetch(`${baseUrl}/boom`)
+  const requestId = res.headers.get('X-Request-Id')
   expect(res.status).toBe(500)
-  expect(await res.json()).toEqual({ error: 'internal server error' })
-  expect(logged).toHaveBeenCalledWith('GET /boom 500 column widget does not exist')
-  expect(logged).toHaveBeenCalledWith(error)
+  expect(await res.json()).toEqual({ error: 'internal server error', requestId })
+
+  const errorLines = lines.map((line) => JSON.parse(line)).filter((entry) => entry.level === 'error')
+  expect(errorLines).toHaveLength(1)
+  const [line] = errorLines
+  expect(line).toMatchObject({ msg: 'request failed', status: 500, requestId })
+  expect(line.err).toContain('Error: column widget does not exist\n    at ')
+  expect(line.err).toContain('[cause]: Error: no such file')
+  expect(line.err).toContain("code: 'ENOENT'")
 })
 
 test('an error after the response has started cuts the transfer off, logged once', async () => {
@@ -87,6 +111,7 @@ test('an error after the response has started cuts the transfer off, logged once
   })
 
   await expect(fetch(`${baseUrl}/boom`).then((res) => res.text())).rejects.toThrow()
-  expect(logged).toHaveBeenCalledTimes(2)
-  expect(logged).toHaveBeenNthCalledWith(1, 'GET /boom 500 read failed mid-stream')
+  expect(failures()).toEqual([
+    expect.objectContaining({ level: 'error', error: 'read failed mid-stream' }),
+  ])
 })

@@ -42,3 +42,15 @@ test('an invalid PAGE_SIZE exits 2 with its message and no stack', () => {
   expect(result.stderr).toContain('PAGE_SIZE must be a whole number of at least 1')
   expect(result.stderr).not.toContain('    at ')
 })
+
+test('an invalid LOG_LEVEL exits 2 with its message and no stack', () => {
+  const result = run({
+    DB_PATH: join(root, 'app.db'),
+    UPLOADS_DIR: join(root, 'uploads'),
+    LOG_LEVEL: 'loud',
+  })
+
+  expect(result.status).toBe(2)
+  expect(result.stderr).toContain('LOG_LEVEL must be one of debug, info, warn, error, silent')
+  expect(result.stderr).not.toContain('    at ')
+})

@@ -154,6 +154,22 @@ Nothing hard to reverse. `requestId` is an extra body field and an extra
 header: `checkOk` and `mcp/lib/client.ts` read only `error`, so clients are
 unaffected. Revert the build commit to roll back.
 
+## Build notes
+
+Where the build departed from the plan:
+
+- `server/index.ts`: `readPageSize` became `readOrExit(read)`, shared by
+  `PAGE_SIZE` and `LOG_LEVEL`, so the exit-2 pattern isn't written twice.
+  `index.test.ts` gained the invalid-`LOG_LEVEL` case.
+- `auth.test.ts` had two more exact-body comparisons than the plan counted
+  (wrong password vs unknown user, form-urlencoded login). They now compare
+  the `error` field only.
+- The malformed-body failure case is asserted in `auth.test.ts`'s existing
+  malformed-JSON login test, which also checks the body's `requestId` against
+  the header.
+- `docs/architecture.md` never listed `logging.ts`, so there was nothing to
+  remove there.
+
 ---
 
 **Next stage:** run `/sdlc`.

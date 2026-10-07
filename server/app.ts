@@ -10,16 +10,24 @@ import { createUsersRouter } from './routes/users.ts'
 import { requireAdmin, requireSession } from './middleware/auth.ts'
 import { requireParsableBody } from './middleware/contentType.ts'
 import { jsonErrorHandler } from './middleware/errors.ts'
+import { requestLogging } from './middleware/requestLogging.ts'
 import { DEFAULT_PAGE_SIZE } from './lib/config.ts'
+import { createLogger } from './lib/logger.ts'
+import type { Logger } from './lib/logger.ts'
 
-type CreateAppOptions = { staticDir?: string; pageSize?: number }
+type CreateAppOptions = { staticDir?: string; pageSize?: number; logger?: Logger }
 
 export function createApp(
   db: Database.Database,
   uploadsDir: string,
-  { staticDir, pageSize = DEFAULT_PAGE_SIZE }: CreateAppOptions = {},
+  {
+    staticDir,
+    pageSize = DEFAULT_PAGE_SIZE,
+    logger = createLogger('silent'),
+  }: CreateAppOptions = {},
 ): ExpressApp {
   const app = express()
+  app.use(requestLogging(logger))
   app.use(express.json())
   app.use('/api', requireParsableBody)
   app.use('/api', createAuthRouter(db))

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test } from 'vitest'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,6 +7,7 @@ import type { Database as Db } from 'better-sqlite3'
 import type { Server } from 'node:http'
 import { openDatabase } from '../db/index.ts'
 import { createApp } from '../app.ts'
+import { createLogger } from '../lib/logger.ts'
 import { createUser, seedUser } from '../lib/seed.ts'
 import { loginAs } from '../test/auth.ts'
 import type { Application, Attachment, User } from '../types.ts'
@@ -28,6 +29,7 @@ let adminId: number
 let basicId: number
 let adminCookie: string
 let basicCookie: string
+let logLines: string[]
 
 beforeEach(async () => {
   root = mkdtempSync(join(tmpdir(), 'job-app-test-'))
@@ -35,7 +37,9 @@ beforeEach(async () => {
   db = openDatabase(join(root, 'app.db'))
   adminId = seedUser(db, 'admin-user', 'admin-password')
   basicId = createUser(db, 'basic-user', 'basic-password')
-  const app = createApp(db, uploadsDir)
+  logLines = []
+  const logger = createLogger('info', (line) => logLines.push(line))
+  const app = createApp(db, uploadsDir, { logger })
   server = app.listen(0)
   await new Promise<void>((resolve) => server.once('listening', resolve))
   const address = server.address()
@@ -137,18 +141,18 @@ test('a new user can log in with the password it was created with', async () => 
 })
 
 test('a taken username is a conflict, logged once without a stack', async () => {
-  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
   const res = await post(
     { username: 'basic-user', password: 'new-password', role: 'basic' },
     adminCookie,
   )
-  const logged = consoleError.mock.calls.map((call) => call[0])
-  consoleError.mockRestore()
 
   expect(res.status).toBe(409)
-  expect(await res.json()).toEqual({ error: 'username taken' })
-  expect(logged).toHaveLength(1)
-  expect(logged[0]).toMatch(/409 username taken$/)
+  expect(await res.json()).toMatchObject({ error: 'username taken' })
+  const failed = logLines.map((line) => JSON.parse(line)).filter((entry) => entry.msg === 'request failed')
+  expect(failed).toEqual([
+    expect.objectContaining({ level: 'info', status: 409, error: 'username taken' }),
+  ])
+  expect(failed[0]).not.toHaveProperty('err')
 })
 
 test('a missing username, an empty password and an unknown role are refused', async () => {
@@ -181,7 +185,7 @@ test('an unknown role is refused and an unknown user is 404', async () => {
 test('demoting the last admin is refused', async () => {
   const res = await put(`/api/users/${adminId}/role`, { role: 'basic' })
   expect(res.status).toBe(409)
-  expect(await res.json()).toEqual({ error: 'cannot demote the last admin' })
+  expect(await res.json()).toMatchObject({ error: 'cannot demote the last admin' })
 })
 
 test('demoting yourself is refused even when another admin exists', async () => {
@@ -189,7 +193,7 @@ test('demoting yourself is refused even when another admin exists', async () => 
 
   const self = await put(`/api/users/${adminId}/role`, { role: 'basic' })
   expect(self.status).toBe(400)
-  expect(await self.json()).toEqual({ error: 'cannot demote yourself' })
+  expect(await self.json()).toMatchObject({ error: 'cannot demote yourself' })
 
   const other = await put(`/api/users/${basicId}/role`, { role: 'basic' })
   expect(other.status).toBe(200)
@@ -201,7 +205,7 @@ test.each(['role', 'password'])('PUT %s with no body is a 400, not a 500', async
     headers: { Cookie: adminCookie },
   })
   expect(res.status).toBe(400)
-  expect(await res.json()).toEqual({ error: 'request body must be a JSON object' })
+  expect(await res.json()).toMatchObject({ error: 'request body must be a JSON object' })
 })
 
 test('a password can be reset, and the old one stops working', async () => {
@@ -248,7 +252,7 @@ test('deleting yourself is refused', async () => {
     headers: { Cookie: adminCookie },
   })
   expect(res.status).toBe(400)
-  expect(await res.json()).toEqual({ error: 'cannot delete yourself' })
+  expect(await res.json()).toMatchObject({ error: 'cannot delete yourself' })
 })
 
 test('deleting an unknown user is 404', async () => {
@@ -296,5 +300,5 @@ test('an admin route answers 401 when the session points at a deleted user', asy
 
   const res = await fetch(`${baseUrl}/api/users`, { headers: { Cookie: adminCookie } })
   expect(res.status).toBe(401)
-  expect(await res.json()).toEqual({ error: 'unauthorized' })
+  expect(await res.json()).toMatchObject({ error: 'unauthorized' })
 })
