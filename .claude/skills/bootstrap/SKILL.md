@@ -219,7 +219,8 @@ content for these to seem thorough:
   mistakes, and a fabricated entry there is actively misleading
 - `CLAUDE.md`'s `Errors:` line — it isn't a placeholder. The first plan
   that adds a boundary decides the error contract, per the `error-handling`
-  skill, once there is real code to fit it to
+  skill, once there is real code to fit it to. The `Logging:` line is the
+  same: decided in that plan, per the `logging` skill
 
 ## Step 9 — write the marker, and open the setup PR
 

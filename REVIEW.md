@@ -38,7 +38,10 @@ Every PR gets four passes, in this order:
    and `.claude/skills/error-handling/SKILL.md`: input a caller controls
    that can produce a 5xx or crash, a swallowed or double-logged error, a
    failure response shaped outside the contract, a new boundary without
-   failure-case tests. Cross-reference against `plans/<branch>.plan.md` if one
+   failure-case tests. Check logging against the `Logging:` contract and
+   `.claude/skills/logging/SKILL.md`: a leftover `print`/`console.log`, a
+   secret, body or personal data in a log line, a new request, command or job
+   with no finishing log line. Cross-reference against `plans/<branch>.plan.md` if one
    exists: does the diff match what was planned?
 2. **Security** — injection risks, auth gaps, secrets or credentials
    committed, unsafe deserialization, missing validation on anything that

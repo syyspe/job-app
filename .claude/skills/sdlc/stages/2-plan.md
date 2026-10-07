@@ -8,7 +8,8 @@ from the file alone, without the conversation that produced it.
 
 If the plan adds code that can fail at a boundary, follow the `error-handling`
 skill: list the failure cases under Tests. If `CLAUDE.md`'s `Errors:` line
-says the contract isn't decided, decide it in this plan.
+says the contract isn't decided, decide it in this plan — and the `Logging:`
+contract with it, per the `logging` skill.
 
 Once `ExitPlanMode` is approved, write the plan into `plans/<slug>.plan.md` in
 `plans/TEMPLATE.plan.md`'s shape and commit it.

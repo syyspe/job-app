@@ -21,6 +21,7 @@ session missed or rationalized away, not to rubber-stamp it.
    cat "plans/$b.plan.md"
    git status --porcelain
    git diff --stat "$base"
+   grep -n -A2 '^- \(Errors\|Logging\):' CLAUDE.md
    ```
 
    Diff against the merge-base, not `HEAD` — you run at the head of Stage 4,
@@ -41,7 +42,17 @@ session missed or rationalized away, not to rubber-stamp it.
    passing." If the tail doesn't show why something broke, re-run scoped to
    the failing test rather than dumping the whole log.
 4. **Check the new/updated tests exist** and actually exercise the behavior
-   described in the plan, not just that test files were touched.
+   described in the plan, not just that test files were touched. That
+   includes each case under the plan's "Failure cases": find the test for it
+   by name and confirm it asserts the status or exit code and message the
+   plan says the caller gets. A failure case with no test is a FAIL.
+5. **Check the contracts were recorded.** If the plan has a Contracts
+   section — or the diff adds an endpoint, CLI command or external
+   I/O while the grep above still shows `not decided yet` — then both the
+   `Errors:` and `Logging:` lines in `CLAUDE.md` must be replaced in this
+   diff, and must say what that section decided. Either line still undecided is
+   a FAIL. Whether the code follows the contracts is `/review`'s job, not
+   yours.
 
 ## Report format
 
