@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -136,13 +136,19 @@ test('a new user can log in with the password it was created with', async () => 
   expect(meRes.status).toBe(200)
 })
 
-test('a taken username is refused', async () => {
+test('a taken username is a conflict, logged once without a stack', async () => {
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
   const res = await post(
     { username: 'basic-user', password: 'new-password', role: 'basic' },
     adminCookie,
   )
-  expect(res.status).toBe(400)
+  const logged = consoleError.mock.calls.map((call) => call[0])
+  consoleError.mockRestore()
+
+  expect(res.status).toBe(409)
   expect(await res.json()).toEqual({ error: 'username taken' })
+  expect(logged).toHaveLength(1)
+  expect(logged[0]).toMatch(/409 username taken$/)
 })
 
 test('a missing username, an empty password and an unknown role are refused', async () => {
@@ -174,7 +180,7 @@ test('an unknown role is refused and an unknown user is 404', async () => {
 
 test('demoting the last admin is refused', async () => {
   const res = await put(`/api/users/${adminId}/role`, { role: 'basic' })
-  expect(res.status).toBe(400)
+  expect(res.status).toBe(409)
   expect(await res.json()).toEqual({ error: 'cannot demote the last admin' })
 })
 
@@ -187,6 +193,15 @@ test('demoting yourself is refused even when another admin exists', async () => 
 
   const other = await put(`/api/users/${basicId}/role`, { role: 'basic' })
   expect(other.status).toBe(200)
+})
+
+test.each(['role', 'password'])('PUT %s with no body is a 400, not a 500', async (field) => {
+  const res = await fetch(`${baseUrl}/api/users/${basicId}/${field}`, {
+    method: 'PUT',
+    headers: { Cookie: adminCookie },
+  })
+  expect(res.status).toBe(400)
+  expect(await res.json()).toEqual({ error: 'request body must be a JSON object' })
 })
 
 test('a password can be reset, and the old one stops working', async () => {

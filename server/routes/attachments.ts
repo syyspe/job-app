@@ -2,24 +2,22 @@ import { Router } from 'express'
 import multer from 'multer'
 import type { NextFunction, Request, Response } from 'express'
 import type Database from 'better-sqlite3'
-import { mkdirSync } from 'node:fs'
+import { mkdir } from 'node:fs'
 import { extname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { toAttachment } from '../models/attachment.ts'
 import { unlinkIfExists } from '../lib/files.ts'
 import { touchApplication } from '../lib/applications.ts'
+import { HttpError } from '../lib/httpError.ts'
 import type { AttachmentRow } from '../models/attachment.ts'
 
 function checkApplicationExists(db: Database.Database) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     const id = Number(req.params.id)
     const exists = db
       .prepare('SELECT 1 FROM applications WHERE id = ? AND user_id = ?')
       .get(id, req.userId)
-    if (!exists) {
-      res.status(404).json({ error: 'application not found' })
-      return
-    }
+    if (!exists) throw new HttpError(404, 'application not found')
     next()
   }
 }
@@ -27,9 +25,9 @@ function checkApplicationExists(db: Database.Database) {
 function buildUpload(uploadsDir: string) {
   return multer({
     storage: multer.diskStorage({
+      // Callback-style so a failure reaches multer's error path, not busboy's listener.
       destination: (_req, _file, callback) => {
-        mkdirSync(uploadsDir, { recursive: true })
-        callback(null, uploadsDir)
+        mkdir(uploadsDir, { recursive: true }, (error) => callback(error, uploadsDir))
       },
       filename: (_req, file, callback) => {
         callback(null, `${randomUUID()}${extname(file.originalname)}`)
@@ -42,10 +40,7 @@ function buildUpload(uploadsDir: string) {
 function uploadHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
     const applicationId = Number(req.params.id)
-    if (!req.file) {
-      res.status(400).json({ error: 'file is required' })
-      return
-    }
+    if (!req.file) throw new HttpError(400, 'file is required')
 
     const result = db
       .prepare(
@@ -74,23 +69,23 @@ function findOwnedAttachment(db: Database.Database, id: number, userId: number) 
 }
 
 function downloadHandler(db: Database.Database, uploadsDir: string) {
-  return (req: Request, res: Response) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     const id = Number(req.params.id)
     const row = findOwnedAttachment(db, id, req.userId)
-    if (!row) {
-      res.status(404).json({ error: 'not found' })
-      return
-    }
+    if (!row) throw new HttpError(404, 'not found')
 
-    res.download(join(uploadsDir, row.stored_name), row.original_name)
+    // The send error carries a 404 and the absolute path; neither is the caller's to see.
+    res.download(join(uploadsDir, row.stored_name), row.original_name, (error) => {
+      if (!error) return
+      next(new Error(`cannot send attachment ${row.id} (${row.stored_name})`, { cause: error }))
+    })
   }
 }
 
 function checkAttachmentOwned(db: Database.Database) {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
     if (!findOwnedAttachment(db, Number(req.params.id), req.userId)) {
-      res.status(404).json({ error: 'not found' })
-      return
+      throw new HttpError(404, 'not found')
     }
     next()
   }
@@ -99,10 +94,7 @@ function checkAttachmentOwned(db: Database.Database) {
 function replaceHandler(db: Database.Database, uploadsDir: string) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    if (!req.file) {
-      res.status(400).json({ error: 'file is required' })
-      return
-    }
+    if (!req.file) throw new HttpError(400, 'file is required')
 
     const old = findOwnedAttachment(db, id, req.userId) as AttachmentRow
     db.prepare(
@@ -122,10 +114,7 @@ function removeHandler(db: Database.Database, uploadsDir: string) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
     const row = findOwnedAttachment(db, id, req.userId)
-    if (!row) {
-      res.status(404).json({ error: 'not found' })
-      return
-    }
+    if (!row) throw new HttpError(404, 'not found')
 
     unlinkIfExists(join(uploadsDir, row.stored_name))
     db.prepare(

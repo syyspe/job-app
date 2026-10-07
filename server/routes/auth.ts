@@ -5,6 +5,7 @@ import { verifyPassword, createSessionToken } from '../lib/passwords.ts'
 import { SESSION_COOKIE, readSessionCookie } from '../lib/cookies.ts'
 import { toUser } from '../models/user.ts'
 import type { UserRow } from '../models/user.ts'
+import { HttpError } from '../lib/httpError.ts'
 
 const COOKIE_OPTIONS = { httpOnly: true, sameSite: 'lax' as const, path: '/' }
 
@@ -20,8 +21,7 @@ function loginHandler(db: Database.Database) {
       .get(username) as UserRow | undefined
 
     if (!row || !verifyPassword(password, row.password_hash)) {
-      res.status(401).json({ error: 'invalid credentials' })
-      return
+      throw new HttpError(401, 'invalid credentials')
     }
 
     const token = createSessionToken()
@@ -50,19 +50,13 @@ function meHandler(db: Database.Database) {
           | undefined)
       : undefined
 
-    if (!session) {
-      res.status(401).json({ error: 'unauthorized' })
-      return
-    }
+    if (!session) throw new HttpError(401, 'unauthorized')
 
     const row = db
       .prepare('SELECT * FROM users WHERE id = ?')
       .get(session.user_id) as UserRow | undefined
 
-    if (!row) {
-      res.status(401).json({ error: 'unauthorized' })
-      return
-    }
+    if (!row) throw new HttpError(401, 'unauthorized')
 
     res.json(toUser(row))
   }

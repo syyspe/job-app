@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { afterEach, beforeEach, expect, test } from 'vitest'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Server } from 'node:http'
@@ -316,4 +316,58 @@ test('replacing an unknown attachment is rejected and leaves no file behind', as
   const replaceRes = await replaceAttachment(999999, newCvFile())
   expect(replaceRes.status).toBe(404)
   expect(existsSync(uploadsDir)).toBe(false)
+})
+
+test('downloading an attachment whose file is gone is a generic 500 that names it in the log', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+  rmSync(join(uploadsDir, attachment.storedName))
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+  const res = await fetch(`${baseUrl}/api/attachments/${attachment.id}`, {
+    headers: { Cookie: cookie },
+  })
+  const logged = consoleError.mock.calls.map((call) => call[0])
+  consoleError.mockRestore()
+
+  expect(res.status).toBe(500)
+  const body = await res.text()
+  expect(JSON.parse(body)).toEqual({ error: 'internal server error' })
+  expect(body).not.toContain(uploadsDir)
+  expect(logged[0]).toContain(
+    `cannot send attachment ${attachment.id} (${attachment.storedName})`,
+  )
+})
+
+test('an upload whose directory cannot be created is a 500, and the server keeps answering', async () => {
+  const blocker = join(root, 'not-a-directory')
+  writeFileSync(blocker, '')
+  const db = openDatabase(join(root, 'blocked.db'))
+  createUser(db, 'blocked-user', 'blocked-password')
+  const blocked = createApp(db, join(blocker, 'uploads')).listen(0)
+  await new Promise<void>((resolve) => blocked.once('listening', resolve))
+  const address = blocked.address()
+  const blockedUrl = `http://localhost:${typeof address === 'object' && address ? address.port : 0}`
+  const blockedCookie = await loginAs(blockedUrl, 'blocked-user', 'blocked-password')
+  const applicationRes = await fetch(`${blockedUrl}/api/applications`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Cookie: blockedCookie },
+    body: JSON.stringify({ company: 'Acme', role: 'Engineer', status: 'draft' }),
+  })
+  const application = (await applicationRes.json()) as Application
+  const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+  const res = await fetch(`${blockedUrl}/api/applications/${application.id}/attachments`, {
+    method: 'POST',
+    headers: { Cookie: blockedCookie },
+    body: resumeFile(),
+  })
+  consoleError.mockRestore()
+  const followUp = await fetch(`${blockedUrl}/api/applications`, {
+    headers: { Cookie: blockedCookie },
+  })
+  await new Promise<void>((resolve) => blocked.close(() => resolve()))
+
+  expect(res.status).toBe(500)
+  expect(await res.json()).toEqual({ error: 'internal server error' })
+  expect(followUp.status).toBe(200)
 })

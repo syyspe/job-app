@@ -62,6 +62,9 @@ with no `failed` line. Playwright: `N passed`.
   error, plus the stack for a 5xx. On the client, `checkOk` in
   `src/lib/api.ts` turns `{error}` into a thrown `Error` and a 401 into
   `UnauthorizedError`. `mcp/` tools signal failure by throwing.
+  CLI entry points (`server/index.ts`, `server/seed.ts`, `mcp/index.ts`)
+  report missing or invalid configuration as one stderr line and exit 2,
+  with no stack.
 
 ## Architecture
 

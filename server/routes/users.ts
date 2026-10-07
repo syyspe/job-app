@@ -4,7 +4,8 @@ import type Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { toUser } from '../models/user.ts'
 import type { UserRow } from '../models/user.ts'
-import { isRole, validateUserInput } from '../lib/validation.ts'
+import { validatePassword, validateRole, validateUserInput } from '../lib/validation.ts'
+import { HttpError } from '../lib/httpError.ts'
 import { unlinkIfExists } from '../lib/files.ts'
 import { hashPassword } from '../lib/passwords.ts'
 import { createUser } from '../lib/seed.ts'
@@ -26,16 +27,8 @@ function listHandler(db: Database.Database) {
 function createHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
     const input = validateUserInput(req.body)
-    if (!input) {
-      res.status(400).json({ error: 'invalid user' })
-      return
-    }
-
     const taken = db.prepare('SELECT 1 FROM users WHERE username = ?').get(input.username)
-    if (taken) {
-      res.status(400).json({ error: 'username taken' })
-      return
-    }
+    if (taken) throw new HttpError(409, 'username taken')
 
     const id = createUser(db, input.username, input.password)
     setUserRole(db, id, input.role)
@@ -46,27 +39,17 @@ function createHandler(db: Database.Database) {
 function roleHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    const role = (req.body as { role?: unknown }).role
-    if (!isRole(role)) {
-      res.status(400).json({ error: 'invalid role' })
-      return
-    }
-
+    const role = validateRole(req.body)
     const existing = findUser(db, id)
-    if (!existing) {
-      res.status(404).json({ error: 'not found' })
-      return
-    }
+    if (!existing) throw new HttpError(404, 'not found')
 
     if (role !== 'admin' && existing.role === 'admin' && adminCount(db) === 1) {
-      res.status(400).json({ error: 'cannot demote the last admin' })
-      return
+      throw new HttpError(409, 'cannot demote the last admin')
     }
 
     // The sole-admin case above is the same person, and reports itself better.
     if (role !== 'admin' && id === req.userId) {
-      res.status(400).json({ error: 'cannot demote yourself' })
-      return
+      throw new HttpError(400, 'cannot demote yourself')
     }
 
     setUserRole(db, id, role)
@@ -77,17 +60,9 @@ function roleHandler(db: Database.Database) {
 function passwordHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    const password = (req.body as { password?: unknown }).password
-    if (typeof password !== 'string' || !password) {
-      res.status(400).json({ error: 'invalid password' })
-      return
-    }
-
+    const password = validatePassword(req.body)
     const existing = findUser(db, id)
-    if (!existing) {
-      res.status(404).json({ error: 'not found' })
-      return
-    }
+    if (!existing) throw new HttpError(404, 'not found')
 
     // A reset logs the user out everywhere — the old password's sessions go with it.
     db.transaction(() => {
@@ -105,10 +80,7 @@ function deleteHandler(
 ) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    if (id === req.userId) {
-      res.status(400).json({ error: 'cannot delete yourself' })
-      return
-    }
+    if (id === req.userId) throw new HttpError(400, 'cannot delete yourself')
 
     const files = storedNames.all(id)
 
@@ -118,10 +90,7 @@ function deleteHandler(
       return db.prepare('DELETE FROM users WHERE id = ?').run(id).changes
     })()
 
-    if (deleted === 0) {
-      res.status(404).json({ error: 'not found' })
-      return
-    }
+    if (deleted === 0) throw new HttpError(404, 'not found')
 
     for (const file of files) {
       unlinkIfExists(join(uploadsDir, file.stored_name))

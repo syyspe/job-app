@@ -113,7 +113,7 @@ test('a rejected change shows the error from the API', async () => {
   stubFetch((_url, init) => {
     if (init?.method === 'PUT') {
       return new Response(JSON.stringify({ error: 'cannot demote the last admin' }), {
-        status: 400,
+        status: 409,
       })
     }
     return new Response(JSON.stringify(users), { status: 200 })

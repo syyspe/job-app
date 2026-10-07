@@ -6,10 +6,20 @@ import { parsePageSize } from './lib/config.ts'
 const dbPath = process.env.DB_PATH
 const uploadsDir = process.env.UPLOADS_DIR
 if (!dbPath || !uploadsDir) {
-  throw new Error('DB_PATH and UPLOADS_DIR must both be set (see .env.example)')
+  console.error('DB_PATH and UPLOADS_DIR must both be set (see .env.example)')
+  process.exit(2)
 }
 
-const pageSize = parsePageSize(process.env.PAGE_SIZE)
+function readPageSize(): number {
+  try {
+    return parsePageSize(process.env.PAGE_SIZE)
+  } catch (error) {
+    console.error((error as Error).message)
+    process.exit(2)
+  }
+}
+
+const pageSize = readPageSize()
 
 const staticDir = join(import.meta.dirname, '../dist')
 const port = process.env.PORT === undefined ? 3001 : Number(process.env.PORT)

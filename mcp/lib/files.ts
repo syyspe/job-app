@@ -18,8 +18,9 @@ export interface LocalFile {
 }
 
 export async function readLocalFile(path: string): Promise<LocalFile> {
-  const bytes = await readFile(path).catch(() => {
-    throw new Error(`no file at ${path}`)
+  const bytes = await readFile(path).catch((error: NodeJS.ErrnoException) => {
+    if (error.code !== 'ENOENT') throw error
+    throw new Error(`no file at ${path}`, { cause: error })
   })
   return {
     bytes,

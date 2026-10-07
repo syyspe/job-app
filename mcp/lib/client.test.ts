@@ -83,13 +83,15 @@ test('an unreachable API says it may not be running', async () => {
     password: 'test-password',
   })
 
-  await expect(offline.getJson('/api/applications')).rejects.toThrow(
+  const error = (await offline.getJson('/api/applications').catch((e) => e)) as Error
+  expect(error.message).toBe(
     `cannot reach the job-applications API at ${closedUrl} — is it running? (npm run dev:server)`,
   )
+  expect(error.cause).toBeInstanceOf(TypeError)
 })
 
 test("a rejected request carries the server's own error string", async () => {
   await expect(client.sendJson('POST', '/api/applications', { company: '' })).rejects.toThrow(
-    'invalid application',
+    'company is required',
   )
 })

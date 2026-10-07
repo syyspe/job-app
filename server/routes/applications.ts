@@ -6,6 +6,7 @@ import { toApplication, matchesInput } from '../models/application.ts'
 import type { ApplicationRow } from '../models/application.ts'
 import type { AttachmentRow } from '../models/attachment.ts'
 import { validateInput } from '../lib/validation.ts'
+import { HttpError } from '../lib/httpError.ts'
 import { unlinkIfExists } from '../lib/files.ts'
 import { touchApplication } from '../lib/applications.ts'
 
@@ -26,10 +27,6 @@ function listHandler(db: Database.Database, attachments: AttachmentsForApplicati
 function createHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
     const input = validateInput(req.body)
-    if (!input) {
-      res.status(400).json({ error: 'invalid application' })
-      return
-    }
 
     const result = db
       .prepare(
@@ -70,16 +67,9 @@ function updateHandler(db: Database.Database, attachments: AttachmentsForApplica
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
     const input = validateInput(req.body)
-    if (!input) {
-      res.status(400).json({ error: 'invalid application' })
-      return
-    }
 
     const existing = findOwnedApplication(db, id, req.userId)
-    if (!existing) {
-      res.status(404).json({ error: 'not found' })
-      return
-    }
+    if (!existing) throw new HttpError(404, 'not found')
 
     db.prepare(
       `UPDATE applications
@@ -109,14 +99,10 @@ function archiveHandler(db: Database.Database, attachments: AttachmentsForApplic
     const id = Number(req.params.id)
     const archived = (req.body as { archived?: unknown } | undefined)?.archived
     if (typeof archived !== 'boolean') {
-      res.status(400).json({ error: 'invalid archived' })
-      return
+      throw new HttpError(400, 'archived must be true or false')
     }
 
-    if (!findOwnedApplication(db, id, req.userId)) {
-      res.status(404).json({ error: 'not found' })
-      return
-    }
+    if (!findOwnedApplication(db, id, req.userId)) throw new HttpError(404, 'not found')
 
     db.prepare('UPDATE applications SET archived = ? WHERE id = ? AND user_id = ?').run(
       archived ? 1 : 0,
@@ -142,10 +128,7 @@ function deleteHandler(
       .prepare('DELETE FROM applications WHERE id = ? AND user_id = ?')
       .run(id, req.userId)
 
-    if (result.changes === 0) {
-      res.status(404).json({ error: 'not found' })
-      return
-    }
+    if (result.changes === 0) throw new HttpError(404, 'not found')
 
     for (const attachment of attachmentRows) {
       unlinkIfExists(join(uploadsDir, attachment.stored_name))
