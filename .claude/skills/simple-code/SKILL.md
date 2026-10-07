@@ -49,6 +49,9 @@ guarantees. Only validate at real boundaries: user input, external APIs,
 file/network I/O. Trust internal code and framework guarantees everywhere
 else.
 
+Validation at those boundaries isn't defensive code. It's required, and the
+`error-handling` skill sets how it fails.
+
 ## No cleverness over simplicity
 
 Prefer the boring, obvious implementation. Avoid one-liners or

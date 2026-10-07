@@ -6,6 +6,10 @@ be asked and don't assume the user started the session in plan mode.
 Then read `brief/<slug>.md` and iterate until the plan could be implemented
 from the file alone, without the conversation that produced it.
 
+If the plan adds code that can fail at a boundary, follow the `error-handling`
+skill: list the failure cases under Tests. If `CLAUDE.md`'s `Errors:` line
+says the contract isn't decided, decide it in this plan.
+
 Once `ExitPlanMode` is approved, write the plan into `plans/<slug>.plan.md` in
 `plans/TEMPLATE.plan.md`'s shape and commit it.
 

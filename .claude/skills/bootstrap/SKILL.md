@@ -217,6 +217,9 @@ content for these to seem thorough:
   exactly as they are
 - `CLAUDE.md`'s "Things Claude gets wrong here" — it fills from real
   mistakes, and a fabricated entry there is actively misleading
+- `CLAUDE.md`'s `Errors:` line — it isn't a placeholder. The first plan
+  that adds a boundary decides the error contract, per the `error-handling`
+  skill, once there is real code to fit it to
 
 ## Step 9 — write the marker, and open the setup PR
 

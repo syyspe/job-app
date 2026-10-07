@@ -6,8 +6,8 @@ applies without you having to bring it up. They're advisory controls: they
 make correct behavior likely, unlike hooks (`.claude/hooks/`), which make
 violations impossible.
 
-`simple-code/` is the one filled-out example, and the one worth keeping on
-every project. The others aren't policy — they drive the process itself:
+`simple-code/` and `error-handling/` are the filled-out examples, and the two
+worth keeping on every project. The others aren't policy — they drive the process itself:
 `sdlc/` (`/sdlc` — which stage the branch is in and what's next),
 `bootstrap/` (one-time project setup), `worktree/` (parallel work streams),
 and `review/` (`/review` — Stage 4's default local pass against

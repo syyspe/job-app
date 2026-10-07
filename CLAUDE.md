@@ -51,6 +51,17 @@ with no `failed` line. Playwright: `N passed`.
   undeclared `test` is a type error at build time, not a runtime surprise.
 - Query by accessible role/name in tests (`getByRole`), not by CSS class or
   test id, unless there's no accessible handle.
+- Errors: the API answers every failure as JSON `{"error": "<message>"}`.
+  New and changed server code throws `HttpError(status, message)`
+  (`server/lib/httpError.ts`) for a client error, and doesn't write
+  `res.status(...).json(...)` by hand. `jsonErrorHandler`
+  (`server/middleware/errors.ts`, mounted last in `app.ts`) is the single
+  edge-out handler: an error's own 4xx `status` gets passed through with its
+  message, and anything else becomes `500 {"error": "internal server
+  error"}`. `logError` (`server/lib/logging.ts`) writes one stderr line per
+  error, plus the stack for a 5xx. On the client, `checkOk` in
+  `src/lib/api.ts` turns `{error}` into a thrown `Error` and a 401 into
+  `UnauthorizedError`. `mcp/` tools signal failure by throwing.
 
 ## Architecture
 
@@ -137,7 +148,8 @@ need goes in `server/lib/` — never import one router from another.
   file you touch while writing or editing code, unconditionally — its
   limits and no-cleverness/no-defensive-code rules are active from the
   first line, not a checklist for after `verifier` or review catches
-  something.
+  something. `error-handling` applies the same way to any code that can
+  fail, and the `Errors:` line above is the contract it keeps consistent.
 - Hooks in `.claude/hooks/` are hard guardrails, not suggestions — if one
   blocks you, that's a signal to stop and check with me, not to work
   around it.
