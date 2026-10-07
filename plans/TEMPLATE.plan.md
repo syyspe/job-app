@@ -20,9 +20,20 @@ date: <YYYY-MM-DD>
 - Errors: `<the error contract, if this plan decides it — see the
   error-handling skill>`
 - Logging: `<the logging contract, decided with it — see the logging skill>`
+- UI: `<the visual direction — typography, color, layout, tone; see the
+  frontend-design skill>`
 
-Delete this section unless `CLAUDE.md` still says these are not decided and
-this plan adds the first boundary.
+Keep a line only if `CLAUDE.md` still says it is not decided and this plan
+decides it: Errors and Logging with the first boundary, UI with the first UI.
+Delete the section if no line is left.
+
+## Parallel streams
+
+- `<other slug>` — `<what overlaps>`; `<sequence | extract | merge>`:
+  `<what that means for this plan>`
+
+Delete this section if no stream in flight overlaps this plan's Affected
+files or contracts.
 
 ## Tests
 
