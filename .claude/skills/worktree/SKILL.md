@@ -35,6 +35,20 @@ Branches from the current `HEAD` by default. If the current branch is
 itself mid-work on something unrelated, ask which branch to base the new
 one on (usually the default branch) rather than assuming.
 
+**Stacked branch** (building on another stream that hasn't merged yet, when
+its plan chose to sequence that way):
+
+```
+git worktree add ../<repo-dir-name>-<slug> -b <slug> <parent-slug>
+```
+
+Branch from the parent's committed state, so it needs at least the work
+this stream builds on. The stacked stream can run Stages 1–3 alongside the
+parent but doesn't ship first: its Stage 4 waits until the parent merges,
+then rebases onto the default branch. Until then its diff against the
+default branch includes the parent's work, which would confuse the
+verifier and review.
+
 **Existing branch** (resuming work someone/something already pushed):
 
 ```

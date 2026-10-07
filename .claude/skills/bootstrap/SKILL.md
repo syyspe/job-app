@@ -190,7 +190,17 @@ Edit:
 - **`CLAUDE.md`** — Commands, Conventions (including `Language/runtime`
   and `Framework`, using the *verified actual* versions from Step 4, not
   just what was requested), Architecture. Leave "Things Claude gets wrong
-  here" empty. Leave `## The loop` exactly as it is — its `<slug>` is a
+  here" empty. If the project has a UI (Next.js, React + Node, Django, or an
+  Other stack that renders one), add this to Conventions after `Logging:`,
+  verbatim; a stack without one (Plain Node/TS) gets no `UI:` line:
+
+  ```
+  - UI: not decided yet. The first plan that adds or reshapes UI decides the
+    visual direction and replaces this line; see the `frontend-design`
+    skill, if installed.
+  ```
+
+  Leave `## The loop` exactly as it is — its `<slug>` is a
   variable that gets filled in per piece of work, not a setup placeholder.
 - **`README.md`** — replace the title and opening framing with the real
   project name/purpose. Leave the pointers to `/sdlc` and the `sdlc` skill
@@ -221,6 +231,8 @@ content for these to seem thorough:
   that adds a boundary decides the error contract, per the `error-handling`
   skill, once there is real code to fit it to. The `Logging:` line is the
   same: decided in that plan, per the `logging` skill
+- the `UI:` line Step 8 adds — decided by the first plan that adds UI, not
+  here
 
 ## Step 9 — write the marker, and open the setup PR
 

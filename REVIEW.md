@@ -51,7 +51,9 @@ Every PR gets four passes, in this order:
 3. **Scope** — alignment with `brief/<slug>.md` and `plans/<slug>.plan.md`.
    Flag anything in the diff that neither document asked for. Unplanned
    work isn't automatically wrong, but it should be a decision, not a
-   surprise.
+   surprise. The same goes for UI that departs from `CLAUDE.md`'s `UI:`
+   line, if it has one: a new font, palette or layout pattern the line
+   doesn't cover.
 4. **Simplicity** — function/file length, parameter count, nesting depth,
    and complexity within the limits in
    `.claude/skills/simple-code/SKILL.md`; flag defensive code handling

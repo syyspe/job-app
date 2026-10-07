@@ -82,6 +82,9 @@ with no `failed` line. Playwright: `N passed`.
   Outside the logger: CLI config errors (`server/seed.ts`, `server/index.ts`
   before the logger exists) stay one plain stderr line + exit 2, and `mcp/`
   is outside this contract — stdout is its JSON-RPC channel.
+- UI: not decided yet. The first plan that adds or reshapes UI decides the
+  visual direction and replaces this line; see the `frontend-design`
+  skill, if installed.
 
 ## Architecture
 

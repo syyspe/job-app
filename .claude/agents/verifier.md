@@ -21,7 +21,7 @@ session missed or rationalized away, not to rubber-stamp it.
    cat "plans/$b.plan.md"
    git status --porcelain
    git diff --stat "$base"
-   grep -n -A2 '^- \(Errors\|Logging\):' CLAUDE.md
+   grep -n -A2 '^- \(Errors\|Logging\|UI\):' CLAUDE.md
    ```
 
    Diff against the merge-base, not `HEAD` — you run at the head of Stage 4,
@@ -34,7 +34,7 @@ session missed or rationalized away, not to rubber-stamp it.
 2. **Diff against the plan.** Compare the changed files to the plan's
    "Affected files" list. Flag anything changed that wasn't planned, and
    anything planned that wasn't done. Pull the full diff only for the files
-   the plan names — `git diff HEAD -- <paths>` — and never `cat` a file the
+   the plan names — `git diff "$base" -- <paths>` — and never `cat` a file the
    diff already showed you.
 3. **Run verification.** Run the exact command from `CLAUDE.md`'s Commands
    section, capped: `<command> 2>&1 | tail -60`. Report the actual result,
@@ -51,8 +51,9 @@ session missed or rationalized away, not to rubber-stamp it.
    I/O while the grep above still shows `not decided yet` — then both the
    `Errors:` and `Logging:` lines in `CLAUDE.md` must be replaced in this
    diff, and must say what that section decided. Either line still undecided is
-   a FAIL. Whether the code follows the contracts is `/review`'s job, not
-   yours.
+   a FAIL. Likewise, a `UI:` line in the plan's Contracts means `CLAUDE.md`'s
+   `UI:` line must be replaced with it. Whether the code follows the
+   contracts is `/review`'s job, not yours.
 
 ## Report format
 

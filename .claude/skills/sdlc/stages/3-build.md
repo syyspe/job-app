@@ -4,7 +4,8 @@ Implement the work order in `plans/<slug>.plan.md`.
 
 - `simple-code` applies from the first line, not as a cleanup pass afterwards.
   `error-handling` applies the same way to anything that can fail, and
-  `logging` to anything that logs.
+  `logging` to anything that logs. For UI work, `frontend-design` too, if the
+  session lists it, following `CLAUDE.md`'s `UI:` line.
 - For a bug fix, commit the failing test *before* the fix, and don't edit it
   while fixing.
 - If the implementation departs from the plan, update `plans/<slug>.plan.md`

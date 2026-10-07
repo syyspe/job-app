@@ -10,6 +10,14 @@ and 5 and skip `verifier` and `/security-review`. Say in the PR body that the
 light path was used and why. A diff that touches a hook, config, a
 dependency or anything executable is not low-risk: it runs every step.
 
+**Before step 1, sync with the default branch.** Another stream may have
+merged since this one branched. `git fetch origin && git rebase origin/HEAD`.
+Every step below then checks the code that will actually merge. Resolve any
+conflicts and commit. If the resolution changed what the code does, rather
+than just how two edits fit together, the plan no longer describes it: that
+is a return to Stage 3, as in "When a step fails". A stacked branch waits
+until its parent has merged, then syncs onto the default branch the same way.
+
 1. **Verify.** Run the verification command from `CLAUDE.md` and report its
    real output, not a paraphrase. If it says "3 failed," say that.
 2. **`verifier`.** The subagent re-checks the diff against
@@ -28,7 +36,10 @@ dependency or anything executable is not low-risk: it runs every step.
    In the PR body, name anything in the diff that neither `brief/<slug>.md`
    nor the plan asked for.
 
-The user reviews and merges.
+The user reviews and merges. If the PR picks up conflicts while it waits,
+because another stream merged first, that's a fresh Ship session: sync, run
+the steps again, and ask before `git push --force-with-lease`. The branch is
+already published.
 
 ## When a step fails
 
