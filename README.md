@@ -37,7 +37,7 @@ default, so it fails fast at startup if either is missing:
 - `UPLOADS_DIR` — full path to the uploads directory
 - `SEED_USERNAME` / `SEED_PASSWORD` — the login `npm run seed` creates
 
-Three more are optional:
+Five more are optional:
 
 - `PORT` — the port the API listens on (default 3001)
 - `PAGE_SIZE` — how many applications one page of the list shows (default 7).
@@ -46,6 +46,8 @@ Three more are optional:
   startup.
 - `LOG_LEVEL` — `debug`, `info`, `warn`, `error` or `silent` (default `info`).
   The API logs JSON lines to stdout; any other value fails at startup.
+- `TLS_CERT` / `TLS_KEY` — PEM files for the certificate and its key. Set
+  both and `npm start` serves HTTPS instead of HTTP; see "HTTPS" below.
 
 Copy `.env.example` to `.env`, fill in real paths, and pick your own
 `SEED_USERNAME`/`SEED_PASSWORD` — do this before either mode below.
@@ -96,6 +98,32 @@ user's existing sessions, so the old password's cookies stop working. A
 forgotten password is an admin's job on this page; if the forgotten password *is* the last admin's, re-run
 `npm run seed` with that user's `SEED_USERNAME` and a new `SEED_PASSWORD`.
 
+### HTTPS
+
+Unset, the server speaks plain HTTP, so the password and session cookie cross
+the network unencrypted. To serve HTTPS, make a certificate with
+[mkcert](https://github.com/FiloSottile/mkcert), signed by the local CA at
+`mkcert -CAROOT`. Keep it outside the repo, next to the database:
+
+```
+mkdir -p /projects/tests/job-app-certs && cd /projects/tests/job-app-certs
+mkcert -cert-file job-app.pem -key-file job-app-key.pem localhost 127.0.0.1 192.168.100.9
+```
+
+Then point `.env` at both files:
+
+```
+TLS_CERT=/projects/tests/job-app-certs/job-app.pem
+TLS_KEY=/projects/tests/job-app-certs/job-app-key.pem
+```
+
+The key is a secret, which is why it lives outside the repo rather than
+gitignored inside it. After that, `npm start` serves
+`https://192.168.100.9:3001` (and `https://localhost:3001`), and the session
+cookie is `Secure`. A device only trusts the certificate once it trusts the
+mkcert root CA. Setting only one of the two vars, or naming a file that can't
+be read or isn't a valid PEM, stops startup with one line on stderr.
+
 ### Development
 
 Two processes: Vite serves the React app on `:5173` with HMR and proxies
@@ -105,6 +133,9 @@ Two processes: Vite serves the React app on `:5173` with HMR and proxies
 npm run dev         # frontend, :5173
 npm run dev:server  # API, :3001
 ```
+
+`npm run dev:server` always serves plain HTTP, whatever `.env` says about
+`TLS_CERT`/`TLS_KEY` — HTTPS is for `npm start` only.
 
 ### Production
 
@@ -150,6 +181,12 @@ Add it to `claude_desktop_config.json` and restart Claude Desktop:
 The three env vars are all required, and Claude Desktop is the only thing
 that supplies them — the MCP server does not read `.env`. Use the same
 credentials `npm run seed` created.
+
+When `npm start` serves HTTPS (see "HTTPS"), set
+`JOBAPP_API_URL` to `https://localhost:3001` and add
+`"NODE_EXTRA_CA_CERTS": "<the output of mkcert -CAROOT>/rootCA.pem"` to the
+same `env` block, so Node trusts the mkcert certificate. `npm run dev:server`
+stays on HTTP, so the URL follows whichever of the two is running.
 
 Claude Desktop spawns the server with a minimal `PATH`, so a bare `node` may
 not resolve; if the server shows as failed, put the absolute path from

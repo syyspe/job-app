@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { LOG_LEVELS } from './logger.ts'
 import type { LogLevel } from './logger.ts'
 
@@ -19,4 +20,25 @@ export function parseLogLevel(raw: string | undefined): LogLevel {
     throw new Error(`LOG_LEVEL must be one of ${LOG_LEVELS.join(', ')}`)
   }
   return level
+}
+
+export type TlsFiles = { cert: Buffer; key: Buffer }
+
+// An empty value counts as unset, so `TLS_CERT= TLS_KEY=` can switch TLS off
+// over a `.env` that sets them.
+export function parseTls(certPath: string | undefined, keyPath: string | undefined): TlsFiles | undefined {
+  if (!certPath && !keyPath) return undefined
+  if (!certPath || !keyPath) {
+    throw new Error('TLS_CERT and TLS_KEY must be set together, or both left unset')
+  }
+  return { cert: readTlsFile('TLS_CERT', certPath), key: readTlsFile('TLS_KEY', keyPath) }
+}
+
+function readTlsFile(name: string, path: string): Buffer {
+  try {
+    return readFileSync(path)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    throw new Error(`${name} could not be read: ${path} (${code})`, { cause: error })
+  }
 }

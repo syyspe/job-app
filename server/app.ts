@@ -15,7 +15,12 @@ import { DEFAULT_PAGE_SIZE } from './lib/config.ts'
 import { createLogger } from './lib/logger.ts'
 import type { Logger } from './lib/logger.ts'
 
-type CreateAppOptions = { staticDir?: string; pageSize?: number; logger?: Logger }
+type CreateAppOptions = {
+  staticDir?: string
+  pageSize?: number
+  logger?: Logger
+  secureCookies?: boolean
+}
 
 export function createApp(
   db: Database.Database,
@@ -24,13 +29,14 @@ export function createApp(
     staticDir,
     pageSize = DEFAULT_PAGE_SIZE,
     logger = createLogger('silent'),
+    secureCookies = false,
   }: CreateAppOptions = {},
 ): ExpressApp {
   const app = express()
   app.use(requestLogging(logger))
   app.use(express.json())
   app.use('/api', requireParsableBody)
-  app.use('/api', createAuthRouter(db))
+  app.use('/api', createAuthRouter(db, secureCookies))
   app.use('/api', requireSession(db))
   app.use('/api', createConfigRouter(pageSize))
   app.use('/api', createApplicationsRouter(db, uploadsDir))
