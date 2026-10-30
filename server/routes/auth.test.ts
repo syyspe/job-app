@@ -45,6 +45,25 @@ test('login sets an httpOnly cookie and returns the user', async () => {
   expect(user.username).toBe('testuser')
   const setCookie = res.headers.get('set-cookie')
   expect(setCookie).toContain('HttpOnly')
+  expect(setCookie).not.toContain('Secure')
+})
+
+test('with secureCookies the login cookie is Secure', async () => {
+  const secureApp = createApp(db, join(root, 'uploads'), { secureCookies: true })
+  const secureServer = secureApp.listen(0)
+  await new Promise<void>((resolve) => secureServer.once('listening', resolve))
+  const address = secureServer.address()
+  const port = typeof address === 'object' && address ? address.port : 0
+  try {
+    const res = await fetch(`http://localhost:${port}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'testuser', password: 'test-password' }),
+    })
+    expect(res.headers.get('set-cookie')).toContain('Secure')
+  } finally {
+    await new Promise<void>((resolve) => secureServer.close(() => resolve()))
+  }
 })
 
 test('a wrong password and an unknown username give the same 401', async () => {

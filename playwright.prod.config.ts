@@ -21,6 +21,9 @@ export default defineConfig({
       UPLOADS_DIR: join(dataDir, 'uploads'),
       // Small enough that the e2e specs can page a list they can build by hand.
       PAGE_SIZE: '3',
+      // Blank, not absent: --env-file won't override a set var, so a TLS-enabled .env can't make this HTTPS.
+      TLS_CERT: '',
+      TLS_KEY: '',
       SEED_USERNAME: TEST_USERNAME,
       SEED_PASSWORD: TEST_PASSWORD,
     },

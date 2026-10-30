@@ -7,9 +7,9 @@ import { toUser } from '../models/user.ts'
 import type { UserRow } from '../models/user.ts'
 import { HttpError } from '../lib/httpError.ts'
 
-const COOKIE_OPTIONS = { httpOnly: true, sameSite: 'lax' as const, path: '/' }
+type CookieOptions = { httpOnly: true; sameSite: 'lax'; path: '/'; secure: boolean }
 
-function loginHandler(db: Database.Database) {
+function loginHandler(db: Database.Database, cookieOptions: CookieOptions) {
   return (req: Request, res: Response) => {
     // Express 5 leaves req.body undefined when no parser matched the request.
     const body = (req.body ?? {}) as Record<string, unknown>
@@ -27,16 +27,16 @@ function loginHandler(db: Database.Database) {
     const token = createSessionToken()
     db.prepare('INSERT INTO sessions (token, user_id) VALUES (?, ?)').run(token, row.id)
 
-    res.cookie(SESSION_COOKIE, token, COOKIE_OPTIONS)
+    res.cookie(SESSION_COOKIE, token, cookieOptions)
     res.json(toUser(row))
   }
 }
 
-function logoutHandler(db: Database.Database) {
+function logoutHandler(db: Database.Database, cookieOptions: CookieOptions) {
   return (req: Request, res: Response) => {
     const token = readSessionCookie(req.headers.cookie)
     if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token)
-    res.clearCookie(SESSION_COOKIE, COOKIE_OPTIONS)
+    res.clearCookie(SESSION_COOKIE, cookieOptions)
     res.status(204).end()
   }
 }
@@ -62,10 +62,11 @@ function meHandler(db: Database.Database) {
   }
 }
 
-export function createAuthRouter(db: Database.Database): Router {
+export function createAuthRouter(db: Database.Database, secureCookies: boolean): Router {
+  const cookieOptions: CookieOptions = { httpOnly: true, sameSite: 'lax', path: '/', secure: secureCookies }
   const router = Router()
-  router.post('/login', loginHandler(db))
-  router.post('/logout', logoutHandler(db))
+  router.post('/login', loginHandler(db, cookieOptions))
+  router.post('/logout', logoutHandler(db, cookieOptions))
   router.get('/me', meHandler(db))
   return router
 }
