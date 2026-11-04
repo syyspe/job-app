@@ -7,6 +7,7 @@ test('the list shows one page at a time and the pager moves between them', async
   page,
 }) => {
   await logIn(page)
+  await page.getByRole('button', { name: 'Add an application' }).click()
 
   for (const company of companies) {
     await page.getByRole('textbox', { name: 'Company' }).fill(company)

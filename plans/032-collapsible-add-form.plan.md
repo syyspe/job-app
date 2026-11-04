@@ -24,7 +24,9 @@ toggle, without changing the two-column layout.
   half-typed draft survives close and reopen. Hidden fields are out of the
   accessibility tree, so `getByRole` doesn't find them while the panel is
   collapsed (tests can assert on that with `queryByRole`).
-- State is `useState(false)` in `ApplicationsView`, with no persistence. After
+- State is `useState(false)` in a local `AddPanel` component in
+  `ApplicationsView.tsx` (extracted during build to keep `ApplicationsView`
+  under the 40-line lint limit), with no persistence. After
   an add, nothing touches `open`, so the form stays open and `ApplicationForm`
   resets itself as it does today.
 - CSS: the rules go in `App.css`, which already owns `.panel` / `.panel h2`.
@@ -39,8 +41,8 @@ toggle, without changing the two-column layout.
 
 ## Affected files
 
-- `src/components/ApplicationsView.tsx` — `open` state, a toggle button in the
-  h2, and the form wrapped in `<div id="add-application-form" hidden={!open}>`.
+- `src/components/ApplicationsView.tsx` — a local `AddPanel` with the `open`
+  state, a toggle button in the h2, and the form wrapped in `<div id="add-application-form" hidden={!open}>`.
 - `src/App.css` — `.add-panel` toggle and chevron rules, and the collapsed
   h2 margin.
 - `src/components/ApplicationsView.test.tsx` — new tests. The

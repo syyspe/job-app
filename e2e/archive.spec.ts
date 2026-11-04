@@ -3,6 +3,7 @@ import { logIn } from './login.ts'
 
 test('archive an application, reveal it, and unarchive it', async ({ page }) => {
   await logIn(page)
+  await page.getByRole('button', { name: 'Add an application' }).click()
 
   await page.getByRole('textbox', { name: 'Company' }).fill('Archivco')
   await page.getByRole('textbox', { name: 'Role' }).fill('Engineer')

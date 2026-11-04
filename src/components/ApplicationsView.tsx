@@ -125,6 +125,30 @@ function useListView(applications: Application[], pageSize: number | null) {
   }
 }
 
+// Collapsed on every load; hidden rather than unmounted so a draft survives a close.
+function AddPanel({ onAdd }: { onAdd: (input: ApplicationInput) => Promise<void> }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <section className="panel add-panel">
+      <h2>
+        <button
+          type="button"
+          className="add-toggle"
+          aria-expanded={open}
+          aria-controls="add-application-form"
+          onClick={() => setOpen((current) => !current)}
+        >
+          Add an application
+        </button>
+      </h2>
+      <div id="add-application-form" hidden={!open}>
+        <ApplicationForm submitLabel="Add application" onSubmit={onAdd} />
+      </div>
+    </section>
+  )
+}
+
 interface ApplicationsViewProps {
   onUnauthorized: () => void
 }
@@ -144,10 +168,7 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
 
   return (
     <div className="layout">
-      <section className="panel">
-        <h2>Add an application</h2>
-        <ApplicationForm submitLabel="Add application" onSubmit={handleAdd} />
-      </section>
+      <AddPanel onAdd={handleAdd} />
       <div>
         <ApplicationSort sort={list.sort} onChange={list.changeSort} />
         <ApplicationList

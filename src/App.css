@@ -50,6 +50,39 @@ main {
   margin-bottom: var(--s-4);
 }
 
+.add-panel h2:has(.add-toggle[aria-expanded='false']) {
+  margin-bottom: 0;
+}
+
+.add-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.add-toggle::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--ink-muted);
+  border-bottom: 2px solid var(--ink-muted);
+  transform: translateY(-25%) rotate(45deg);
+  transition: transform 120ms ease;
+}
+
+.add-toggle[aria-expanded='true']::after {
+  transform: translateY(25%) rotate(-135deg);
+}
+
 .login-panel {
   max-width: 380px;
   margin: 0 auto;

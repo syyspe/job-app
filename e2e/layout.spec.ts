@@ -5,6 +5,7 @@ test('the form and list sit side by side on wide viewports, stacked on narrow on
   page,
 }) => {
   await logIn(page)
+  await page.getByRole('button', { name: 'Add an application' }).click()
 
   await page.getByRole('textbox', { name: 'Company' }).fill('Layout Co')
   await page.getByRole('textbox', { name: 'Role' }).fill('Engineer')
