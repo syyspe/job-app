@@ -5,6 +5,7 @@ test('add, edit, attach a file, and delete an application', async ({
   page,
 }) => {
   await logIn(page)
+  await page.getByRole('button', { name: 'Add an application' }).click()
 
   await page.getByRole('textbox', { name: 'Company' }).fill('Acme')
   await page.getByRole('textbox', { name: 'Role' }).fill('Engineer')

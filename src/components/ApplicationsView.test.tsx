@@ -98,11 +98,53 @@ test('a 401 from the API calls onUnauthorized', async () => {
   )
 })
 
+const addToggle = () => screen.getByRole('button', { name: 'Add an application' })
+
 async function addApplication(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(addToggle())
   await user.type(screen.getByRole('textbox', { name: 'Company' }), 'Globex')
   await user.type(screen.getByRole('textbox', { name: 'Role' }), 'Engineer')
   await user.click(screen.getByRole('button', { name: 'Add application' }))
 }
+
+test('the add form starts collapsed', async () => {
+  stubFetch(sampleApplications)
+  renderView()
+  await screen.findByRole('button', { name: /Acme/ })
+
+  expect(addToggle()).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByRole('textbox', { name: 'Company' })).not.toBeInTheDocument()
+})
+
+test('the add toggle opens and closes the form', async () => {
+  const user = userEvent.setup()
+  stubFetch(sampleApplications)
+  renderView()
+  await screen.findByRole('button', { name: /Acme/ })
+
+  await user.click(addToggle())
+  expect(addToggle()).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('textbox', { name: 'Company' })).toBeVisible()
+
+  await user.click(addToggle())
+  expect(addToggle()).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByRole('textbox', { name: 'Company' })).not.toBeInTheDocument()
+})
+
+test('the add form stays open and empties after a successful add', async () => {
+  const user = userEvent.setup()
+  stubFetch(sampleApplications, {
+    post: () => new Response(JSON.stringify(sampleApplications[0]), { status: 201 }),
+  })
+  renderView()
+  await screen.findByRole('button', { name: /Acme/ })
+
+  await addApplication(user)
+
+  expect(await screen.findByText('Application added')).toBeVisible()
+  expect(addToggle()).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('textbox', { name: 'Company' })).toHaveValue('')
+})
 
 test('a successful add shows a success toast', async () => {
   const user = userEvent.setup()
