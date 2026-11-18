@@ -51,7 +51,7 @@ concurrency limit. Each ad gets a fresh process.
 |---|---|---|---|
 | Mail read and send | yes | no | no |
 | Job-app credentials and writes | yes | no | no |
-| Network or web tools | public ad pages only | no | the configured Ollama endpoint only |
+| Network or web tools | job-app API, mail server, Ollama health check, public ad pages on each connector's `fetchHosts` | no | the configured Ollama endpoint only |
 | Shell, file write | runner's own state only | no | no |
 | Profile search | no | yes | its local index only |
 | Untrusted ad text | passes it through | reads it as data | no |
@@ -70,9 +70,10 @@ Every `claude -p` step must:
 processed, and settles the exact flags against the installed CLI.
 
 The summary recipient is fixed in private config. No value from an ad or a
-model response can select a recipient, URL to fetch, file path or status. The
-runner only ever creates applications with status `draft` and has no code path
-that submits an application.
+model response can select a recipient, file path or status, and a URL is
+fetched only if it passes the host check in section 6. The runner only ever
+creates applications with status `draft` and has no code path that submits an
+application.
 
 ## 3. Private configuration
 
@@ -128,15 +129,22 @@ Allowed transitions; the server answers anything else with 409:
 - `title_rejected` → `ready` (the user hands the ad over anyway)
 - `ready` → `suitable`, `unsuitable`, `duplicate`, `failed`, `dismissed`
 - `suitable` → `drafted`, `failed`, `dismissed`
-- `failed` → `new` or `awaiting_handover`, by the connector's mode (user retry)
+- `failed` → `new` or `awaiting_handover`, by the connector's mode (user retry,
+  which resets `attempts`)
+
+`drafted` is reached only through `POST /api/ads/:id/draft`. The transition
+route answers 409 for it, so no ad is marked drafted without an application.
 
 An unsure evaluation counts as `suitable`, and the doubt becomes a question in
 the draft. A block or rate-limit response does not count as an attempt: the ad
-stays `new` for the next run.
+stays `new` for the next run. A `gone` fetch result moves the ad straight to
+`failed` with the category `gone`.
 
-For a hand-over source, `title` and `company` are blanked once the ad is
-terminal and reported, leaving only the keys needed for deduplication. This
-keeps stored Duunitori content to what the review needs.
+For a hand-over source, `title` and `company` are blanked as soon as the ad
+enters `unsuitable`, `duplicate` or `dismissed`, which no summary covers, and
+once reported for `drafted`, `title_rejected` and `failed`. Only the keys needed
+for deduplication remain, and handing such an ad over again supplies the title
+and company anew. This keeps stored Duunitori content to what the review needs.
 
 **Deduplication**, applied by the server, in order:
 
@@ -145,8 +153,8 @@ keeps stored Duunitori content to what the review needs.
    included. Canonical means lowercase host, no fragment, no tracking
    parameters, no trailing slash.
 3. Normalised company and title match another ad from the last 90 days or any
-   application's company and role. Rerun when `ready` if the company was
-   unknown at ingest.
+   application's company and role. This rule is skipped while the company is
+   unknown, and runs when the ad reaches `ready`.
 
 ## 5. Inbox API
 
@@ -194,6 +202,7 @@ interface SourceConnector {
   mode: SourceMode
   matches(message: AlertMessage): boolean
   parseAlert(message: AlertMessage): AdCandidate[]
+  fetchHosts?: string[]
   fetchAd?(candidate: AdCandidate, http: PoliteHttp): Promise<FetchResult>
 }
 ```
@@ -201,7 +210,11 @@ interface SourceConnector {
 - Connectors do no I/O except through `PoliteHttp`, which the runner supplies.
   It enforces the daily cap and pauses, sends no credentials, and ends that
   source's day on the first `blocked`.
-- A `handover` connector has no `fetchAd`. Duunitori is `handover`.
+- `PoliteHttp` fetches only `https` URLs whose host is in the connector's
+  `fetchHosts`, and applies the same check to every redirect. Alert emails are
+  untrusted, so a candidate with any other host is dropped without a request.
+- A `handover` connector has no `fetchAd` or `fetchHosts`. Duunitori is
+  `handover`.
 - Each source's config is `{enabled, termsCheckedOn, dailyOpenCap, minDelayMs}`.
   The runner refuses to enable an automatic source with no `termsCheckedOn`.
 

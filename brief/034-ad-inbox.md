@@ -23,8 +23,7 @@ processed twice. Every later stream writes to this inbox, so it comes first.
 4. Every inbox API route except `POST /api/ads/:id/draft` works behind
    `requireSession`.
 5. Ad text is cleared on the states the contract lists, and a hand-over
-   source's `title` and `company` are blanked once the ad is terminal and
-   reported.
+   source's `title` and `company` are blanked when the contract says so.
 6. The MCP tools `list_ads`, `get_ad`, `handover_ad` and `dismiss_ad` work from
    Claude Desktop.
 7. A review view lists ads by state, and lets me dismiss an ad, hand over its
@@ -66,6 +65,8 @@ code exists.
   undecided until the first plan that reshapes it.
 - Does this third feature area trigger the deferred split of `src/components/`
   into feature folders?
+- How long may an ad wait in `awaiting_handover`? Until I act, its Duunitori
+  title and company stay stored, and the contract sets no time limit.
 - How does the server know an ad's source is a hand-over source? The `failed`
   retry target and the blanking of `title` and `company` both depend on the
   connector's mode, but the `ads` table has no column for it.

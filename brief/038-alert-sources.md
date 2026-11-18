@@ -20,7 +20,8 @@ limited requests, and no automatic fetching from Duunitori.
 3. New candidates reach the inbox through `POST /api/ads`, and the mail watermark
    advances only after ingest succeeds.
 4. `PoliteHttp` enforces each source's daily cap and pauses, sends no credentials
-   and ends that source's day on the first `blocked`.
+   and ends that source's day on the first `blocked`. It fetches only `https`
+   URLs on the connector's `fetchHosts`, redirects included.
 5. A block or rate-limit response leaves the ad `new` and counts no attempt.
 6. The runner refuses to enable an automatic source with no `termsCheckedOn`.
 7. Duunitori is a `handover` connector. Its titles are screened from the email,
