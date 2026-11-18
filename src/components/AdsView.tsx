@@ -18,11 +18,14 @@ function useAds(onUnauthorized: () => void): { ads: AdSummary[]; actions: AdActi
     void run(reload)
   }, [run])
 
-  async function change(call: () => Promise<unknown>, message: string) {
+  async function change(call: () => Promise<unknown>, message: string): Promise<boolean> {
+    let succeeded = false
     await run(async () => {
       await call()
+      succeeded = true
       await reload()
     }, message)
+    return succeeded
   }
 
   return {

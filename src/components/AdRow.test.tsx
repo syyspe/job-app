@@ -29,8 +29,12 @@ function sampleAd(overrides: Partial<AdSummary> = {}): AdSummary {
   }
 }
 
-function renderRow(ad: AdSummary) {
-  const actions: AdActions = { onHandOver: vi.fn(), onRetry: vi.fn(), onDismiss: vi.fn() }
+function renderRow(ad: AdSummary, handedOver = true) {
+  const actions: AdActions = {
+    onHandOver: vi.fn().mockResolvedValue(handedOver),
+    onRetry: vi.fn(),
+    onDismiss: vi.fn(),
+  }
   render(
     <ul>
       <AdRow ad={ad} actions={actions} />
@@ -133,6 +137,17 @@ test('handing over submits the form and closes it', async () => {
     company: 'Acme',
   })
   expect(screen.queryByRole('textbox', { name: 'Ad text' })).not.toBeInTheDocument()
+})
+
+test('a failed hand-over keeps the form and the pasted text', async () => {
+  const user = userEvent.setup()
+  renderRow(sampleAd(), false)
+
+  await user.click(screen.getByRole('button', { name: 'Hand over' }))
+  await user.type(screen.getByRole('textbox', { name: 'Ad text' }), 'The full ad.')
+  await user.click(screen.getByRole('button', { name: 'Hand over ad' }))
+
+  expect(await screen.findByRole('textbox', { name: 'Ad text' })).toHaveValue('The full ad.')
 })
 
 test('retry is offered on a failed ad only', async () => {

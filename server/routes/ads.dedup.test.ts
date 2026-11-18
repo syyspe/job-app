@@ -77,6 +77,29 @@ describe('deduplication by company and title', () => {
     expect(ad.body).toBeNull()
   })
 
+  test('the earlier ad survives when it reaches ready before its repeat', async () => {
+    const original = await ingest({ company: 'Acme', title: 'Test Lead' })
+    const repeat = await ingest({ company: 'Acme', title: 'Test Lead' })
+
+    expect((await moved(original.id, { to: 'ready', body: 'Text.' })).state).toBe('ready')
+
+    const ad = await moved(repeat.id, { to: 'ready', body: 'Text.' })
+    expect(ad.state).toBe('duplicate')
+    expect(ad.duplicateOf).toBe(original.id)
+  })
+
+  test('a later ad that already reached ready still matches', async () => {
+    const earlier = await ingest({ company: '', title: 'Test Lead', sourceMode: 'handover' })
+    const later = await ingest({ company: 'Acme', title: 'Test Lead' })
+    await moved(later.id, { to: 'ready', body: 'Text.' })
+
+    const res = await post(`/ads/${earlier.id}/handover`, { text: 'Text.', company: 'Acme' })
+
+    const ad = (await res.json()) as Ad
+    expect(ad.state).toBe('duplicate')
+    expect(ad.duplicateOf).toBe(later.id)
+  })
+
   test('an ad first seen over 90 days ago does not match', async () => {
     const old = await ingest({ company: 'Acme', title: 'Test Lead' })
     db.prepare("UPDATE ads SET first_seen_at = datetime('now', '-91 days') WHERE id = ?").run(

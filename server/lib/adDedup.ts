@@ -60,14 +60,16 @@ export function findTitleDuplicate(db: Database.Database, ad: AdRow): DuplicateM
   const isSame = (otherCompany: string, otherTitle: string) =>
     normaliseText(otherCompany) === company && normaliseText(otherTitle) === title
 
+  // A later ad still waiting for its text is the repeat, so it is not a target.
   const ads = db
     .prepare(
       `SELECT id, company, title FROM ads
         WHERE user_id = ? AND id <> ? AND state <> 'duplicate'
+          AND (id < ? OR state NOT IN ('new', 'awaiting_handover'))
           AND first_seen_at >= datetime('now', '-90 days')
         ORDER BY id`,
     )
-    .all(ad.user_id, ad.id) as { id: number; company: string; title: string }[]
+    .all(ad.user_id, ad.id, ad.id) as { id: number; company: string; title: string }[]
   const other = ads.find((candidate) => isSame(candidate.company, candidate.title))
   if (other) return { duplicateOf: other.id }
 

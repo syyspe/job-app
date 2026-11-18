@@ -182,7 +182,9 @@ and company anew. This keeps stored Duunitori content to what the review needs.
 Rules 2 and 3 both run when an ad reaches `ready`. A match moves it on to
 `duplicate` in the same transaction, and the response is 200 with the final
 row. Ads in state `duplicate` are never match targets, so `duplicate_of` points
-at an original, and a match against an application leaves it null.
+at an original, and a match against an application leaves it null. Rule 3 also
+skips a later ad still in `new` or `awaiting_handover`, so the earlier ad
+survives whichever of the two reaches `ready` first.
 
 ## 5. Inbox API
 

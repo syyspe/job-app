@@ -6,7 +6,8 @@ import type { AdHandoverInput, AdSummary } from '../types.ts'
 type Mode = 'idle' | 'handover' | 'dismiss'
 
 export interface AdActions {
-  onHandOver: (id: number, input: AdHandoverInput) => void
+  /** Resolves to whether the ad was handed over, so a failure can keep the form. */
+  onHandOver: (id: number, input: AdHandoverInput) => Promise<boolean>
   onRetry: (ad: AdSummary) => void
   onDismiss: (id: number) => void
 }
@@ -84,9 +85,9 @@ interface AdRowProps {
 export function AdRow({ ad, actions }: AdRowProps) {
   const [mode, setMode] = useState<Mode>('idle')
 
-  function handleHandOver(input: AdHandoverInput) {
-    actions.onHandOver(ad.id, input)
-    setMode('idle')
+  async function handleHandOver(input: AdHandoverInput) {
+    const handedOver = await actions.onHandOver(ad.id, input)
+    if (handedOver) setMode('idle')
   }
 
   return (
