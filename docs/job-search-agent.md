@@ -84,7 +84,7 @@ synthetic.
 | Path | Holds |
 |---|---|
 | `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets |
-| `~/.config/job-agent/config.json` | Recipient, source switches, caps, title rules, corpus paths, file name prefix, Ollama URL and embedding model |
+| `~/.config/job-agent/config.json` | Recipient, source switches, caps, `handoverWaitDays`, title rules, corpus paths, file name prefix, Ollama URL and embedding model |
 | `~/.config/job-agent/prompts/` | Headless evaluation and drafting rules adapted from the three job application skills |
 | `~/.local/state/job-agent/` | Run lock, mail watermarks, daily counters, unreported source failures, logs |
 | `~/.local/share/job-agent/` | Profile index |
@@ -126,11 +126,11 @@ Allowed transitions; the server answers anything else with 409:
 
 - `new` → `title_rejected`, `awaiting_handover`, `ready`, `duplicate`, `failed`, `dismissed`
 - `awaiting_handover` → `ready`, `dismissed`
-- `title_rejected` → `ready` (the user hands the ad over anyway)
+- `title_rejected` → `ready` (the user hands the ad over anyway), `dismissed`
 - `ready` → `suitable`, `unsuitable`, `duplicate`, `failed`, `dismissed`
 - `suitable` → `drafted`, `failed`, `dismissed`
 - `failed` → `new` or `awaiting_handover`, by the connector's mode (user retry,
-  which resets `attempts`)
+  which resets `attempts`), `dismissed`
 
 `drafted` is reached only through `POST /api/ads/:id/draft`. The transition
 route answers 409 for it, so no ad is marked drafted without an application.
@@ -139,6 +139,10 @@ An unsure evaluation counts as `suitable`, and the doubt becomes a question in
 the draft. A block or rate-limit response does not count as an attempt: the ad
 stays `new` for the next run. A `gone` fetch result moves the ad straight to
 `failed` with the category `gone`.
+
+An ad waits in `awaiting_handover` for `handoverWaitDays` days after
+`first_seen_at`, 7 by default. If the ad has a deadline that falls sooner, it
+waits only until the end of that day. The runner then moves it to `dismissed`.
 
 For a hand-over source, `title` and `company` are blanked as soon as the ad
 enters `unsuitable`, `duplicate` or `dismissed`, which no summary covers, and
@@ -279,6 +283,8 @@ attachment name and body. PDFs are never rendered by the agent.
 - Catch-up comes from state: the mail watermark advances only after ingest
   succeeds, and unfinished ads stay in their state for the next run.
 - Per-run caps on evaluations and drafts leave the remainder queued.
+- Each run dismisses the `awaiting_handover` ads whose wait has ended (section
+  4), so a day missed because the PC was off is caught up on the next run.
 - One summary is sent when there are unreported drafts, title rejections,
   failures or source failures. Nothing is marked reported until the mail server
   accepts the message.

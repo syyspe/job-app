@@ -65,8 +65,6 @@ code exists.
   undecided until the first plan that reshapes it.
 - Does this third feature area trigger the deferred split of `src/components/`
   into feature folders?
-- How long may an ad wait in `awaiting_handover`? Until I act, its Duunitori
-  title and company stay stored, and the contract sets no time limit.
 - How does the server know an ad's source is a hand-over source? The `failed`
   retry target and the blanking of `title` and `company` both depend on the
   connector's mode, but the `ads` table has no column for it.

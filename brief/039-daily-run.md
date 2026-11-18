@@ -27,6 +27,8 @@ the PC was off, and tell me only when there is something to report.
    otherwise.
 8. Nothing is marked reported until the mail server accepts the message, so a
    failed send is retried on the next run.
+9. Each run dismisses `awaiting_handover` ads after `handoverWaitDays` days, 7
+   by default, or after their deadline day if that comes sooner.
 
 ## Approach
 
