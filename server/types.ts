@@ -46,3 +46,53 @@ export interface Application {
   updatedAt: string
   attachments: Attachment[]
 }
+
+export const AD_STATES = [
+  'new',
+  'awaiting_handover',
+  'ready',
+  'suitable',
+  'drafted',
+  'title_rejected',
+  'unsuitable',
+  'duplicate',
+  'dismissed',
+  'failed',
+] as const
+
+export type AdState = (typeof AD_STATES)[number]
+
+export const SOURCE_MODES = ['automatic', 'handover'] as const
+
+export type SourceMode = (typeof SOURCE_MODES)[number]
+
+export interface AdEvaluation {
+  verdict: 'suitable' | 'unsuitable'
+  fitSummary: string
+  reasons: string[]
+}
+
+export interface AdSummary {
+  id: number
+  source: string
+  sourceMode: SourceMode
+  externalId: string
+  url: string
+  title: string
+  company: string
+  location: string
+  deadline: string
+  state: AdState
+  evaluation: AdEvaluation | null
+  applicationId: number | null
+  duplicateOf: number | null
+  attempts: number
+  lastError: string | null
+  firstSeenAt: string
+  updatedAt: string
+  reportedAt: string | null
+}
+
+export interface Ad extends AdSummary {
+  body: string | null
+}

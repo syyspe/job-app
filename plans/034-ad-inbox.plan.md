@@ -128,7 +128,8 @@ limits.
    - Rule 2 compares with the user's other ads and all their applications,
      archived included. Rule 3 compares normalised company and title with other
      ads first seen in the last 90 days and with every application's company and
-     role, and is skipped while the company is empty.
+     role, and is skipped while the company or title is empty, so two untitled
+     ads from one company are not called the same ad.
    - Ads in state `duplicate` are never match targets, so `duplicate_of` points
      at an original. A match against an application leaves `duplicate_of` null.
 5. **Validation and database operations** in `adValidation.ts` and `ads.ts`.
@@ -189,7 +190,10 @@ No other unmerged branches exist.
 ## Tests
 
 - New, server: `server/lib/adStates.test.ts` (every allowed and refused
-  transition), `server/lib/adDedup.test.ts`, `server/routes/ads.test.ts`.
+  transition), `server/lib/adDedup.test.ts`, and the route tests split by topic
+  to stay within the file limit: `server/routes/ads.test.ts`,
+  `ads.dedup.test.ts`, `ads.transitions.test.ts`, `ads.attempts.test.ts` and
+  `ads.handover.test.ts`, sharing `server/test/adsApi.ts`.
 - New, MCP: `mcp/tools/ads.test.ts`, over the real harness.
 - New, client: a test beside each new component, querying by role.
 - New, e2e: `e2e/ads.spec.ts` ingests through `page.request`, then hands over,

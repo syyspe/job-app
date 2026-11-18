@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AdminView } from './components/AdminView.tsx'
+import { AdsView } from './components/AdsView.tsx'
 import { ApplicationsView } from './components/ApplicationsView.tsx'
 import { LoginForm } from './components/LoginForm.tsx'
 import { NavBar } from './components/NavBar.tsx'
@@ -10,6 +11,7 @@ import type { User } from './types.ts'
 import './App.css'
 import './applications.css'
 import './admin.css'
+import './ads.css'
 
 function useCurrentUser() {
   const [user, setUser] = useState<User | null>(null)
@@ -59,6 +61,7 @@ function App() {
         {user && view === 'applications' && (
           <ApplicationsView onUnauthorized={() => setUser(null)} />
         )}
+        {user && view === 'ads' && <AdsView onUnauthorized={() => setUser(null)} />}
         {user && view === 'admin' && <AdminView onUnauthorized={() => setUser(null)} />}
       </main>
     </>

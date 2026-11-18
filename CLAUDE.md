@@ -82,9 +82,10 @@ with no `failed` line. Playwright: `N passed`.
   Outside the logger: CLI config errors (`server/seed.ts`, `server/index.ts`
   before the logger exists) stay one plain stderr line + exit 2, and `mcp/`
   is outside this contract — stdout is its JSON-RPC channel.
-- UI: not decided yet. The first plan that adds or reshapes UI decides the
-  visual direction and replaces this line; see the `frontend-design`
-  skill, if installed.
+- UI: extend the existing visual language rather than adding a second one:
+  IBM Plex Sans, the tokens in `src/index.css`, and list rows with the 4px
+  status spine. Colour shows what needs the user; closed items recede with a
+  2px neutral spine and muted text, never opacity.
 
 ## Architecture
 
@@ -130,8 +131,8 @@ are the invariants a directory listing won't tell you:
   `src/lib/dates.ts`, locale pinned to `en-GB` so tests are deterministic.
 - **A CSS value belongs to exactly one file**: `index.css` the design tokens,
   resets and `.button`; `App.css` the app frame; `applications.css` the list
-  surface; `admin.css` the admin surface. New rules read tokens from
-  `index.css` rather than inventing values.
+  surface; `admin.css` the admin surface; `ads.css` the ad inbox surface. New
+  rules read tokens from `index.css` rather than inventing values.
 - **Nothing in `mcp/` may write to stdout** — that is the JSON-RPC channel;
   diagnostics go to `console.error`. A tool handler signals failure by
   **throwing**; the SDK turns that into the tool error the user reads.

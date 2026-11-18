@@ -66,6 +66,24 @@ test('offers the way back while the admin view is showing', async () => {
   expect(onViewChange).toHaveBeenCalledWith('applications')
 })
 
+test('offers the ad inbox to every user', async () => {
+  const user = userEvent.setup()
+  const onViewChange = vi.fn()
+  renderNavBar(basicUser, 'applications', { onViewChange })
+
+  await user.click(screen.getByRole('button', { name: 'Ad inbox' }))
+
+  expect(onViewChange).toHaveBeenCalledWith('ads')
+})
+
+test('leaves out the view currently showing', () => {
+  renderNavBar(adminUser, 'ads')
+
+  expect(screen.queryByRole('button', { name: 'Ad inbox' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Applications' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Admin' })).toBeVisible()
+})
+
 test('does not offer the admin view to a basic user', () => {
   renderNavBar(basicUser)
 

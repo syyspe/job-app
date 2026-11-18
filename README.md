@@ -152,10 +152,11 @@ servers — useful for confirming the built app actually works end to end.
 
 ## Claude Desktop (MCP)
 
-`mcp/` is a stdio MCP server that gives Claude Desktop nine tools over this
+`mcp/` is a stdio MCP server that gives Claude Desktop thirteen tools over this
 app: `list_applications`, `get_application`, `create_application`,
 `attach_file`, `update_application`, `archive_application`,
-`read_attachment`, `delete_attachment` and `replace_attachment`. It speaks
+`read_attachment`, `delete_attachment`, `replace_attachment`, `list_ads`,
+`get_ad`, `handover_ad` and `dismiss_ad`. It speaks
 to the API over HTTP exactly as the browser does, so **the API has to be
 running already** (`npm run dev:server`, or `npm start`) and the seed user
 has to exist — if it isn't up, the first tool call says so.
