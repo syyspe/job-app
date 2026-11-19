@@ -186,6 +186,18 @@
   font-size: var(--fs-sm);
 }
 
+.attachment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.sync-pending {
+  color: var(--ink-muted);
+  font-size: var(--fs-sm);
+}
+
 .attachment-list:not(:empty) {
   margin-bottom: var(--s-3);
 }

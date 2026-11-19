@@ -20,6 +20,7 @@
     "profile:index": "node agent/profile/commands/build.ts",
     "profile:health": "node agent/profile/commands/health.ts",
     "profile:search": "node agent/profile/commands/search.ts",
+    "profile:sync": "node agent/runner/commands/sync.ts",
     "profile:mcp": "node agent/profile/index.ts",
     "preview": "vite preview",
     "start": "npm run build && node --env-file-if-exists=.env server/index.ts"

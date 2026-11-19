@@ -73,6 +73,22 @@ function replaceAttachment(id: number, body: FormData, sessionCookie = cookie) {
   })
 }
 
+function setProfileSync(id: number, body: unknown, sessionCookie = cookie) {
+  return fetch(`${baseUrl}/api/attachments/${id}/profile-sync`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Cookie: sessionCookie },
+    body: JSON.stringify(body),
+  })
+}
+
+async function listPendingSync(sessionCookie = cookie): Promise<Attachment[]> {
+  const res = await fetch(`${baseUrl}/api/attachments/pending-sync`, {
+    headers: { Cookie: sessionCookie },
+  })
+  expect(res.status).toBe(200)
+  return (await res.json()) as Attachment[]
+}
+
 function newCvFile(): FormData {
   const form = new FormData()
   form.append('file', new Blob(['%PDF new cv'], { type: 'application/pdf' }), 'cv-2026.pdf')
@@ -372,4 +388,79 @@ test('an upload whose directory cannot be created is a 500, and the server keeps
   expect(res.status).toBe(500)
   expect(await res.json()).toMatchObject({ error: 'internal server error' })
   expect(followUp.status).toBe(200)
+})
+
+test('a new attachment is not pending profile sync', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+
+  expect(attachment.profileSyncPending).toBe(false)
+  expect(await listPendingSync()).toEqual([])
+})
+
+test('marking an attachment lists it as pending sync, and unmarking removes it', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+
+  const markRes = await setProfileSync(attachment.id, { pending: true })
+  expect(markRes.status).toBe(200)
+  const marked = (await markRes.json()) as Attachment
+  expect(marked).toEqual({ ...attachment, profileSyncPending: true })
+  expect(await listPendingSync()).toEqual([marked])
+
+  const unmarkRes = await setProfileSync(attachment.id, { pending: false })
+  expect(((await unmarkRes.json()) as Attachment).profileSyncPending).toBe(false)
+  expect(await listPendingSync()).toEqual([])
+})
+
+test('a mark that is not a boolean is rejected', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+
+  const res = await setProfileSync(attachment.id, { pending: 'yes' })
+
+  expect(res.status).toBe(400)
+  expect(await res.json()).toMatchObject({ error: 'pending must be true or false' })
+})
+
+test('another user cannot mark the attachment or see it as pending', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+  await setProfileSync(attachment.id, { pending: true })
+  const db = openDatabase(join(root, 'app.db'))
+  createUser(db, 'other', 'password')
+  const otherCookie = await loginAs(baseUrl, 'other', 'password')
+
+  const res = await setProfileSync(attachment.id, { pending: false }, otherCookie)
+
+  expect(res.status).toBe(404)
+  expect(await res.json()).toMatchObject({ error: 'not found' })
+  expect(await listPendingSync(otherCookie)).toEqual([])
+  expect(await listPendingSync()).toHaveLength(1)
+})
+
+test('marking an unknown attachment is a 404', async () => {
+  const res = await setProfileSync(999999, { pending: true })
+
+  expect(res.status).toBe(404)
+})
+
+test('replacing a marked attachment keeps the mark', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+  await setProfileSync(attachment.id, { pending: true })
+
+  const replaceRes = await replaceAttachment(attachment.id, newCvFile())
+
+  expect(((await replaceRes.json()) as Attachment).profileSyncPending).toBe(true)
+})
+
+test('marking an attachment does not move the parent application\'s updatedAt', async () => {
+  const application = await createApplication()
+  const attachment = await uploadResume(application.id)
+  const db = openDatabase(join(root, 'app.db'))
+  db.prepare(
+    "UPDATE applications SET updated_at = '2020-01-01 00:00:00' WHERE id = ?",
+  ).run(application.id)
+
+  await setProfileSync(attachment.id, { pending: true })
+
+  const listRes = await fetch(`${baseUrl}/api/applications`, { headers: { Cookie: cookie } })
+  const [listed] = (await listRes.json()) as Application[]
+  expect(listed.updatedAt).toBe('2020-01-01 00:00:00')
 })

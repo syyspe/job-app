@@ -11,6 +11,7 @@ import {
   getConfig,
   listApplications,
   setArchived,
+  setAttachmentProfileSync,
   updateApplication,
   uploadAttachment,
 } from '../lib/api.ts'
@@ -35,6 +36,11 @@ function changeHandlers(change: Change) {
       ),
     handleUploadAttachment: (applicationId: number, file: File) =>
       change(() => uploadAttachment(applicationId, file), 'Attachment uploaded'),
+    handleSetProfileSync: (attachmentId: number, pending: boolean) =>
+      change(
+        () => setAttachmentProfileSync(attachmentId, pending),
+        pending ? 'Marked for profile sync' : 'Profile mark removed',
+      ),
     handleRemoveAttachment: (attachmentId: number) =>
       change(() => deleteAttachment(attachmentId), 'Attachment removed'),
   }
@@ -178,6 +184,7 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
           onUpdate={apps.handleUpdate}
           onDelete={apps.handleDelete}
           onUploadAttachment={apps.handleUploadAttachment}
+          onSetProfileSync={apps.handleSetProfileSync}
           onRemoveAttachment={apps.handleRemoveAttachment}
           onSetArchived={apps.handleSetArchived}
           hiddenArchivedCount={list.hiddenArchivedCount}

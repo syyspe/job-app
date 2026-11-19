@@ -67,3 +67,14 @@ test('a missing corpus path is a config error', () => {
     expect.objectContaining({ exitCode: 2, message: `config corpus[0].path: ${path} does not exist` }),
   )
 })
+
+test('a sync folder inside another entry\'s folder is rejected as reached twice', () => {
+  const copy = dir.write('style/synced/7-letter.md', 'letter')
+
+  expect(() =>
+    listCorpusFiles([
+      { path: join(dir.root, 'style'), label: 'style' },
+      { path: join(dir.root, 'style/synced'), label: 'style' },
+    ]),
+  ).toThrow(`config corpus[1]: ${copy} is also reached by corpus[0]`)
+})

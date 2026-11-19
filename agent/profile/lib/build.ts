@@ -51,6 +51,13 @@ async function indexFile(context: BuildContext, file: CorpusFile): Promise<numbe
   return vectors[0]?.length
 }
 
+export function formatBuildSummary(summary: BuildSummary, skipped: string[]): string[] {
+  const { added, updated, removed, unchanged, chunks } = summary
+  const lines = [`added ${added}, updated ${updated}, removed ${removed}, unchanged ${unchanged}; ${chunks} chunks embedded`]
+  if (skipped.length === 0) return lines
+  return [...lines, 'skipped, not .txt or .md:', ...skipped.map((path) => `  ${path}`)]
+}
+
 // A different model wipes the index. The model is recorded only once every
 // file is in, so an interrupted model change leaves an index search refuses.
 export async function buildIndex(options: {

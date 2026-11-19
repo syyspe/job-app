@@ -126,6 +126,33 @@ function removeHandler(db: Database.Database, uploadsDir: string) {
   }
 }
 
+function pendingSyncHandler(db: Database.Database) {
+  return (req: Request, res: Response) => {
+    const rows = db
+      .prepare(
+        `SELECT a.* FROM attachments a
+           JOIN applications app ON app.id = a.application_id
+          WHERE a.profile_sync = 1 AND app.user_id = ?
+          ORDER BY a.id`,
+      )
+      .all(req.userId) as AttachmentRow[]
+    res.json(rows.map(toAttachment))
+  }
+}
+
+function profileSyncHandler(db: Database.Database) {
+  return (req: Request, res: Response) => {
+    const id = Number(req.params.id)
+    if (!findOwnedAttachment(db, id, req.userId)) throw new HttpError(404, 'not found')
+    const pending: unknown = req.body?.pending
+    if (typeof pending !== 'boolean') throw new HttpError(400, 'pending must be true or false')
+
+    db.prepare('UPDATE attachments SET profile_sync = ? WHERE id = ?').run(pending ? 1 : 0, id)
+    const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as AttachmentRow
+    res.json(toAttachment(row))
+  }
+}
+
 export function createAttachmentsRouter(
   db: Database.Database,
   uploadsDir: string,
@@ -139,6 +166,7 @@ export function createAttachmentsRouter(
     upload.single('file'),
     uploadHandler(db),
   )
+  router.get('/attachments/pending-sync', pendingSyncHandler(db))
   router.get('/attachments/:id', downloadHandler(db, uploadsDir))
   router.put(
     '/attachments/:id',
@@ -146,6 +174,7 @@ export function createAttachmentsRouter(
     upload.single('file'),
     replaceHandler(db, uploadsDir),
   )
+  router.put('/attachments/:id/profile-sync', profileSyncHandler(db))
   router.delete('/attachments/:id', removeHandler(db, uploadsDir))
 
   return router

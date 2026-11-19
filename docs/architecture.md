@@ -90,7 +90,9 @@ that enforces it.
 ### `server/routes/`
 
 One router factory per resource, plus its tests: `ads.ts` (the ad inbox),
-`applications.ts`, `attachments.ts`, `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
+`applications.ts`, `attachments.ts` (upload, download, replace, delete, and
+the profile-sync mark: `GET /attachments/pending-sync`,
+`PUT /attachments/:id/profile-sync`), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
 (`/config`, the page size the client pages the list by) and `users.ts`
 (admin-only account management).
 
@@ -140,7 +142,8 @@ Helpers with no Express dependency:
 
 ### Everything else under `server/`
 
-- `db/index.ts` — `openDatabase`: connection plus schema.
+- `db/index.ts` — `openDatabase`: connection plus schema. `attachments.profile_sync`
+  (0/1) is the "Add to profile" mark the runner clears.
 - `seed.ts` — the `npm run seed` CLI entry point.
 - `test/auth.ts` — `loginAs`, a test helper that logs in and returns a cookie
   header string for route tests to pass by hand.
@@ -183,13 +186,14 @@ reads.
 
 ## `agent/` — the job search agent
 
-The start of the tree the daily runner joins in `036-ad-evaluation`. It is its
-own process: it imports nothing from `server/` or `mcp/` and holds no job-app
-credentials. Its contracts are in `docs/job-search-agent.md`.
+The job search agent's own processes. Nothing in it imports from `server/` or
+`mcp/`. Job-app credentials live only in `agent/runner/`, which may import
+`agent/profile/lib/` and `agent/lib/`. `agent/profile/` never imports
+`agent/runner/`. Its contracts are in `docs/job-search-agent.md`.
 
 ### `agent/lib/`
 
-- `paths.ts` — `configPath(env)` and `indexPath(env)`, from `XDG_CONFIG_HOME` /
+- `paths.ts` — `configPath(env)`, `envPath(env)` and `indexPath(env)`, from `XDG_CONFIG_HOME` /
   `XDG_DATA_HOME` or the `HOME` defaults.
 - `cliError.ts` — `CliError(exitCode, message)`, the one agent error type, and
   `runCommand(main)`, the edge-out handler every entry point runs under: a
@@ -213,6 +217,7 @@ health check first), `health.ts` (`profile:health`) and `search.ts`
 
 - `config.ts` — `loadProfileConfig(path)`, the zod check of the keys this
   stream owns in `~/.config/job-agent/config.json`; other keys are ignored.
+  An optional `syncFolder` is appended to `corpus` as a `style` entry.
 - `corpus.ts` — `listCorpusFiles(entries)`: walks folders for `.txt`/`.md`,
   lists the rest as skipped, rejects a file reached from two entries.
 - `chunk.ts` — `chunkText(text)`: paragraphs packed up to 1500 characters.
@@ -222,11 +227,37 @@ health check first), `health.ts` (`profile:health`) and `search.ts`
   Float32 vector blobs: `openIndex`, `openReadonlyIndex`.
 - `build.ts` — `buildIndex`: incremental by SHA-256 and label, wipes on a
   model change, records the model only once the build completes.
+  `formatBuildSummary` gives the summary lines `profile:index` and
+  `profile:sync` print.
 - `search.ts` — `searchIndex` / `searchIndexFile`: brute-force cosine, and
   the refusals (no index, no completed build, other model, other dimension).
 
+### `agent/runner/` — the runner
+
+The part of `agent/` that talks to job-app. It reads its credentials from
+`~/.config/job-agent/env` and never from `process.env`.
+
+`commands/sync.ts` is `npm run profile:sync`. It requires `syncFolder`, checks
+Ollama, then runs `syncProfile` and prints what it copied and the build
+summary.
+
+`lib/`:
+
+- `env.ts` — `loadJobAppEnv(path)`: `util.parseEnv` of the env file, which
+  gives `{ baseUrl, username, password }`. A missing file or variable is exit
+  2.
+- `jobApp.ts` — `createJobAppClient(config)`: `listPendingSync`,
+  `downloadAttachment`, `setProfileSync`. It logs in lazily, re-logs in once
+  on a 401, and turns every failure into a `CliError(1, …)`.
+- `sync.ts` — `syncProfile({ jobApp, config, store, ollama })`: copies the
+  marked attachments into `syncFolder` as `<id>-<safe name>`, rebuilds the
+  index, then clears the marks. It does no health check.
+
 ### `agent/test/`
 
+- `fakeJobApp.ts` — an HTTP stand-in for the four job-app endpoints the runner
+  uses (login, pending list, download, flag), with recorded flag calls, a
+  login counter, session expiry and a switchable failure.
 - `fakeOllama.ts` — an HTTP stand-in on port 0 with deterministic trigram
   vectors, a request counter and switchable failures.
 - `profileFixture.ts` — a temp `HOME` with a synthetic corpus and config, and

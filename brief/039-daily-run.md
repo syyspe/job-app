@@ -29,6 +29,11 @@ the PC was off, and tell me only when there is something to report.
    failed send is retried on the next run.
 9. Each run dismisses `awaiting_handover` ads after `handoverWaitDays` days, 7
    by default, or after their deadline day if that comes sooner.
+10. The run includes `035a-corpus-sync`'s `syncProfile`. A mark is cleared only
+    if the attachment is unchanged since the sync downloaded it. Today
+    `profile:sync` clears every mark it listed once the build completes. If a
+    marked file is replaced while a run is in progress, the old bytes get
+    indexed and the new version is never synced.
 
 ## Approach
 
@@ -53,8 +58,9 @@ The contracts are fixed in `docs/job-search-agent.md`:
 
 ## Related streams
 
-- Before: `034-ad-inbox`, `035-profile-corpus`, `036-ad-evaluation`,
-  `037-application-drafts` and `038-alert-sources` provide every step it runs.
+- Before: `034-ad-inbox`, `035-profile-corpus`, `035a-corpus-sync`,
+  `036-ad-evaluation`, `037-application-drafts` and `038-alert-sources`
+  provide every step it runs.
 - After: none. This stream completes the feature in
   `033-job-search-agent`.
 

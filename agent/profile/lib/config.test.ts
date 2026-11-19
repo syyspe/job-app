@@ -47,6 +47,7 @@ test.each([
   ['a wrong-typed key', { ...valid, corpus: 'no' }, 'corpus'],
   ['a non-http ollamaUrl', { ...valid, ollamaUrl: 'ftp://laptop:11434' }, 'ollamaUrl'],
   ['a relative corpus path', { ...valid, corpus: [{ path: 'cv', label: 'facts' }] }, 'corpus[0].path'],
+  ['a relative syncFolder', { ...valid, syncFolder: 'sync' }, 'syncFolder'],
   ['an unknown label', { ...valid, corpus: [{ path: '/cv', label: 'other' }] }, 'corpus[0].label'],
 ])('%s is an exit-2 error naming the file and field', (_name, value, field) => {
   const path = writeConfig(value)
@@ -54,4 +55,20 @@ test.each([
   expect(() => loadProfileConfig(path)).toThrow(
     expect.objectContaining({ exitCode: 2, message: expect.stringContaining(`${path}: ${field}: `) }),
   )
+})
+
+test('a syncFolder is appended to the corpus as a style entry', () => {
+  const path = writeConfig({ ...valid, syncFolder: '/corpus/synced' })
+
+  expect(loadProfileConfig(path)).toEqual({
+    ...valid,
+    syncFolder: '/corpus/synced',
+    corpus: [...valid.corpus, { path: '/corpus/synced', label: 'style' }],
+  })
+})
+
+test('without a syncFolder the corpus is left as configured', () => {
+  const path = writeConfig(valid)
+
+  expect(loadProfileConfig(path).corpus).toEqual(valid.corpus)
 })

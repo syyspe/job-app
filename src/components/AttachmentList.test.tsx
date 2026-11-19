@@ -12,6 +12,7 @@ const attachments: Attachment[] = [
     originalName: 'resume.txt',
     mimeType: 'text/plain',
     uploadedAt: '2026-01-15 09:00:00',
+    profileSyncPending: false,
   },
   {
     id: 2,
@@ -20,6 +21,7 @@ const attachments: Attachment[] = [
     originalName: 'cover-letter.txt',
     mimeType: 'text/plain',
     uploadedAt: '2026-01-15 09:00:00',
+    profileSyncPending: true,
   },
 ]
 
@@ -28,6 +30,7 @@ test('renders a link for each attachment', () => {
     <AttachmentList
       attachments={attachments}
       onUpload={vi.fn()}
+      onSetProfileSync={vi.fn()}
       onRemove={vi.fn()}
     />,
   )
@@ -43,6 +46,7 @@ test('removing an attachment reports its id', async () => {
     <AttachmentList
       attachments={attachments}
       onUpload={vi.fn()}
+      onSetProfileSync={vi.fn()}
       onRemove={onRemove}
     />,
   )
@@ -60,6 +64,7 @@ test('choosing a file reports the file', async () => {
     <AttachmentList
       attachments={attachments}
       onUpload={onUpload}
+      onSetProfileSync={vi.fn()}
       onRemove={vi.fn()}
     />,
   )
@@ -77,6 +82,7 @@ test('the input is cleared after an upload', async () => {
     <AttachmentList
       attachments={attachments}
       onUpload={vi.fn()}
+      onSetProfileSync={vi.fn()}
       onRemove={vi.fn()}
     />,
   )
@@ -94,6 +100,7 @@ test('a change with no file reports nothing', () => {
     <AttachmentList
       attachments={attachments}
       onUpload={onUpload}
+      onSetProfileSync={vi.fn()}
       onRemove={vi.fn()}
     />,
   )
@@ -103,4 +110,42 @@ test('a change with no file reports nothing', () => {
   })
 
   expect(onUpload).not.toHaveBeenCalled()
+})
+
+test('an unmarked attachment offers to add it to the profile', async () => {
+  const user = userEvent.setup()
+  const onSetProfileSync = vi.fn()
+  render(
+    <AttachmentList
+      attachments={attachments}
+      onUpload={vi.fn()}
+      onSetProfileSync={onSetProfileSync}
+      onRemove={vi.fn()}
+    />,
+  )
+
+  await user.click(screen.getByRole('button', { name: 'Add resume.txt to profile' }))
+
+  expect(onSetProfileSync).toHaveBeenCalledWith(1, true)
+})
+
+test('a marked attachment shows it is pending and offers to take the mark back', async () => {
+  const user = userEvent.setup()
+  const onSetProfileSync = vi.fn()
+  render(
+    <AttachmentList
+      attachments={attachments}
+      onUpload={vi.fn()}
+      onSetProfileSync={onSetProfileSync}
+      onRemove={vi.fn()}
+    />,
+  )
+
+  expect(screen.getAllByText('Pending profile sync')).toHaveLength(1)
+  expect(screen.queryByRole('button', { name: 'Add cover-letter.txt to profile' })).toBeNull()
+  await user.click(
+    screen.getByRole('button', { name: "Don't add cover-letter.txt to profile" }),
+  )
+
+  expect(onSetProfileSync).toHaveBeenCalledWith(2, false)
 })

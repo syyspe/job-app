@@ -58,6 +58,7 @@ interface ApplicationRowProps {
   onUpdate: (input: ApplicationInput) => void
   onDelete: () => void
   onUploadAttachment: (file: File) => void
+  onSetProfileSync: (attachmentId: number, pending: boolean) => void
   onRemoveAttachment: (attachmentId: number) => void
   onSetArchived: (archived: boolean) => void
 }
@@ -69,6 +70,7 @@ function ApplicationRow({
   onUpdate,
   onDelete,
   onUploadAttachment,
+  onSetProfileSync,
   onRemoveAttachment,
   onSetArchived,
 }: ApplicationRowProps) {
@@ -85,6 +87,7 @@ function ApplicationRow({
           onUpdate={onUpdate}
           onDelete={onDelete}
           onUploadAttachment={onUploadAttachment}
+          onSetProfileSync={onSetProfileSync}
           onRemoveAttachment={onRemoveAttachment}
           onSetArchived={onSetArchived}
         />
@@ -100,6 +103,7 @@ interface ApplicationListProps {
   onUpdate: (id: number, input: ApplicationInput) => void
   onDelete: (id: number) => void
   onUploadAttachment: (applicationId: number, file: File) => void
+  onSetProfileSync: (attachmentId: number, pending: boolean) => void
   onRemoveAttachment: (attachmentId: number) => void
   onSetArchived: (id: number, archived: boolean) => void
   hiddenArchivedCount: number
@@ -112,6 +116,7 @@ export function ApplicationList({
   onUpdate,
   onDelete,
   onUploadAttachment,
+  onSetProfileSync,
   onRemoveAttachment,
   onSetArchived,
   hiddenArchivedCount,
@@ -133,6 +138,7 @@ export function ApplicationList({
           onUploadAttachment={(file) =>
             onUploadAttachment(application.id, file)
           }
+          onSetProfileSync={onSetProfileSync}
           onRemoveAttachment={onRemoveAttachment}
           onSetArchived={(archived) => onSetArchived(application.id, archived)}
         />
