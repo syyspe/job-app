@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, test } from 'vitest'
+import { mkdirSync, symlinkSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
@@ -27,6 +28,17 @@ test('a folder is walked recursively and its files inherit its label', () => {
     { path: nested, label: 'facts', source: 'older/2020.txt' },
   ])
   expect(result.skipped).toEqual([pdf])
+})
+
+test('a symlinked file inside a folder is listed like any other file', () => {
+  const target = dir.write('elsewhere/cv.md', 'cv')
+  const link = join(dir.root, 'facts', 'cv.md')
+  mkdirSync(join(dir.root, 'facts'))
+  symlinkSync(target, link)
+
+  const result = listCorpusFiles([{ path: join(dir.root, 'facts'), label: 'facts' }])
+
+  expect(result.files).toEqual([{ path: link, label: 'facts', source: 'cv.md' }])
 })
 
 test('a file entry is its own source by file name', () => {

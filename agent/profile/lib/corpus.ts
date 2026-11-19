@@ -16,7 +16,8 @@ function filesOf(entry: CorpusEntry, index: number): string[] {
   if (!stat) throw new CliError(2, `config corpus[${index}].path: ${entry.path} does not exist`)
   if (!stat.isDirectory()) return [entry.path]
   return readdirSync(entry.path, { recursive: true, withFileTypes: true })
-    .filter((dirent) => dirent.isFile())
+    // Not isFile(): a symlinked file would be dropped without being reported.
+    .filter((dirent) => !dirent.isDirectory())
     .map((dirent) => join(dirent.parentPath, dirent.name))
     .sort()
 }
