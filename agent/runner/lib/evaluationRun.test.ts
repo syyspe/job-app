@@ -7,7 +7,7 @@ import type { HealthResult } from '../../profile/lib/ollama.ts'
 import type { EvaluationOutcome } from './evaluate.ts'
 import { createJobAppClient } from './jobApp.ts'
 import type { Ad } from './jobApp.ts'
-import { mapLimit, runEvaluation } from './evaluationRun.ts'
+import { runEvaluation } from './evaluationRun.ts'
 
 let fake: FakeJobApp
 
@@ -125,12 +125,4 @@ test('the evaluated ad carries its body', async () => {
   await run({ evaluate: (ad) => (bodies.push(ad.body), Promise.resolve(suitable)) })
 
   expect(bodies).toEqual(['Full ad text'])
-})
-
-test('mapLimit keeps input order', async () => {
-  const delays = [30, 10, 20]
-
-  const results = await mapLimit(delays, 2, (ms) => new Promise<number>((resolve) => setTimeout(() => resolve(ms), ms)))
-
-  expect(results).toEqual([30, 10, 20])
 })

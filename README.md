@@ -335,6 +335,62 @@ up as above, the job-app env file, and a logged-in `claude` CLI on `PATH`.
   (`timeout`, `cli_failed`, `bad_output`, `invalid_result`), and the third
   failed attempt moves the ad to `failed`.
 
+## Ad drafting
+
+`agent:draft` turns each `suitable` ad into a job-app application with status
+`draft`. A sandboxed `claude -p` step writes a cover letter, a tailored CV, a
+fit summary and the open questions as JSON. The runner checks them, builds
+three `.txt` attachments (the saved ad, the cover letter and the CV) and
+creates the application in one call to `POST /api/ads/:id/draft`. Nothing in
+the agent can submit an application. The setup from "Ad evaluation" applies,
+including the sandbox check.
+
+### Setup
+
+1. Write your drafting rules (voice, structure, naming) to
+   `~/.config/job-agent/prompts/draft.md`. Start from
+   `agent/runner/prompts/draft.example.md`. The runner puts its fixed framing
+   first (`agent/runner/prompts/draft.framing.md`): the ad is untrusted data,
+   facts come only from the CV templates and `facts` results, `style` results
+   set tone only, and motivation or any unconfirmed fact becomes a
+   `[[ASK:qN]]` question rather than being invented.
+2. Add the `drafting` key to `config.json`. `filePrefix` and both
+   `cvTemplates` paths are required; the rest shows the defaults:
+
+   ```json
+   {
+     "drafting": {
+       "filePrefix": "Firstname_Lastname",
+       "cvTemplates": { "fi": "/abs/path/cv-fi.md", "en": "/abs/path/cv-en.md" },
+       "concurrency": 1,
+       "perRunCap": 3,
+       "timeoutMs": 600000
+     }
+   }
+   ```
+
+   Each step gets both templates whole and starts the CV from the one in the
+   draft's language. `concurrency` is 1–4.
+3. Export your work history, meaning the notes on your work experience and
+   projects that you would otherwise give an assistant by hand, as `.md`
+   files into a folder listed in `corpus` with the label `facts`, then run
+   `npm run profile:index`. The step finds them through `search_profile`.
+   Nothing it writes about you comes from anywhere else.
+
+### Command
+
+- `npm run agent:draft` checks Ollama first. If Ollama is down, it prints
+  `drafting skipped: <reason>`, exits 0 and touches no ad. Otherwise it
+  drafts the oldest `perRunCap` suitable ads and leaves the rest queued. Each
+  draft's `notes` hold the fit summary, the open questions (`q1: …`) and the
+  ad's source and URL. An ad that gives no company or title gets
+  `Unknown company` / `Unknown role` and a fixed question asking for it. A
+  failed step records an attempt with a fixed category (`timeout`,
+  `cli_failed`, `bad_output`, `invalid_result`, `ask_mismatch`), and the
+  third failed attempt moves the ad to `failed`. A draft the API refuses
+  (for example a 409 because the ad was drafted in the meantime) stops the
+  run with exit 1.
+
 ## The default branch is PR-only
 
 Nothing lands on the default branch except by merged pull request. On a solo

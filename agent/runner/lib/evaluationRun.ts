@@ -1,6 +1,7 @@
 import type { HealthResult } from '../../profile/lib/ollama.ts'
 import type { EvaluationOutcome } from './evaluate.ts'
 import type { Ad, AdSummary, JobAppClient } from './jobApp.ts'
+import { mapLimit } from './mapLimit.ts'
 import type { RunnerConfig } from './runnerConfig.ts'
 import { screenTarget } from './titleRules.ts'
 
@@ -45,20 +46,6 @@ async function screenNewAds(jobApp: JobAppClient, phrases: string[]): Promise<Sc
     else counts.awaitingHandover += 1
   }
   return counts
-}
-
-// Runs fn over items with at most `limit` calls in flight, keeping input order.
-export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length)
-  let next = 0
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const index = next++
-      results[index] = await fn(items[index])
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
-  return results
 }
 
 // A failure is a same-state transition carrying its category: the server adds

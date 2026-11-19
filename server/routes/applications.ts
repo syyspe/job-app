@@ -8,7 +8,7 @@ import type { AttachmentRow } from '../models/attachment.ts'
 import { validateInput } from '../lib/validation.ts'
 import { HttpError } from '../lib/httpError.ts'
 import { unlinkIfExists } from '../lib/files.ts'
-import { touchApplication } from '../lib/applications.ts'
+import { insertApplication, touchApplication } from '../lib/applications.ts'
 
 type AttachmentsForApplication = Database.Statement<[number, number], AttachmentRow>
 
@@ -28,27 +28,7 @@ function createHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
     const input = validateInput(req.body)
 
-    const result = db
-      .prepare(
-        `INSERT INTO applications
-           (user_id, company, role, date_applied, deadline, status, link, notes,
-            created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`,
-      )
-      .run(
-        req.userId,
-        input.company,
-        input.role,
-        input.dateApplied,
-        input.deadline,
-        input.status,
-        input.link,
-        input.notes,
-      )
-
-    const row = db
-      .prepare('SELECT * FROM applications WHERE id = ?')
-      .get(result.lastInsertRowid) as ApplicationRow
+    const row = insertApplication(db, req.userId, input)
     res.status(201).json(toApplication(row, []))
   }
 }

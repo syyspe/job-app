@@ -89,7 +89,9 @@ that enforces it.
 
 ### `server/routes/`
 
-One router factory per resource, plus its tests: `ads.ts` (the ad inbox),
+One router factory per resource, plus its tests: `ads.ts` (the ad inbox,
+including the multipart `POST /ads/:id/draft`, which removes every uploaded
+file again when the draft is refused),
 `applications.ts`, `attachments.ts` (upload, download, replace, delete, and
 the profile-sync mark: `GET /attachments/pending-sync`,
 `PUT /attachments/:id/profile-sync`), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
@@ -105,13 +107,19 @@ Sqlite row shapes and the row→domain mappers, including `user.ts`.
 Helpers with no Express dependency:
 
 - `validation.ts` — input checks, and the server's `ApplicationInput`.
-- `applications.ts` — `touchApplication`, which bumps `updated_at`.
+- `applications.ts` — `touchApplication`, which bumps `updated_at`, and
+  `insertApplication`/`insertAttachment`, the one copy of each INSERT, used by
+  the applications, attachments and ad draft routes.
+- `uploads.ts` — `createUpload(uploadsDir)`, the multer disk storage both
+  upload routers use (UUID file names, 10 MB limit, UTF-8 file names).
 - `adStates.ts` — the ad state tables: allowed transitions, and which states
   clear the text or blank a hand-over ad's title and company.
 - `adDedup.ts` — `canonicalUrl`, `normaliseText` and the two duplicate lookups.
-- `adValidation.ts` — request parsing for each ad route.
+- `adValidation.ts` — request parsing for each ad route; `parseAdDraft`
+  fixes status `draft` and an empty `dateApplied` itself.
 - `ads.ts` — the ad database operations: ingest, transition, hand-over,
-  reporting.
+  `draftAd` (application, attachments and the move to `drafted`, run by the
+  route in one transaction), reporting.
 - `files.ts` — attachment storage.
 - `passwords.ts` — hashing and session tokens.
 - `cookies.ts` — reads the session cookie. Express 5 doesn't parse cookies,
@@ -246,11 +254,14 @@ summary. `commands/sandboxCheck.ts` is `npm run agent:sandbox-check`: it runs
 the probes, prints pass or fail per property and records the CLI version only
 when all pass. `commands/evaluate.ts` is `npm run agent:evaluate`: config,
 runner config, private prompt and env, then the version gate, then
-`runEvaluation`.
+`runEvaluation`. `commands/draft.ts` is `npm run agent:draft`: config, the
+`drafting` key, the private prompt and both CV templates, env, the version
+gate, then `runDrafting`.
 
 `prompts/evaluate.framing.md` is the fixed head of the evaluation system
 prompt; `prompts/evaluate.example.md` a synthetic example of the private
-criteria that follow it.
+criteria that follow it. `prompts/draft.framing.md` and
+`prompts/draft.example.md` are the same pair for drafting.
 
 `lib/`:
 
@@ -259,11 +270,18 @@ criteria that follow it.
   2.
 - `jobApp.ts` — `createJobAppClient(config)`: `listPendingSync`,
   `downloadAttachment`, `setProfileSync`, `listAds(state)`, `getAd(id)`,
-  `transitionAd(id, body)`. It logs in lazily, re-logs in once on a 401, and
+  `transitionAd(id, body)`, `draftAd(id, upload)` (multipart: the five fields
+  and three `text/plain` files). There is no other way to create or change an
+  application. It logs in lazily, re-logs in once on a 401, and
   turns every failure into a `CliError(1, …)`. Ad responses are checked
   against only the fields the runner reads.
 - `runnerConfig.ts` — `loadRunnerConfig(path)`: `titleRules.reject` and
-  `evaluation.{concurrency, perRunCap, timeoutMs}`, with defaults.
+  `evaluation.{concurrency, perRunCap, timeoutMs}`, with defaults;
+  `loadDraftConfig(path)`: the `drafting` key, read only by `agent:draft`.
+- `mapLimit.ts` — `mapLimit(items, limit, fn)`, order-keeping bounded
+  concurrency for both runs.
+- `prompts.ts` — `buildSystemPrompt(framing, rules)`: the fixed framing
+  first, then the private rules.
 - `titleRules.ts` — `matchesReject(title, phrases)` (whole-word,
   case-insensitive, Unicode letters as word characters) and
   `screenTarget(ad, phrases)`.
@@ -279,10 +297,20 @@ criteria that follow it.
   `requirePassedCheck(claudeBin, stateDir)`.
 - `evaluate.ts` — `evaluateAd(ad, runStep)`: the ad as JSON on stdin, the
   output checked again with zod, `unsure` mapped to `suitable` with the fixed
-  first reason. `buildSystemPrompt(criteria)` puts the framing first.
+  first reason.
 - `evaluationRun.ts` — `runEvaluation`: screen `new` ads, check Ollama, then
   evaluate the oldest `perRunCap` ready ads through `mapLimit` at
   `concurrency`; a failure is a same-state transition with its category.
+- `draftOutput.ts` — the drafting step's zod schema and `checkDraft`, which
+  answers `ask_mismatch` unless the `[[ASK:id]]` markers in the cover letter
+  and CV are exactly the question ids.
+- `draft.ts` — `writeDraft(ad, templates, runStep)`: the ad, its evaluation
+  and both CV templates as JSON on stdin, the output checked again.
+- `draftApplication.ts` — `buildDraft(ad, output, naming)`: company and role
+  fallbacks, `notes`, the file names (`fileComponent`) and the saved ad.
+- `draftRun.ts` — `runDrafting`: check Ollama, then draft the oldest
+  `perRunCap` suitable ads through `mapLimit`; a failure is a same-state
+  transition with its category.
 - `sync.ts` — `syncProfile({ jobApp, config, store, ollama })`: copies the
   marked attachments into `syncFolder` as `<id>-<safe name>`, rebuilds the
   index, then clears the marks. It does no health check.
@@ -291,12 +319,13 @@ criteria that follow it.
 
 - `fakeJobApp.ts` — an HTTP stand-in for the job-app endpoints the runner
   uses (login, pending list, download, flag, and the ad routes from
-  `fakeJobAppAds.ts`), with recorded flag calls and transitions, a login
+  `fakeJobAppAds.ts`), with recorded flag calls, transitions, drafts and
+  every request line, a login
   counter, session expiry and a switchable failure. `fakeHttp.ts` holds its
   JSON helpers.
-- `fakeJobAppAds.ts` — `fakeAd(fields)` and the ad list, get and transition
-  handlers, which record attempts and fail an ad on the third as the server
-  does.
+- `fakeJobAppAds.ts` — `fakeAd(fields)` and the ad list, get, transition and
+  multipart draft handlers, which record attempts, fail an ad on the third and
+  draft only a suitable ad, as the server does.
 - `fakeClaude.ts` — an executable stand-in for the `claude` CLI: records
   argv, env, cwd and stdin to `FAKE_CLAUDE_LOG` and acts as
   `FAKE_CLAUDE_MODE` says; `--version` prints `9.9.9`.

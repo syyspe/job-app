@@ -1,8 +1,8 @@
 // @vitest-environment node
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
-import { loadRunnerConfig } from './runnerConfig.ts'
+import { loadDraftConfig, loadRunnerConfig } from './runnerConfig.ts'
 
 let dir: TempDir
 
@@ -58,4 +58,31 @@ test('bad JSON exits 2 naming the file', () => {
   const path = dir.write('config.json', '{ nope')
 
   expect(() => loadRunnerConfig(path)).toThrow(expect.objectContaining({ exitCode: 2, message: `${path}: invalid JSON` }))
+})
+
+describe('drafting', () => {
+  const drafting = { filePrefix: 'Tester', cvTemplates: { fi: '/cv/fi.md', en: '/cv/en.md' } }
+
+  test('missing keys take their defaults', () => {
+    const path = writeConfig({ drafting })
+
+    expect(loadDraftConfig(path)).toEqual({ concurrency: 1, perRunCap: 3, timeoutMs: 600000, ...drafting })
+  })
+
+  test('agent:evaluate does not need the drafting key', () => {
+    expect(() => loadRunnerConfig(writeConfig({}))).not.toThrow()
+  })
+
+  test.each([
+    ['a missing filePrefix', { cvTemplates: drafting.cvTemplates }, 'drafting.filePrefix'],
+    ['missing cvTemplates', { filePrefix: 'Tester' }, 'drafting.cvTemplates'],
+    ['a relative template path', { ...drafting, cvTemplates: { fi: 'cv/fi.md', en: '/cv/en.md' } }, 'drafting.cvTemplates.fi'],
+    ['a concurrency above 4', { ...drafting, concurrency: 5 }, 'drafting.concurrency'],
+  ])('%s is an exit-2 error naming the field', (_name, value, field) => {
+    const path = writeConfig({ drafting: value })
+
+    expect(() => loadDraftConfig(path)).toThrow(
+      expect.objectContaining({ exitCode: 2, message: expect.stringContaining(`${path}: ${field}: `) }),
+    )
+  })
 })

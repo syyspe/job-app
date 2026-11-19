@@ -24,6 +24,7 @@
     "profile:mcp": "node agent/profile/index.ts",
     "agent:sandbox-check": "node agent/runner/commands/sandboxCheck.ts",
     "agent:evaluate": "node agent/runner/commands/evaluate.ts",
+    "agent:draft": "node agent/runner/commands/draft.ts",
     "preview": "vite preview",
     "start": "npm run build && node --env-file-if-exists=.env server/index.ts"
   },

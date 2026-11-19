@@ -6,10 +6,11 @@ import { configPath, envPath, promptsDir, stateDir } from '../../lib/paths.ts'
 import { loadProfileConfig, readConfigFile } from '../../profile/lib/config.ts'
 import { checkOllama } from '../../profile/lib/ollama.ts'
 import { loadJobAppEnv } from '../lib/env.ts'
-import { EVALUATION_PROMPT, EVALUATION_SCHEMA, buildSystemPrompt, evaluateAd } from '../lib/evaluate.ts'
+import { EVALUATION_FRAMING, EVALUATION_PROMPT, EVALUATION_SCHEMA, evaluateAd } from '../lib/evaluate.ts'
 import { runEvaluation } from '../lib/evaluationRun.ts'
 import type { EvaluationReport } from '../lib/evaluationRun.ts'
 import { createJobAppClient } from '../lib/jobApp.ts'
+import { buildSystemPrompt } from '../lib/prompts.ts'
 import { loadRunnerConfig } from '../lib/runnerConfig.ts'
 import { runSandboxed } from '../lib/sandbox.ts'
 import { requirePassedCheck } from '../lib/sandboxCheck.ts'
@@ -32,7 +33,7 @@ await runCommand(async () => {
   const path = configPath(process.env)
   const profileConfig = loadProfileConfig(path)
   const config = loadRunnerConfig(path)
-  const systemPrompt = buildSystemPrompt(readConfigFile(join(promptsDir(process.env), 'evaluate.md')))
+  const systemPrompt = buildSystemPrompt(EVALUATION_FRAMING, readConfigFile(join(promptsDir(process.env), 'evaluate.md')))
   const env = envPath(process.env)
   const jobApp = createJobAppClient({ ...loadJobAppEnv(env), envPath: env })
   requirePassedCheck(CLAUDE_BIN, stateDir(process.env))

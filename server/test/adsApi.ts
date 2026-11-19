@@ -14,6 +14,7 @@ export let db: Database.Database
 export let baseUrl: string
 export let cookie: string
 export let otherCookie: string
+export let uploadsDir: string
 
 let root: string
 let server: Server
@@ -26,7 +27,8 @@ export function withAdsApi(): void {
     db = openDatabase(join(root, 'app.db'))
     createUser(db, 'testuser', 'test-password')
     createUser(db, 'otheruser', 'other-password')
-    server = createApp(db, join(root, 'uploads')).listen(0)
+    uploadsDir = join(root, 'uploads')
+    server = createApp(db, uploadsDir).listen(0)
     await new Promise<void>((resolve) => server.once('listening', resolve))
     const address = server.address()
     const port = typeof address === 'object' && address ? address.port : 0

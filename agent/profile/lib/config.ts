@@ -6,7 +6,7 @@ import { CliError } from '../../lib/cliError.ts'
 export const LABELS = ['facts', 'style'] as const
 export type Label = (typeof LABELS)[number]
 
-const absolutePath = z.string().refine(isAbsolute, 'must be an absolute path')
+export const absolutePath = z.string().refine(isAbsolute, 'must be an absolute path')
 
 const configSchema = z.object({
   ollamaUrl: z.url({ protocol: /^https?$/, error: 'must be an http or https URL' }),

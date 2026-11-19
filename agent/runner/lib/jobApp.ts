@@ -24,7 +24,13 @@ const adSummaryShape = {
   attempts: z.number(),
 }
 const adSummarySchema = z.object(adSummaryShape)
-const adSchema = z.object({ ...adSummaryShape, body: z.string().nullable() })
+const adSchema = z.object({
+  ...adSummaryShape,
+  source: z.string(),
+  evaluation: z.object({ verdict: z.string(), fitSummary: z.string(), reasons: z.array(z.string()) }).nullable(),
+  body: z.string().nullable(),
+})
+const draftResponseSchema = z.object({ application: z.object({ id: z.number() }) })
 
 // Only the fields the runner reads; the API sends more.
 export type AdSummary = z.infer<typeof adSummarySchema>
@@ -36,6 +42,22 @@ export interface AdTransition {
   error?: string
 }
 
+export interface DraftFile {
+  name: string
+  text: string
+}
+
+// The application fields and the three files of POST /api/ads/:id/draft; the
+// server sets status draft itself.
+export interface DraftUpload {
+  company: string
+  role: string
+  deadline: string
+  link: string
+  notes: string
+  files: { coverLetter: DraftFile; cv: DraftFile; ad: DraftFile }
+}
+
 export interface JobAppClient {
   listPendingSync: () => Promise<PendingAttachment[]>
   downloadAttachment: (id: number) => Promise<Uint8Array>
@@ -43,6 +65,7 @@ export interface JobAppClient {
   listAds: (state: string) => Promise<AdSummary[]>
   getAd: (id: number) => Promise<Ad>
   transitionAd: (id: number, transition: AdTransition) => Promise<AdSummary>
+  draftAd: (id: number, upload: DraftUpload) => Promise<{ applicationId: number }>
 }
 
 interface JobAppRequest {
@@ -54,15 +77,18 @@ interface JobAppRequest {
 const pendingSchema = z.array(z.object({ id: z.number(), originalName: z.string() }))
 const errorSchema = z.object({ error: z.string() })
 
+// fetch sets a FormData body's multipart Content-Type, boundary included.
+function encodeBody(body: unknown, headers: Record<string, string>): string | FormData | undefined {
+  if (body === undefined || body instanceof FormData) return body
+  headers['Content-Type'] = 'application/json'
+  return JSON.stringify(body)
+}
+
 async function fetchJobApp(config: JobAppConfig, request: JobAppRequest, cookie?: string): Promise<Response> {
   const headers: Record<string, string> = cookie ? { Cookie: cookie } : {}
-  if (request.body !== undefined) headers['Content-Type'] = 'application/json'
+  const body = encodeBody(request.body, headers)
   try {
-    return await fetch(`${config.baseUrl}${request.path}`, {
-      method: request.method,
-      headers,
-      body: request.body === undefined ? undefined : JSON.stringify(request.body),
-    })
+    return await fetch(`${config.baseUrl}${request.path}`, { method: request.method, headers, body })
   } catch (err) {
     // fetch rejects with a TypeError when the request itself fails.
     if (!(err instanceof TypeError)) throw err
@@ -113,6 +139,15 @@ async function receive<T>(send: Sender, request: JobAppRequest, schema: z.ZodTyp
   return parsed.data
 }
 
+function draftForm({ files, ...fields }: DraftUpload): FormData {
+  const form = new FormData()
+  for (const [name, value] of Object.entries(fields)) form.append(name, value)
+  for (const [name, file] of Object.entries(files)) {
+    form.append(name, new Blob([file.text], { type: 'text/plain; charset=utf-8' }), file.name)
+  }
+  return form
+}
+
 export function createJobAppClient(config: JobAppConfig): JobAppClient {
   const send = createSender(config)
   return {
@@ -128,5 +163,10 @@ export function createJobAppClient(config: JobAppConfig): JobAppClient {
     getAd: (id) => receive(send, { method: 'GET', path: `/api/ads/${id}` }, adSchema),
     transitionAd: (id, transition) =>
       receive(send, { method: 'POST', path: `/api/ads/${id}/transition`, body: transition }, adSummarySchema),
+    draftAd: async (id, upload) => {
+      const request: JobAppRequest = { method: 'POST', path: `/api/ads/${id}/draft`, body: draftForm(upload) }
+      const { application } = await receive(send, request, draftResponseSchema)
+      return { applicationId: application.id }
+    },
   }
 }

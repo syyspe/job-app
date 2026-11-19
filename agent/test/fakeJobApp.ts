@@ -3,7 +3,7 @@ import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { answerAds } from './fakeJobAppAds.ts'
 import { readJson, sendJson } from './fakeHttp.ts'
-import type { FakeAd, FakeTransition } from './fakeJobAppAds.ts'
+import type { FakeAd, FakeDraft, FakeTransition } from './fakeJobAppAds.ts'
 
 export interface FakeAttachment {
   id: number
@@ -19,6 +19,9 @@ export interface FakeJobApp {
   attachments: FakeAttachment[]
   ads: FakeAd[]
   transitions: FakeTransition[]
+  drafts: FakeDraft[]
+  // Every request as `<method> <url>`, logins included.
+  requests: string[]
   flagCalls: { id: number; pending: boolean }[]
   logins: number
   // 'status' answers the pending list with a 500; 'malformed' answers the ad
@@ -77,6 +80,7 @@ function answerAttachments(state: State, req: IncomingMessage, res: ServerRespon
 // An HTTP stand-in for the job-app endpoints the runner's client uses.
 export async function startFakeJobApp(attachments: FakeAttachment[] = []): Promise<FakeJobApp> {
   const server = createServer((req, res) => {
+    fake.requests.push(`${req.method} ${req.url}`)
     if (req.url === '/api/login' && req.method === 'POST') return void answerLogin(state, req, res)
     if (req.headers.cookie !== `session=${state.session}`) return sendJson(res, 401, { error: 'not logged in' })
     if (req.url?.startsWith('/api/ads')) return void answerAds(fake, req, res)
@@ -92,6 +96,8 @@ export async function startFakeJobApp(attachments: FakeAttachment[] = []): Promi
     attachments,
     ads: [],
     transitions: [],
+    drafts: [],
+    requests: [],
     flagCalls: [],
     logins: 0,
     failure: 'none',
