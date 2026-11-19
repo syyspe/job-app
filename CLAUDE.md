@@ -176,6 +176,16 @@ need goes in `server/lib/` — never import one router from another.
   client from the API's own origin and its port is one `const port` in
   `playwright.prod.config.ts`. `test:e2e`'s ports are not movable per run —
   `vite.config.ts` hardwires the `/api` proxy to 3001.
+- **Run the unit tests as `npm test -- --maxWorkers=2`, and don't rerun a
+  full-parallel run to get it green.** WSL's mirrored networking leaves Linux
+  only about 300 ephemeral ports (`ip_local_port_range` 60600–60900). The
+  `server/` tests' `app.listen(0)` servers and their requests fill that range
+  with TIME-WAIT sockets. A default-parallel `npm test` then fails a random
+  few `server/` tests with `listen EADDRINUSE: address already in use ::`.
+  Different tests fail each run, on master too, so it is never the branch
+  under test. After a run has failed this way, wait for the sockets to drain
+  (`ss -tan state time-wait | wc -l` under ~20) before running again. Don't
+  change the sysctl or the WSL networking mode.
 
 ## Working agreement
 
