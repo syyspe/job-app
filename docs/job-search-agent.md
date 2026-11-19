@@ -184,7 +184,10 @@ Rules 2 and 3 both run when an ad reaches `ready`. A match moves it on to
 row. Ads in state `duplicate` are never match targets, so `duplicate_of` points
 at an original, and a match against an application leaves it null. Rule 3 also
 skips a later ad still in `new` or `awaiting_handover`, so the earlier ad
-survives whichever of the two reaches `ready` first.
+survives whichever of the two reaches `ready` first. An earlier ad waiting in
+`awaiting_handover` does stay a target: a repeat from an automatic source is a
+`duplicate`, even if the earlier ad later expires, so one job never reaches the
+user twice.
 
 ## 5. Inbox API
 
