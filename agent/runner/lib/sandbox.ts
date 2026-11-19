@@ -93,7 +93,9 @@ function runIn(cwd: string, step: SandboxStep, outputFormat: OutputFormat): Prom
       timedOut = true
       child.kill()
     }, step.timeoutMs)
-    child.stdout.on('data', (data: Buffer) => (stdout += data.toString()))
+    // Decoded as a stream, so a character split across two chunks stays whole.
+    child.stdout.setEncoding('utf8')
+    child.stdout.on('data', (data: string) => (stdout += data))
     child.on('error', reject)
     child.on('close', (code) => {
       clearTimeout(timer)

@@ -64,6 +64,12 @@ test('an ok run returns the structured output', async () => {
   expect(await runSandboxed(step('ok'))).toEqual({ kind: 'ok', output: { verdict: 'suitable' } })
 })
 
+test('a multibyte character split across output chunks arrives intact', async () => {
+  const output = '{"fitSummary":"Sopii hyvin: Jyväskylä"}'
+  const run = await runSandboxed(step('split', { env: { ...step('split').env, FAKE_CLAUDE_OUTPUT: output } }))
+  expect(run).toEqual({ kind: 'ok', output: { fitSummary: 'Sopii hyvin: Jyväskylä' } })
+})
+
 test('argv carries every contract flag and never --bare', async () => {
   await runSandboxed(step('ok'))
   const { argv } = record()
