@@ -5,6 +5,7 @@ import { startFakeJobApp } from '../../test/fakeJobApp.ts'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import type { FakeJobApp } from '../../test/fakeJobApp.ts'
 import { createJobAppClient } from './jobApp.ts'
+import type { DraftUpload } from './jobApp.ts'
 
 let fake: FakeJobApp
 
@@ -106,5 +107,36 @@ test('an unknown ad passes the 404 through', async () => {
   await expect(client().getAd(99)).rejects.toMatchObject({
     exitCode: 1,
     message: 'job-app GET /api/ads/99: 404 ad not found',
+  })
+})
+
+const upload: DraftUpload = {
+  company: 'Ääkkönen Oy',
+  role: 'Test Lead',
+  deadline: '2026-12-01',
+  link: 'https://jobs.example/1',
+  notes: 'Fits.\n\nq1: Why?',
+  files: {
+    coverLetter: { name: 'T_Hakemus_Ääkkönen_Oy_FI.txt', text: 'Hei [[ASK:q1]]' },
+    cv: { name: 'T_CV_Ääkkönen_Oy_FI.txt', text: 'CV' },
+    ad: { name: 'Ääkkönen_Oy_Test_Lead_ilmoitus.txt', text: 'Ad' },
+  },
+}
+
+test('draftAd sends the fields and the three files as multipart', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'suitable', body: 'Ad' }))
+
+  expect(await client().draftAd(1, upload)).toEqual({ applicationId: 101 })
+
+  const { files, ...fields } = upload
+  expect(fake.drafts).toEqual([{ id: 1, fields, files }])
+})
+
+test('a draft the server refuses is a CliError naming the request', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'drafted' }))
+
+  await expect(client().draftAd(1, upload)).rejects.toMatchObject({
+    exitCode: 1,
+    message: 'job-app POST /api/ads/1/draft: 409 an ad cannot be drafted from drafted',
   })
 })

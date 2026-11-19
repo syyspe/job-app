@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 import type { Ad } from './jobApp.ts'
 import { stepSchema } from './sandbox.ts'
@@ -14,7 +13,7 @@ export const EVALUATION_SCHEMA = stepSchema(outputSchema)
 export const EVALUATION_PROMPT = 'Evaluate the job ad given on standard input.'
 export const UNSURE_REASON = 'Evaluation was unsure: the points below are open questions.'
 
-const FRAMING = new URL('../prompts/evaluate.framing.md', import.meta.url)
+export const EVALUATION_FRAMING = new URL('../prompts/evaluate.framing.md', import.meta.url)
 
 export interface EvaluationTransition {
   to: 'suitable' | 'unsuitable'
@@ -26,11 +25,6 @@ export type EvaluationOutcome =
   | { kind: 'failed'; category: FailureCategory | 'invalid_result' }
 
 export type RunStep = (input: string) => Promise<SandboxResult>
-
-// The fixed framing first, so the private criteria cannot drop its rules.
-export function buildSystemPrompt(criteria: string): string {
-  return `${readFileSync(FRAMING, 'utf8').trim()}\n\n${criteria.trim()}\n`
-}
 
 export function adInput(ad: Ad): string {
   const { title, company, location, deadline, url, body } = ad

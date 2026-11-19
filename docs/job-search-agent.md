@@ -225,6 +225,28 @@ Unclear titles stay off it and go on to full evaluation. `concurrency` is
 framing the runner supplies from `agent/runner/prompts/evaluate.framing.md`;
 the repo ships only a synthetic `evaluate.example.md`.
 
+The keys `037-application-drafts` owns, read only by `agent:draft`.
+`filePrefix` and `cvTemplates` (absolute paths) are required, and the other
+keys show their defaults:
+
+```json
+{
+  "drafting": {
+    "filePrefix": "<prefix>",
+    "cvTemplates": { "fi": "/abs/path/cv-fi.md", "en": "/abs/path/cv-en.md" },
+    "concurrency": 1,
+    "perRunCap": 3,
+    "timeoutMs": 600000
+  }
+}
+```
+
+`concurrency` is 1–4. The drafting rules live in `prompts/draft.md`, after
+the fixed framing from `agent/runner/prompts/draft.framing.md`. The repo
+ships only a synthetic `draft.example.md`. Both CV templates go to the step
+whole. The person's work-history notes are exported into a corpus folder
+labelled `facts`, where the step finds them through `search_profile`.
+
 `syncFolder` is optional, owned by `035a-corpus-sync`. When set, it joins the
 corpus as one more `style` entry, so every command indexes it.
 
@@ -358,6 +380,13 @@ All routes sit behind `requireSession` and follow the existing error contract.
 files. In one transaction it creates the application with server-fixed status
 `draft`, stores the attachments, sets `application_id` and moves the ad to
 `drafted`. A second call answers 409, so a retry cannot produce a second draft.
+
+The text fields are `company`, `role`, `deadline`, `link` and `notes`. A
+`status` or `dateApplied` field is ignored. The file fields are `coverLetter`,
+`cv` and `ad`, one each, and all three are required (otherwise 400). The ad
+must be `suitable` (otherwise 409 `an ad cannot be drafted from <state>`). A
+refused request leaves no file in the uploads directory. Success answers 201
+`{ ad, application }`, with the application's three attachments.
 `034-ad-inbox` builds everything here except this route, which
 `037-application-drafts` adds.
 
@@ -413,19 +442,39 @@ Model output, validated by the runner:
   "fitSummary": "string",
   "coverLetter": "string",
   "cv": "string",
+  "company": "string",
+  "role": "string",
+  "applyTo": "string",
   "questions": [{ "id": "q1", "text": "string" }]
 }
 ```
 
 - **Questions.** Anything only the user can answer appears in the text as
   `[[ASK:q1]]` and in `questions`. The runner rejects output where the markers
-  and the list differ.
+  and the list differ, or where a question id repeats, as `ask_mismatch`.
+- **Company and role.** `company`, `role` and `applyTo` hold only what the ad
+  text states, empty otherwise. The application takes the ad row's company
+  and title first, then the model's. When both are empty it gets
+  `Unknown company` or `Unknown role`, and `notes` gains a fixed question
+  asking for it.
 - **Facts.** The CV starts from the master template for the language. Facts
   come from sources labelled `facts`. Sources labelled `style` never supply a
   fact. Motivation is always a question.
 - **Application fields.** `status` `draft`, empty `dateApplied`, `link` the ad
   URL, `deadline` from the ad, and `notes` holding the fit summary, the open
-  questions and the source.
+  questions and the source:
+
+  ```text
+  <fitSummary>
+
+  Open questions:            (Avoimet kysymykset: in a Finnish draft)
+  q1: <text>
+  company: <fixed question>  (only for the placeholder)
+
+  <source>: <ad URL>
+  ```
+
+  The questions block is left out when there are none.
 - **Attachments.** All `.txt`, all stored in job-app only. The agent never
   writes to the applications folder.
 
@@ -435,6 +484,11 @@ Model output, validated by the runner:
 | Cover letter (EN) | `<prefix>_CoverLetter_<Company>_EN.txt` |
 | CV | `<prefix>_CV_<Company>_<FI\|EN>.txt` |
 | Saved ad | `<Company>_<Role>_ilmoitus.txt` or `_ad.txt`, with a header of source URL, apply URL or email, and saved date |
+
+`<Company>` and `<Role>` keep Unicode letters, digits and `-`. Every other run
+of characters becomes one `_`, ends are trimmed, the result is capped at 40
+characters, and it falls back to `Unknown`. The saved ad's header is labelled
+in the draft's language, and `applyTo` falls back to the ad URL.
 
 An email application's cover letter file holds the recipient, subject,
 attachment name and body. PDFs are never rendered by the agent.

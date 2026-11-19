@@ -42,7 +42,7 @@ export function createApp(
   app.use('/api', createConfigRouter(pageSize))
   app.use('/api', createApplicationsRouter(db, uploadsDir))
   app.use('/api', createAttachmentsRouter(db, uploadsDir))
-  app.use('/api', createAdsRouter(db))
+  app.use('/api', createAdsRouter(db, uploadsDir))
   app.use('/api/users', requireAdmin(db))
   app.use('/api', createUsersRouter(db, uploadsDir))
   if (staticDir) {

@@ -50,6 +50,9 @@ Server:
 
 - `server/lib/uploads.ts` — new. `createUpload(uploadsDir)`, the multer setup
   moved out of `routes/attachments.ts`, because a second router now needs it.
+  It sets `defParamCharset: 'utf8'`. Multer otherwise decodes file names as
+  latin1, which garbles `Ääkkönen` in a draft file name. The same change fixes
+  this for the existing attachment uploads.
 - `server/lib/applications.ts` — add `insertApplication(db, userId, input)`
   (lifted from `routes/applications.ts` `createHandler`) and
   `insertAttachment(db, applicationId, file)` (lifted from
@@ -61,8 +64,10 @@ Server:
   multipart text fields `company, role, deadline, link, notes` and returns an
   `ApplicationInput` through `validateInput`, with `status: 'draft'` and
   `dateApplied: ''` set by the server. Any `status` or `dateApplied` in the
-  request is ignored.
-- `server/lib/ads.ts` — add `draftAd(db, ad, input, files)`. It answers 409
+  request is ignored. Multipart encodes text-field line breaks as CRLF, so
+  `notes` is turned back to LF, matching the JSON routes.
+- `server/lib/ads.ts` — add `draftAd(db, ad, { input, files })`, with input
+  and files bundled to stay within the three-parameter limit. It answers 409
   `an ad cannot be drafted from <state>` unless the ad is `suitable`. Then it
   inserts the application and the three attachments, and moves the ad to
   `drafted` with `application_id` set. `AdMove`/`movedRow`/`saveMove` gain
@@ -93,7 +98,8 @@ Runner:
 - `agent/runner/lib/mapLimit.ts` — new. `mapLimit` moved here from
   `evaluationRun.ts`, now that both runs use it.
 - `agent/runner/lib/prompts.ts` — new. `buildSystemPrompt(framingUrl, criteria)`,
-  lifted from `evaluate.ts`, which now passes its own framing URL.
+  lifted from `evaluate.ts`, which now exports `EVALUATION_FRAMING` and passes
+  it (`draft.ts` likewise exports `DRAFT_FRAMING`).
 - `agent/runner/lib/jobApp.ts`:
   - `adSchema` gains `source` and `evaluation` (nullable
     `{verdict, fitSummary, reasons}`).
@@ -117,7 +123,9 @@ Runner:
 - `agent/runner/lib/draftApplication.ts` — new.
   `buildDraft(ad, output, { filePrefix, savedOn })` returns a `DraftUpload`:
   - `company` and `role`: the ad's value, else the model's, else the
-    placeholder, which also adds its fixed question.
+    placeholder, which also adds its fixed question to `notes` as a
+    `company: …` / `role: …` line after the `qN` lines. It has no marker,
+    because it never appears in the text.
   - `deadline` and `link`: the ad's `deadline` and `url`.
   - `notes`: the fit summary, the open questions as `q1: …` lines, and
     `<source>: <url>`. Labels are in the draft's language.
@@ -140,7 +148,7 @@ Runner:
      A failure sends a same-state `{to:'suitable', error}`; the server fails
      the ad on the third attempt. A success sends `buildDraft` to
      `jobApp.draftAd`.
-  4. Returns counts: drafted, retrying, failed, queued.
+  4. Returns `{ skipped, counts: { drafted, retrying, failed }, queued }`.
 - `agent/runner/commands/draft.ts` — new; `npm run agent:draft`. It loads the
   profile config, the draft config, `prompts/draft.md` and both CV templates.
   A missing file is a CliError(2) naming the path, via `readConfigFile`. Then
@@ -170,7 +178,8 @@ Runner:
     `new Response(buf, {headers}).formData()`.
   - Records `drafts` on the fake, moves the ad to `drafted`, and answers 409
     when the ad is not `suitable`.
-  - The fake records every request path in `requests`.
+  - The fake records every request as `<method> <url>` in `requests`. It
+    turns CRLF back to LF in text fields, as the server does.
 - `agent/test/fakeJobApp.ts` — `drafts` and `requests` on `FakeJobApp`.
 - `package.json` — script `agent:draft`.
 

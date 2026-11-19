@@ -1,8 +1,11 @@
 import { Router } from 'express'
-import type { Request, Response } from 'express'
+import type { NextFunction, Request, Response } from 'express'
 import type Database from 'better-sqlite3'
+import { join } from 'node:path'
 import { toAd, toAdSummary } from '../models/ad.ts'
+import { toApplication } from '../models/application.ts'
 import {
+  draftAd,
   handOverAd,
   ingestAd,
   listAds,
@@ -11,12 +14,20 @@ import {
   transitionAd,
 } from '../lib/ads.ts'
 import {
+  parseAdDraft,
   parseAdHandover,
   parseAdIngest,
   parseAdTransition,
   parseReportedIds,
   parseStateFilter,
 } from '../lib/adValidation.ts'
+import { unlinkIfExists } from '../lib/files.ts'
+import { HttpError } from '../lib/httpError.ts'
+import { createUpload } from '../lib/uploads.ts'
+
+const DRAFT_FILES = ['coverLetter', 'cv', 'ad'] as const
+
+type UploadedFiles = Record<string, Express.Multer.File[]> | undefined
 
 function listHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
@@ -69,8 +80,50 @@ function reportedHandler(db: Database.Database) {
   }
 }
 
-export function createAdsRouter(db: Database.Database): Router {
+// Answers 404 before multer writes anything to disk.
+function checkAdOwned(db: Database.Database) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    requireAd(db, Number(req.params.id), req.userId)
+    next()
+  }
+}
+
+function draftFiles(req: Request): Express.Multer.File[] {
+  const uploaded = req.files as UploadedFiles
+  const files = DRAFT_FILES.map((name) => uploaded?.[name]?.[0])
+  if (files.includes(undefined)) {
+    throw new HttpError(400, 'coverLetter, cv and ad files are required')
+  }
+  return files as Express.Multer.File[]
+}
+
+function createDraft(db: Database.Database, req: Request) {
+  const files = draftFiles(req)
+  const input = parseAdDraft(req.body)
+  return db.transaction(() => {
+    const ad = requireAd(db, Number(req.params.id), req.userId)
+    return draftAd(db, ad, { input, files })
+  })()
+}
+
+// A rejected draft leaves no file behind, whatever was uploaded.
+function draftHandler(db: Database.Database, uploadsDir: string) {
+  return (req: Request, res: Response) => {
+    try {
+      const { ad, application, attachments } = createDraft(db, req)
+      res.status(201).json({ ad: toAd(ad), application: toApplication(application, attachments) })
+    } catch (err) {
+      const uploaded = Object.values((req.files as UploadedFiles) ?? {}).flat()
+      for (const file of uploaded) unlinkIfExists(join(uploadsDir, file.filename))
+      throw err
+    }
+  }
+}
+
+export function createAdsRouter(db: Database.Database, uploadsDir: string): Router {
   const router = Router()
+  const upload = createUpload(uploadsDir)
+  const draftUpload = upload.fields(DRAFT_FILES.map((name) => ({ name, maxCount: 1 })))
 
   router.get('/ads', listHandler(db))
   router.post('/ads', ingestHandler(db))
@@ -78,6 +131,7 @@ export function createAdsRouter(db: Database.Database): Router {
   router.get('/ads/:id', getHandler(db))
   router.post('/ads/:id/transition', transitionHandler(db))
   router.post('/ads/:id/handover', handoverHandler(db))
+  router.post('/ads/:id/draft', checkAdOwned(db), draftUpload, draftHandler(db, uploadsDir))
 
   return router
 }

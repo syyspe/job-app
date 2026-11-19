@@ -1,13 +1,11 @@
 import { Router } from 'express'
-import multer from 'multer'
 import type { NextFunction, Request, Response } from 'express'
 import type Database from 'better-sqlite3'
-import { mkdir } from 'node:fs'
-import { extname, join } from 'node:path'
-import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
 import { toAttachment } from '../models/attachment.ts'
 import { unlinkIfExists } from '../lib/files.ts'
-import { touchApplication } from '../lib/applications.ts'
+import { insertAttachment, touchApplication } from '../lib/applications.ts'
+import { createUpload } from '../lib/uploads.ts'
 import { HttpError } from '../lib/httpError.ts'
 import type { AttachmentRow } from '../models/attachment.ts'
 
@@ -22,37 +20,12 @@ function checkApplicationExists(db: Database.Database) {
   }
 }
 
-function buildUpload(uploadsDir: string) {
-  return multer({
-    storage: multer.diskStorage({
-      // Callback-style so a failure reaches multer's error path, not busboy's listener.
-      destination: (_req, _file, callback) => {
-        mkdir(uploadsDir, { recursive: true }, (error) => callback(error, uploadsDir))
-      },
-      filename: (_req, file, callback) => {
-        callback(null, `${randomUUID()}${extname(file.originalname)}`)
-      },
-    }),
-    limits: { fileSize: 10 * 1024 * 1024 },
-  })
-}
-
 function uploadHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
     const applicationId = Number(req.params.id)
     if (!req.file) throw new HttpError(400, 'file is required')
 
-    const result = db
-      .prepare(
-        `INSERT INTO attachments
-           (application_id, stored_name, original_name, mime_type, uploaded_at)
-         VALUES (?, ?, ?, ?, datetime('now'))`,
-      )
-      .run(applicationId, req.file.filename, req.file.originalname, req.file.mimetype)
-
-    const row = db
-      .prepare('SELECT * FROM attachments WHERE id = ?')
-      .get(result.lastInsertRowid) as AttachmentRow
+    const row = insertAttachment(db, applicationId, req.file)
     touchApplication(db, applicationId)
     res.status(201).json(toAttachment(row))
   }
@@ -158,7 +131,7 @@ export function createAttachmentsRouter(
   uploadsDir: string,
 ): Router {
   const router = Router()
-  const upload = buildUpload(uploadsDir)
+  const upload = createUpload(uploadsDir)
 
   router.post(
     '/applications/:id/attachments',

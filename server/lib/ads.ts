@@ -1,5 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { AdRow } from '../models/ad.ts'
+import type { ApplicationRow } from '../models/application.ts'
+import type { AttachmentRow } from '../models/attachment.ts'
 import type { AdEvaluation, AdState } from '../types.ts'
 import { findTitleDuplicate, findUrlDuplicate } from './adDedup.ts'
 import {
@@ -11,7 +13,9 @@ import {
   retryTarget,
 } from './adStates.ts'
 import type { AdHandover, AdIngest, AdTransition } from './adValidation.ts'
+import { insertApplication, insertAttachment } from './applications.ts'
 import { HttpError } from './httpError.ts'
+import type { ApplicationInput } from './validation.ts'
 
 const MAX_ATTEMPTS = 3
 
@@ -21,6 +25,18 @@ interface AdMove {
   evaluation?: AdEvaluation
   lastError?: string
   duplicateOf?: number | null
+  applicationId?: number
+}
+
+export interface AdDraft {
+  input: ApplicationInput
+  files: Express.Multer.File[]
+}
+
+export interface DraftedAd {
+  ad: AdRow
+  application: ApplicationRow
+  attachments: AttachmentRow[]
 }
 
 function readAd(db: Database.Database, id: number): AdRow {
@@ -55,6 +71,7 @@ function movedRow(ad: AdRow, move: AdMove): AdRow {
     evaluation: move.evaluation ? JSON.stringify(move.evaluation) : ad.evaluation,
     last_error: move.lastError ?? ad.last_error,
     duplicate_of: move.duplicateOf ?? ad.duplicate_of,
+    application_id: move.applicationId ?? ad.application_id,
     title: blank ? '' : ad.title,
     company: blank ? '' : ad.company,
   }
@@ -64,7 +81,7 @@ function saveMove(db: Database.Database, row: AdRow): AdRow {
   db.prepare(
     `UPDATE ads
         SET url = ?, canonical_url = ?, title = ?, company = ?, state = ?, body = ?,
-            evaluation = ?, duplicate_of = ?, attempts = ?, last_error = ?,
+            evaluation = ?, application_id = ?, duplicate_of = ?, attempts = ?, last_error = ?,
             updated_at = datetime('now'), reported_at = NULL
       WHERE id = ?`,
   ).run(
@@ -75,6 +92,7 @@ function saveMove(db: Database.Database, row: AdRow): AdRow {
     row.state,
     row.body,
     row.evaluation,
+    row.application_id,
     row.duplicate_of,
     row.attempts,
     row.last_error,
@@ -190,6 +208,15 @@ export function handOverAd(db: Database.Database, ad: AdRow, handover: AdHandove
     company: handover.company ?? ad.company,
   }
   return enterReady(db, updated, handover.text)
+}
+
+// The caller runs this in a transaction, so a failure leaves no application behind.
+export function draftAd(db: Database.Database, ad: AdRow, draft: AdDraft): DraftedAd {
+  if (ad.state !== 'suitable') throw new HttpError(409, `an ad cannot be drafted from ${ad.state}`)
+  const application = insertApplication(db, ad.user_id, draft.input)
+  const attachments = draft.files.map((file) => insertAttachment(db, application.id, file))
+  const moved = saveMove(db, movedRow(ad, { to: 'drafted', applicationId: application.id }))
+  return { ad: moved, application, attachments }
 }
 
 function markOneReported(db: Database.Database, ad: AdRow): void {

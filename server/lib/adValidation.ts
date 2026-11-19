@@ -2,7 +2,8 @@ import { AD_STATES, SOURCE_MODES } from '../types.ts'
 import type { AdEvaluation, AdState, SourceMode } from '../types.ts'
 import { canonicalUrl } from './adDedup.ts'
 import { HttpError } from './httpError.ts'
-import { fieldsOf } from './validation.ts'
+import { fieldsOf, validateInput } from './validation.ts'
+import type { ApplicationInput } from './validation.ts'
 
 // A fixed category, so ad text can never reach last_error.
 const ERROR_CATEGORY = /^[a-z0-9_]{1,40}$/
@@ -149,4 +150,24 @@ export function parseStateFilter(state: unknown): AdState | undefined {
   if (state === undefined) return undefined
   if (!isAdState(state)) throw new HttpError(400, `state must be one of: ${AD_STATES.join(', ')}`)
   return state
+}
+
+// multipart/form-data encodes every line break in a text field as CRLF; notes
+// made through the JSON routes use LF.
+function lfNotes(notes: unknown): unknown {
+  return typeof notes === 'string' ? notes.replaceAll('\r\n', '\n') : notes
+}
+
+// The server fixes status and dateApplied: the agent can only create a draft.
+export function parseAdDraft(body: unknown): ApplicationInput {
+  const { company, role, deadline, link, notes } = fieldsOf(body)
+  return validateInput({
+    company,
+    role,
+    deadline,
+    link,
+    notes: lfNotes(notes),
+    status: 'draft',
+    dateApplied: '',
+  })
 }

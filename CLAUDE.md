@@ -41,6 +41,9 @@
   and refuses to run until the check has passed for the installed version.
   Both read `~/.config/job-agent/` and need the private prompt
   `prompts/evaluate.md` — see README's "Ad evaluation" section.
+  `npm run agent:draft` turns suitable ads into draft applications under the
+  same gate. It needs `prompts/draft.md` and config's `drafting` key — see
+  README's "Ad drafting" section.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
