@@ -36,7 +36,7 @@ This design refines brief 033 in two places:
 | `034-ad-inbox` | committed | done | — |
 | `035-profile-corpus` | committed | done | — |
 | `035a-corpus-sync` | committed | done | 035 |
-| `036-ad-evaluation` | committed | open | 034, 035 |
+| `036-ad-evaluation` | committed | in progress | 034, 035 |
 | `037-application-drafts` | committed | open | 036 |
 | `038-alert-sources` | committed | open | 034 |
 | `039-daily-run` | committed | open | 035a, 037, 038 |
