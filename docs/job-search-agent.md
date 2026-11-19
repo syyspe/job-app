@@ -37,7 +37,7 @@ This design refines brief 033 in two places:
 | `035-profile-corpus` | committed | done | — |
 | `035a-corpus-sync` | committed | done | 035 |
 | `036-ad-evaluation` | committed | done | 034, 035 |
-| `037-application-drafts` | committed | in progress | 036 |
+| `037-application-drafts` | committed | done | 036 |
 | `038-alert-sources` | committed | open | 034 |
 | `039-daily-run` | committed | open | 035a, 037, 038 |
 | `040-markdown-attachments` | not written | open | 035a, 037 |
