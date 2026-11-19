@@ -35,6 +35,12 @@
   service — see README's "Profile corpus" section. `npm run profile:sync`
   copies the attachments marked "Add to profile" into `syncFolder` and
   rebuilds; it also reads job-app credentials from `~/.config/job-agent/env`.
+- Ad evaluation: `npm run agent:sandbox-check` runs real `claude -p` probes
+  against the installed CLI and records the version that passed;
+  `npm run agent:evaluate` screens new ads by title and evaluates ready ones,
+  and refuses to run until the check has passed for the installed version.
+  Both read `~/.config/job-agent/` and need the private prompt
+  `prompts/evaluate.md` — see README's "Ad evaluation" section.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.

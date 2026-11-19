@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { UNREACHABLE_URL } from '../../test/fakeOllama.ts'
 import { startFakeJobApp } from '../../test/fakeJobApp.ts'
+import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import type { FakeJobApp } from '../../test/fakeJobApp.ts'
 import { createJobAppClient } from './jobApp.ts'
 
@@ -77,5 +78,33 @@ test('an unknown attachment is a 404 naming the request', async () => {
   await expect(client().setProfileSync(99, false)).rejects.toMatchObject({
     exitCode: 1,
     message: 'job-app PUT /api/attachments/99/profile-sync: 404 not found',
+  })
+})
+
+test('lists ads by state, reads one with its body and transitions it', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'ready', body: 'Full text' }), fakeAd({ id: 2, state: 'new' }))
+  const jobApp = client()
+
+  expect((await jobApp.listAds('ready')).map((ad) => ad.id)).toEqual([1])
+  expect((await jobApp.getAd(1)).body).toBe('Full text')
+  const moved = await jobApp.transitionAd(1, { to: 'ready', error: 'timeout' })
+
+  expect(moved).toMatchObject({ id: 1, state: 'ready', attempts: 1 })
+  expect(fake.transitions).toEqual([{ id: 1, to: 'ready', error: 'timeout' }])
+})
+
+test('an ad list that is not a list is a bad response', async () => {
+  fake.failure = 'malformed'
+
+  await expect(client().listAds('new')).rejects.toMatchObject({
+    exitCode: 1,
+    message: 'job-app GET /api/ads?state=new: bad response',
+  })
+})
+
+test('an unknown ad passes the 404 through', async () => {
+  await expect(client().getAd(99)).rejects.toMatchObject({
+    exitCode: 1,
+    message: 'job-app GET /api/ads/99: 404 ad not found',
   })
 })

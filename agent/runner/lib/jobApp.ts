@@ -12,10 +12,37 @@ export interface PendingAttachment {
   originalName: string
 }
 
+const adSummaryShape = {
+  id: z.number(),
+  sourceMode: z.enum(['automatic', 'handover']),
+  title: z.string(),
+  company: z.string(),
+  location: z.string(),
+  deadline: z.string(),
+  url: z.string(),
+  state: z.string(),
+  attempts: z.number(),
+}
+const adSummarySchema = z.object(adSummaryShape)
+const adSchema = z.object({ ...adSummaryShape, body: z.string().nullable() })
+
+// Only the fields the runner reads; the API sends more.
+export type AdSummary = z.infer<typeof adSummarySchema>
+export type Ad = z.infer<typeof adSchema>
+
+export interface AdTransition {
+  to: string
+  evaluation?: { verdict: string; fitSummary: string; reasons: string[] }
+  error?: string
+}
+
 export interface JobAppClient {
   listPendingSync: () => Promise<PendingAttachment[]>
   downloadAttachment: (id: number) => Promise<Uint8Array>
   setProfileSync: (id: number, pending: boolean) => Promise<void>
+  listAds: (state: string) => Promise<AdSummary[]>
+  getAd: (id: number) => Promise<Ad>
+  transitionAd: (id: number, transition: AdTransition) => Promise<AdSummary>
 }
 
 interface JobAppRequest {
@@ -60,8 +87,10 @@ async function login(config: JobAppConfig): Promise<string> {
   return (response.headers.get('set-cookie') ?? '').split(';')[0]
 }
 
+type Sender = (request: JobAppRequest) => Promise<Response>
+
 // Logs in on first use and once more when the session has expired.
-function createSender(config: JobAppConfig): (request: JobAppRequest) => Promise<Response> {
+function createSender(config: JobAppConfig): Sender {
   let cookie: string | undefined
   async function attempt(request: JobAppRequest): Promise<Response> {
     cookie ??= await login(config)
@@ -78,15 +107,16 @@ function createSender(config: JobAppConfig): (request: JobAppRequest) => Promise
   }
 }
 
+async function receive<T>(send: Sender, request: JobAppRequest, schema: z.ZodType<T>): Promise<T> {
+  const parsed = schema.safeParse(await (await send(request)).json().catch(() => undefined))
+  if (!parsed.success) throw new CliError(1, `job-app ${request.method} ${request.path}: bad response`)
+  return parsed.data
+}
+
 export function createJobAppClient(config: JobAppConfig): JobAppClient {
   const send = createSender(config)
   return {
-    listPendingSync: async () => {
-      const request: JobAppRequest = { method: 'GET', path: '/api/attachments/pending-sync' }
-      const parsed = pendingSchema.safeParse(await (await send(request)).json().catch(() => undefined))
-      if (!parsed.success) throw new CliError(1, `job-app GET ${request.path}: bad response`)
-      return parsed.data
-    },
+    listPendingSync: () => receive(send, { method: 'GET', path: '/api/attachments/pending-sync' }, pendingSchema),
     downloadAttachment: async (id) => {
       const response = await send({ method: 'GET', path: `/api/attachments/${id}` })
       return new Uint8Array(await response.arrayBuffer())
@@ -94,5 +124,9 @@ export function createJobAppClient(config: JobAppConfig): JobAppClient {
     setProfileSync: async (id, pending) => {
       await send({ method: 'PUT', path: `/api/attachments/${id}/profile-sync`, body: { pending } })
     },
+    listAds: (state) => receive(send, { method: 'GET', path: `/api/ads?state=${state}` }, z.array(adSummarySchema)),
+    getAd: (id) => receive(send, { method: 'GET', path: `/api/ads/${id}` }, adSchema),
+    transitionAd: (id, transition) =>
+      receive(send, { method: 'POST', path: `/api/ads/${id}/transition`, body: transition }, adSummarySchema),
   }
 }

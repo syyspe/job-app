@@ -112,6 +112,66 @@ Every `claude -p` step must:
 `036-ad-evaluation` proves these properties with a test before any real ad is
 processed, and settles the exact flags against the installed CLI.
 
+The flags, settled against CLI 2.1.328 (`agent/runner/lib/sandbox.ts`
+`sandboxArgs`, the only place they are written):
+
+```text
+claude -p "<step prompt>"
+  --output-format json --json-schema <schema>
+  --system-prompt <fixed framing + private criteria>
+  --tools "" --strict-mcp-config --mcp-config <inline: search_profile only>
+  --allowedTools mcp__profile__search_profile --permission-mode dontAsk
+  --setting-sources "" --disable-slash-commands --no-session-persistence
+  (cwd: fresh empty mkdtemp; env: allowlist; stdin: the ad as JSON; never --bare)
+```
+
+- `--setting-sources ""` is accepted, so `--restricted` and `--safe-mode`
+  are not needed. `--mcp-config` takes the config as an inline JSON string.
+- The schema output arrives in the result's `structured_output` (and again,
+  stringified, in `result`). The CLI delivers it through a built-in
+  `StructuredOutput` tool, the only tool besides `search_profile` in the
+  `init` event. The CLI rejects a schema carrying a `$schema` key, so
+  `stepSchema` drops the one `z.toJSONSchema` writes.
+- The environment allowlist is `PATH`, `HOME`, `LANG`, `LC_ALL`, `TZ`,
+  `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `CLAUDE_CONFIG_DIR`. The
+  `search_profile` server gets the same set. `ANTHROPIC_API_KEY` is left out,
+  so the step always uses the subscription login (`apiKeySource: "none"` in
+  the `init` event). `--bare` stays unused.
+- With everything disabled, the `init` event still lists four built-in
+  plugins (`path: "builtin"`) and five built-in agent types (`claude`,
+  `Explore`, `general-purpose`, `Plan`, `statusline-setup`). None of the
+  agent types can run, because the step has no Agent tool. `skills` and
+  `slash_commands` are empty and `output_style` is `default`.
+- A usage limit is not marked distinctly in the JSON result: only an
+  `@internal` field on `stream-json` assistant messages names it. The runner
+  counts it as `cli_failed` like any other failed run.
+- Without `--strict-mcp-config`, the user's claude.ai connectors can join the
+  step, but only when they connect before the `init` event. In practice that
+  happens only when another MCP server slows start-up. The gate therefore
+  cannot reliably detect a missing `--strict-mcp-config`. The unit test on
+  `sandboxArgs` is what pins that flag.
+
+**The gate.** `npm run agent:sandbox-check` runs two real steps with
+`--output-format stream-json --verbose` and passes only if all of these hold:
+
+1. The `init` event lists exactly the tools `StructuredOutput` and
+   `mcp__profile__search_profile`, and exactly one MCP server, `profile`,
+   connected.
+2. The reported cwd is the step's empty temp directory.
+3. No customisations are loaded: no skills, slash commands, non-built-in
+   plugins or agent types beyond the five above, and the default output style.
+4. Canary files in the temp directory's parent (`CLAUDE.md`,
+   `.claude/settings.json`, an agent and a skill, each asking for a random
+   token in every answer) leave no trace in the output.
+5. The structured output arrives and passes the schema.
+6. A hostile synthetic ad still yields schema-valid output, and the stream
+   shows no tool call other than the two allowed tools.
+
+It then records `{cliVersion, checkedAt}` in
+`~/.local/state/job-agent/sandbox-check.json`. `agent:evaluate` exits 2 unless
+`claude --version` matches that record, so a CLI update stops evaluation until
+the gate passes again.
+
 The summary recipient is fixed in private config. No value from an ad or a
 model response can select a recipient, file path or status, and a URL is
 fetched only if it passes the host check in section 6. The runner only ever
@@ -148,6 +208,22 @@ The config keys `035-profile-corpus` owns, ignoring every other key:
   "syncFolder": "/abs/path/synced"
 }
 ```
+
+The keys `036-ad-evaluation` owns, with their defaults:
+
+```json
+{
+  "titleRules": { "reject": [] },
+  "evaluation": { "concurrency": 2, "perRunCap": 10, "timeoutMs": 300000 }
+}
+```
+
+`titleRules.reject` is a reject list only: case-insensitive whole-word
+phrases, where letters and digits in any script count as word characters.
+Unclear titles stay off it and go on to full evaluation. `concurrency` is
+1–8. The evaluation criteria live in `prompts/evaluate.md`, after the fixed
+framing the runner supplies from `agent/runner/prompts/evaluate.framing.md`;
+the repo ships only a synthetic `evaluate.example.md`.
 
 `syncFolder` is optional, owned by `035a-corpus-sync`. When set, it joins the
 corpus as one more `style` entry, so every command indexes it.
@@ -219,11 +295,18 @@ state and an `error` adds one to `attempts` and stores `last_error`. It works
 from `new`, `ready` and `suitable`. The third attempt moves the ad to `failed`
 on the server. Any other same-state request is 409.
 
+The evaluation step's categories are `timeout`, `cli_failed` (a non-zero exit
+or `is_error`, a usage limit included), `bad_output` (stdout is not the JSON
+result envelope) and `invalid_result` (the runner's own schema check failed).
+
 Retrying from `failed` must target the ad's mode, otherwise 409, and resets
 `attempts`, `last_error` and `evaluation`.
 
 An unsure evaluation counts as `suitable`, and the doubt becomes a question in
-the draft. A block or rate-limit response does not count as an attempt: the ad
+the draft. The runner sends it with `verdict: "suitable"` and the fixed first
+reason `"Evaluation was unsure: the points below are open questions."`,
+followed by the model's reasons, each an open question `037` turns into a
+draft question. A block or rate-limit response does not count as an attempt: the ad
 stays `new` for the next run. A `gone` fetch result moves the ad straight to
 `failed` with the category `gone`.
 

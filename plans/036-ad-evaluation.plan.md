@@ -260,6 +260,53 @@ stdout for command results, no logger. `last_error` categories are
      new ready ad. It prints "skipped" and the ad stays `ready` with
      `attempts` 0.
 
+## Build notes
+
+Where the build departed from the plan, and what step 1 settled:
+
+- **Step 1 findings.** These are recorded in `docs/job-search-agent.md`
+  section 2.
+  - `--setting-sources ""` is accepted, and `--mcp-config` takes inline JSON.
+  - Output lands in `structured_output`.
+  - The `init` event also lists the built-in `StructuredOutput` tool, through
+    which `--json-schema` output is delivered, so probe 1 expects exactly
+    `StructuredOutput` and `mcp__profile__search_profile`.
+  - The CLI rejects a schema carrying `$schema`, so `sandbox.ts` adds
+    `stepSchema`, which drops the key `z.toJSONSchema` writes.
+- **`usage_limit` dropped.** The JSON result does not mark a usage limit
+  distinctly. Only an `@internal` field on `stream-json` assistant messages
+  names it. As the plan allowed, the variant and its test are gone, and a
+  limit counts as `cli_failed`.
+- **Step 5's negative check did not fail.** With `--strict-mcp-config`
+  removed, the gate still passed. The only other MCP source here, the
+  claude.ai connectors, joins the step only when it connects before the
+  `init` event. Four plain runs without the flag listed `profile` alone, and
+  it appeared only when an extra pending server slowed start-up. The
+  `sandboxArgs` unit test pins the flag. The gate cannot detect its absence
+  reliably on this machine.
+- **Wrapper shape.**
+  - `runSandboxed` also takes `prompt`, `env` (the runner's environment,
+    filtered inside), `extraEnv` (tests only) and `workRoot`.
+  - `spawnSandboxed(step, outputFormat)` is exported, so the gate can run the
+    same wrapper with `stream-json` and put canary files in the parent of the
+    working directory.
+  - `profileMcpConfig(env)` builds the inline config.
+- **Files split.**
+  - The probes live in `sandboxProbes.ts`, the canary files in
+    `sandboxCanary.ts`, and `sandboxCheck.ts` keeps the record and the gate.
+  - The fake's ad handlers live in `agent/test/fakeJobAppAds.ts`, and its
+    JSON helpers in `agent/test/fakeHttp.ts`.
+- **Order.** `GET /api/ads` lists newest first, so `runEvaluation` reverses
+  the list to evaluate the oldest first.
+- **Report.** `retrying` counts attempts on ads that stay `ready`, and
+  `failed` counts ads the third attempt moved to `failed`.
+- **Extra test.** `agent/runner/commands/evaluate.test.ts` covers the
+  command's failure cases end to end with `fakeClaude.ts` on `PATH`.
+- **Manual verification** (2026-11-19) ran against a scratch database on port
+  3011, a fake Ollama and the real CLI 2.1.328. All five steps behaved as
+  listed. The hand-over ad reached `suitable` with an evaluation citing the
+  synthetic CV.
+
 ## Risks / rollback
 
 Nothing here is hard to reverse: no schema change, and every state the runner
