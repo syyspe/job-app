@@ -28,6 +28,11 @@
   `JOBAPP_API_URL`, `JOBAPP_USERNAME` and `JOBAPP_PASSWORD` in the
   environment (it does not read `.env`) and an already-running API. See the
   README's "Claude Desktop (MCP)" section.
+- Profile corpus: `npm run profile:health`, `npm run profile:index`,
+  `npm run profile:search -- "<query>" [facts|style]`, `npm run profile:mcp`
+  (the `search_profile` stdio server). They read
+  `~/.config/job-agent/config.json`, not `.env`, and need the LAN Ollama
+  service — see README's "Profile corpus" section.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
@@ -41,12 +46,12 @@ with no `failed` line. Playwright: `N passed`.
   tests, Playwright 1.62.1 for end-to-end.
 - Dependency policy: no new dependencies without approval. Approved so far
   beyond the framework set: `@modelcontextprotocol/sdk` 1.30.0 and `zod`
-  4.6.5, both for `mcp/`.
+  4.6.5, both for `mcp/` and `agent/`.
 - Unit tests live beside the code they test as `src/**/*.test.tsx?`,
-  `server/**/*.test.ts` and `mcp/**/*.test.ts`; those globs are what Vitest
-  picks up. E2E specs go in `e2e/*.spec.ts`.
-- `tsconfig.server.json` covers both `server/` and `mcp/` — one project, one
-  set of settings, and `mcp/`'s import of `server/types.ts` stays plain.
+  `server/**/*.test.ts`, `mcp/**/*.test.ts` and `agent/**/*.test.ts`; those
+  globs are what Vitest picks up. E2E specs go in `e2e/*.spec.ts`.
+- `tsconfig.server.json` covers `server/`, `mcp/` and `agent/` — one project,
+  one set of settings, and `mcp/`'s import of `server/types.ts` stays plain.
 - Import `test`/`expect` from `vitest` explicitly — globals are off, so an
   undeclared `test` is a type error at build time, not a runtime surprise.
 - Query by accessible role/name in tests (`getByRole`), not by CSS class or
@@ -63,8 +68,10 @@ with no `failed` line. Playwright: `N passed`.
   client, `checkOk` in `src/lib/api.ts` turns `{error}` into a thrown `Error`
   and a 401 into `UnauthorizedError`. `mcp/` tools signal failure by
   throwing. CLI entry points (`server/index.ts`, `server/seed.ts`,
-  `mcp/index.ts`) report missing or invalid configuration as one stderr line
-  and exit 2, with no stack.
+  `mcp/index.ts`, `agent/**`) report missing or invalid configuration as one
+  stderr line and exit 2, with no stack. `agent/` throws
+  `CliError(exitCode, message)` (`agent/lib/cliError.ts`) for anything the
+  user can act on, and every entry runs under its `runCommand`.
 - Logging: `createLogger` (`server/lib/logger.ts`, no dependency) is built
   once in `server/index.ts` and passed to `createApp`; nothing else
   constructs one except tests. It writes JSON lines `{time, level, msg,
@@ -81,7 +88,9 @@ with no `failed` line. Playwright: `N passed`.
   fields; log IDs, never bodies, headers, cookies, passwords or usernames.
   Outside the logger: CLI config errors (`server/seed.ts`, `server/index.ts`
   before the logger exists) stay one plain stderr line + exit 2, and `mcp/`
-  is outside this contract — stdout is its JSON-RPC channel.
+  is outside this contract — stdout is its JSON-RPC channel. So is
+  `agent/profile/`: its commands print results to stdout, its MCP entry
+  writes nothing there.
 - UI: extend the existing visual language rather than adding a second one:
   IBM Plex Sans, the tokens in `src/index.css`, and list rows with the 4px
   status spine. Colour shows what needs the user; closed items recede with a
@@ -105,6 +114,10 @@ with no `failed` line. Playwright: `N passed`.
   `server.ts` is `createMcpServer(client)`, wiring only; `lib/` carries no MCP
   dependency; `tools/` is one file per tool group, each exporting a
   `register*Tools(server, client)` with zod schemas.
+- `agent/` — the job search agent's own processes, starting with
+  `agent/profile/`: the profile index commands and the `search_profile` stdio
+  MCP server. No job-app credentials, no import from `server/` or `mcp/`, and
+  nothing in its MCP entry writes to stdout.
 - `public/` — served verbatim at the site root, not processed by Vite.
 - `e2e/` — Playwright specs, configured by `playwright.config.ts`.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are

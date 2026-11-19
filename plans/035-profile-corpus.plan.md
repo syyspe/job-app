@@ -152,29 +152,40 @@ New, `agent/`:
   validates `embeddings` is an array of equal-length number arrays matching the
   input count) and `checkOllama(config)`. Embed failures throw
   `CliError(1, 'Ollama embedding failed: <status|unreachable|bad response>')`.
-- `agent/profile/lib/store.ts` — schema (`meta`, `files(path, label, hash)`,
-  `chunks(file_path → files ON DELETE CASCADE, ordinal, text, vector)`),
-  `openIndex(path, {readonly})`, `readMeta`, `fileHashes`, `replaceFile`,
-  `removeFile`, `resetIndex`, `completeBuild(model, dimensions)`,
-  `allChunks(label?)`.
+- `agent/profile/lib/store.ts` — schema (`meta`, `files(path, label, source,
+  hash)`, `chunks(file_path → files ON DELETE CASCADE, ordinal, text,
+  vector)`), `openIndex(path)` → `IndexStore` and `openReadonlyIndex(path)` →
+  `IndexReader` (read-only has no write methods at all; a missing file is
+  `CliError(1)` with the rebuild hint), `readMeta`, `fileHashes`,
+  `replaceFile`, `removeFile`, `resetIndex`, `completeBuild(model,
+  dimensions)`, `allChunks(label?)`.
 - `agent/profile/lib/build.ts` — `buildIndex({files, store, ollama, model})`
   → summary `{added, updated, removed, unchanged, chunks}`.
 - `agent/profile/lib/search.ts` — `cosine`, `searchIndex({store, ollama,
   model}, {query, label?, limit})` → `{source, label, text, score}[]`, with the
-  refusals in decision 5 and a dimension check.
+  refusals in decision 5 (as `CliError(1)`) and a dimension check; and
+  `searchIndexFile(indexFile, {ollama, model}, request)`, which opens the
+  index read-only for that one search.
 - `agent/profile/server.ts` — `createProfileServer(search)`: registers only
   `search_profile` (`query` 1–2000 chars, optional `label` `facts|style`,
   `limit` 1–20 default 5). The description says `style` results never supply a
   fact.
-- `agent/profile/index.ts` — stdio entry: load config (exit 2 on error), open
-  the index read-only, connect. Writes nothing to stdout.
+- `agent/profile/index.ts` — stdio entry: load config (exit 2 on error),
+  connect. Each tool call opens the index read-only through
+  `searchIndexFile`, so a missing or rebuilt index is seen per call (a tool
+  error) instead of failing or going stale at startup. Writes nothing to
+  stdout.
 - `agent/profile/commands/build.ts`, `commands/health.ts`,
   `commands/search.ts` — `profile:index` (health first, then build, summary on
   stdout), `profile:health` (prints `ok` or the reason, exit 0/1),
-  `profile:search "<query>" [facts|style]` (results on stdout).
+  `profile:search "<query>" [facts|style]` (results on stdout). The health
+  reason goes to stderr as a `CliError(1)`.
 - `agent/test/fakeOllama.ts` — test HTTP server on port 0: `/api/tags`,
   `/api/embed` with deterministic trigram-hash vectors, a request counter and
   switchable failures.
+- `agent/test/profileFixture.ts` (temp `HOME`, synthetic corpus and config,
+  async `runNode` spawn so the in-process fake can answer), `tempDir.ts`,
+  `runCommandFixture.ts` (spawned by `cliError.test.ts`).
 - Tests beside each module (listed under Tests).
 
 Changed:
@@ -245,9 +256,11 @@ All `// @vitest-environment node`, synthetic fixtures in temp dirs.
   processes, below.
 - Failure cases:
   - Config file missing / invalid JSON / missing or wrong-typed key /
-    non-http(s) `ollamaUrl` / relative `path` / unknown label / file in two
-    entries / corpus path missing → exit 2, one line naming file and field, no
-    stack, empty stdout (each command and the MCP entry).
+    non-http(s) `ollamaUrl` / relative `path` / unknown label → exit 2, one
+    line naming file and field, no stack, empty stdout (unit-tested in
+    `config.test.ts`; each command and the MCP entry spawned with one case).
+    File in two entries / corpus path missing → exit 2 from `profile:index`,
+    the only entry that walks the corpus.
   - Ollama unreachable, non-2xx, malformed body, wrong embedding count →
     `profile:index` exit 1 with one line; `checkOllama` returns `unreachable`
     / `bad_response`; timeout → `unreachable`; model not pulled →

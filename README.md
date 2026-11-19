@@ -196,6 +196,80 @@ not resolve; if the server shows as failed, put the absolute path from
 `npm run mcp` runs the same server against your own shell's env vars, which
 is the quickest way to check it by hand before wiring Claude Desktop up.
 
+## Profile corpus
+
+`agent/profile/` keeps a local, searchable index of your own application
+material (CVs, cover letters, notes) for the job search agent. Embeddings come
+from an [Ollama](https://ollama.com) service on another machine in the home
+LAN, so no corpus text or query leaves the LAN. `search_profile` is the only
+tool the agent's `claude -p` steps get.
+
+### Config
+
+Settings live outside the repo, in `~/.config/job-agent/config.json`
+(`$XDG_CONFIG_HOME/job-agent/config.json` when that is set). This stream reads
+three keys and ignores the rest:
+
+```json
+{
+  "ollamaUrl": "http://192.168.1.50:11434",
+  "embeddingModel": "bge-m3",
+  "corpus": [
+    { "path": "/home/you/applications/cv-templates", "label": "facts" },
+    { "path": "/home/you/applications/sent-letters", "label": "style" }
+  ]
+}
+```
+
+- `path` is absolute, a file or a folder. Folders are walked recursively for
+  `.txt` and `.md` files, which inherit the folder's label; anything else is
+  skipped and listed when you build. A file reachable from two entries is an
+  error.
+- `facts` is the source of truth about you. `style` is material kept only as
+  examples of tone: earlier letters may contain errors, so search results
+  carry the label and a `style` result never supplies a fact.
+
+The index is written to `~/.local/share/job-agent/profile.db`
+(`$XDG_DATA_HOME/job-agent/profile.db`). It is derived data: delete it and
+rebuild any time.
+
+### Ollama on the laptop
+
+On the machine that runs Ollama, make it listen on the LAN and pull the model:
+
+```bash
+OLLAMA_HOST=0.0.0.0:11434 ollama serve
+ollama pull bge-m3
+```
+
+and allow inbound TCP 11434 in that machine's firewall. With WSL in
+`networkingMode=mirrored`, outbound connections from WSL to the LAN work as
+from Windows, so no extra WSL rule is needed (the Hyper-V firewall rule only
+matters for traffic *into* WSL). Check from WSL:
+
+```bash
+curl http://192.168.1.50:11434/api/tags
+```
+
+`bge-m3` is the recommended model: multilingual (Finnish included), 1024
+dimensions, long context. Use `profile:search` with a few Finnish and English
+queries to judge it on your own corpus.
+
+### Commands
+
+- `npm run profile:health` — prints `ok`, or `unreachable`, `bad_response`
+  or `model_missing`, and exits 1.
+- `npm run profile:index` — checks Ollama, then builds the index. Reruns embed
+  only new or changed files and drop deleted ones. A different
+  `embeddingModel` re-embeds everything.
+- `npm run profile:search -- "<query>" [facts|style]` — prints the top five
+  results with score, label and source.
+- `npm run profile:mcp` — the stdio MCP server with the single
+  `search_profile` tool. It needs no job-app credentials.
+
+Rebuild after adding, changing or removing corpus files, or after changing
+`embeddingModel`. Search refuses until you do, and says so.
+
 ## The default branch is PR-only
 
 Nothing lands on the default branch except by merged pull request. On a solo
