@@ -1,7 +1,7 @@
 # Daily job search agent: cross-stream contracts
 
-What the streams `034` to `039` agree on. A stream that needs to change anything
-here changes this file in the same PR. The feature's goals are in
+What the streams listed under [Streams](#streams) agree on. A stream that needs
+to change anything here changes this file in the same PR. The feature's goals are in
 [brief 033](../brief/033-job-search-agent.md).
 
 ```text
@@ -27,6 +27,42 @@ This design refines brief 033 in two places:
 - **Fan-out** uses parallel `claude -p` processes rather than subagents, so one
   hostile ad cannot influence the judgement of another.
 - **The timer** is on the Windows side, because this WSL install has no systemd.
+
+## Streams
+
+| Stream | Brief | State | Needs |
+|---|---|---|---|
+| `033-job-search-agent` | committed | done | — |
+| `034-ad-inbox` | committed | done | — |
+| `035-profile-corpus` | committed | in progress | — |
+| `035a-corpus-sync` | not written | open | 035 |
+| `036-ad-evaluation` | committed | open | 034, 035 |
+| `037-application-drafts` | committed | open | 036 |
+| `038-alert-sources` | committed | open | 034 |
+| `039-daily-run` | committed | open | 035a, 037, 038 |
+
+`035a-corpus-sync` adds an "Add to profile" action on an application, which
+sets a flag in job-app. A runner-side `profile:sync` command then copies the
+flagged applications' CV and cover letter attachments into a `style` corpus
+folder, runs the incremental index build and clears the flags. Marking is by
+the UI action only. `039-daily-run` runs the sync each day. The letter suffix
+keeps it in build order next to 035 without taking a new number.
+
+### Picking the next stream
+
+For `/sdlc` Stage 1 when pointed at this file:
+
+- The next stream is the first `open` row, top to bottom, whose **Needs** are
+  all `done`. Use its slug as written; don't take a new number from the sdlc
+  numbering command.
+- Before starting it, check `git branch -a --list '*<slug>*'`. A branch means
+  the stream is already in progress elsewhere, because this table on the
+  default branch only changes on merge. Take the next eligible row instead.
+- Brief **committed**: Stage 1 is already done. Create the branch and go to
+  Stage 2. Brief **not written**: Stage 1 writes `brief/<slug>.md` from
+  `brief/TEMPLATE.md`, using this file's sections as its contract.
+- Each stream updates its own row: `in progress` in its plan commit, `done` in
+  its PR. A stream that adds a follow-up stream adds its row in the same commit.
 
 ## 1. Pipeline and runtime
 
