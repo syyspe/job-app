@@ -193,8 +193,9 @@ The job search agent's own processes. Nothing in it imports from `server/` or
 
 ### `agent/lib/`
 
-- `paths.ts` — `configPath(env)`, `envPath(env)` and `indexPath(env)`, from `XDG_CONFIG_HOME` /
-  `XDG_DATA_HOME` or the `HOME` defaults.
+- `paths.ts` — `configPath(env)`, `envPath(env)`, `promptsDir(env)`,
+  `indexPath(env)` and `stateDir(env)`, from `XDG_CONFIG_HOME` /
+  `XDG_DATA_HOME` / `XDG_STATE_HOME` or the `HOME` defaults.
 - `cliError.ts` — `CliError(exitCode, message)`, the one agent error type, and
   `runCommand(main)`, the edge-out handler every entry point runs under: a
   `CliError` becomes one stderr line and its exit code; anything else
@@ -218,6 +219,8 @@ health check first), `health.ts` (`profile:health`) and `search.ts`
 - `config.ts` — `loadProfileConfig(path)`, the zod check of the keys this
   stream owns in `~/.config/job-agent/config.json`; other keys are ignored.
   An optional `syncFolder` is appended to `corpus` as a `style` entry.
+  `parseConfigFile(path, schema)` is the shared read-parse-check with the
+  `<path>: <field>: <message>` exit-2 error, which the runner's config reuses.
 - `corpus.ts` — `listCorpusFiles(entries)`: walks folders for `.txt`/`.md`,
   lists the rest as skipped, rejects a file reached from two entries.
 - `chunk.ts` — `chunkText(text)`: paragraphs packed up to 1500 characters.
@@ -239,7 +242,15 @@ The part of `agent/` that talks to job-app. It reads its credentials from
 
 `commands/sync.ts` is `npm run profile:sync`. It requires `syncFolder`, checks
 Ollama, then runs `syncProfile` and prints what it copied and the build
-summary.
+summary. `commands/sandboxCheck.ts` is `npm run agent:sandbox-check`: it runs
+the probes, prints pass or fail per property and records the CLI version only
+when all pass. `commands/evaluate.ts` is `npm run agent:evaluate`: config,
+runner config, private prompt and env, then the version gate, then
+`runEvaluation`.
+
+`prompts/evaluate.framing.md` is the fixed head of the evaluation system
+prompt; `prompts/evaluate.example.md` a synthetic example of the private
+criteria that follow it.
 
 `lib/`:
 
@@ -247,17 +258,48 @@ summary.
   gives `{ baseUrl, username, password }`. A missing file or variable is exit
   2.
 - `jobApp.ts` — `createJobAppClient(config)`: `listPendingSync`,
-  `downloadAttachment`, `setProfileSync`. It logs in lazily, re-logs in once
-  on a 401, and turns every failure into a `CliError(1, …)`.
+  `downloadAttachment`, `setProfileSync`, `listAds(state)`, `getAd(id)`,
+  `transitionAd(id, body)`. It logs in lazily, re-logs in once on a 401, and
+  turns every failure into a `CliError(1, …)`. Ad responses are checked
+  against only the fields the runner reads.
+- `runnerConfig.ts` — `loadRunnerConfig(path)`: `titleRules.reject` and
+  `evaluation.{concurrency, perRunCap, timeoutMs}`, with defaults.
+- `titleRules.ts` — `matchesReject(title, phrases)` (whole-word,
+  case-insensitive, Unicode letters as word characters) and
+  `screenTarget(ad, phrases)`.
+- `sandbox.ts` — the one way the runner starts `claude -p`: `sandboxArgs`
+  (the fixed flag list), `sandboxEnv` (the allowlist), `profileMcpConfig`,
+  `stepSchema` (zod → JSON Schema without `$schema`), `spawnSandboxed` (fresh
+  empty cwd, stdin, timeout) and `runSandboxed`, which parses the JSON
+  envelope into `ok` or a failure category.
+- `sandboxProbes.ts` / `sandboxCanary.ts` — the gate's two real runs (benign
+  with canary project files in the parent directory, hostile) and the judging
+  of their `stream-json` events.
+- `sandboxCheck.ts` — the `sandbox-check.json` record and
+  `requirePassedCheck(claudeBin, stateDir)`.
+- `evaluate.ts` — `evaluateAd(ad, runStep)`: the ad as JSON on stdin, the
+  output checked again with zod, `unsure` mapped to `suitable` with the fixed
+  first reason. `buildSystemPrompt(criteria)` puts the framing first.
+- `evaluationRun.ts` — `runEvaluation`: screen `new` ads, check Ollama, then
+  evaluate the oldest `perRunCap` ready ads through `mapLimit` at
+  `concurrency`; a failure is a same-state transition with its category.
 - `sync.ts` — `syncProfile({ jobApp, config, store, ollama })`: copies the
   marked attachments into `syncFolder` as `<id>-<safe name>`, rebuilds the
   index, then clears the marks. It does no health check.
 
 ### `agent/test/`
 
-- `fakeJobApp.ts` — an HTTP stand-in for the four job-app endpoints the runner
-  uses (login, pending list, download, flag), with recorded flag calls, a
-  login counter, session expiry and a switchable failure.
+- `fakeJobApp.ts` — an HTTP stand-in for the job-app endpoints the runner
+  uses (login, pending list, download, flag, and the ad routes from
+  `fakeJobAppAds.ts`), with recorded flag calls and transitions, a login
+  counter, session expiry and a switchable failure. `fakeHttp.ts` holds its
+  JSON helpers.
+- `fakeJobAppAds.ts` — `fakeAd(fields)` and the ad list, get and transition
+  handlers, which record attempts and fail an ad on the third as the server
+  does.
+- `fakeClaude.ts` — an executable stand-in for the `claude` CLI: records
+  argv, env, cwd and stdin to `FAKE_CLAUDE_LOG` and acts as
+  `FAKE_CLAUDE_MODE` says; `--version` prints `9.9.9`.
 - `fakeOllama.ts` — an HTTP stand-in on port 0 with deterministic trigram
   vectors, a request counter and switchable failures.
 - `profileFixture.ts` — a temp `HOME` with a synthetic corpus and config, and

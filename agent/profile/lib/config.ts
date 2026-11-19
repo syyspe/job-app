@@ -42,6 +42,16 @@ function parseJson(path: string, text: string): unknown {
   }
 }
 
+// Reads a JSON config file and checks it against `schema`, naming the file and
+// the first failing field in the exit-2 error.
+export function parseConfigFile<T>(path: string, schema: z.ZodType<T>): T {
+  const result = schema.safeParse(parseJson(path, readConfigFile(path)))
+  if (result.success) return result.data
+  const [issue] = result.error.issues
+  const field = issue.path.map((part) => (typeof part === 'number' ? `[${part}]` : `.${String(part)}`))
+  throw new CliError(2, `${path}: ${field.join('').slice(1) || '(root)'}: ${issue.message}`)
+}
+
 function withSyncFolder(config: ProfileConfig): ProfileConfig {
   if (!config.syncFolder) return config
   return { ...config, corpus: [...config.corpus, { path: config.syncFolder, label: 'style' }] }
@@ -50,9 +60,5 @@ function withSyncFolder(config: ProfileConfig): ProfileConfig {
 // Reads only the keys this stream owns; other keys in the file are ignored.
 // A syncFolder joins the corpus as a style entry, so every command indexes it.
 export function loadProfileConfig(path: string): ProfileConfig {
-  const result = configSchema.safeParse(parseJson(path, readConfigFile(path)))
-  if (result.success) return withSyncFolder(result.data)
-  const [issue] = result.error.issues
-  const field = issue.path.map((part) => (typeof part === 'number' ? `[${part}]` : `.${String(part)}`))
-  throw new CliError(2, `${path}: ${field.join('').slice(1) || '(root)'}: ${issue.message}`)
+  return withSyncFolder(parseConfigFile(path, configSchema))
 }

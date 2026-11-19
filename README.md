@@ -288,6 +288,53 @@ queries to judge it on your own corpus.
 Rebuild after adding, changing or removing corpus files, or after changing
 `embeddingModel`. Search refuses until you do, and says so.
 
+## Ad evaluation
+
+`agent:evaluate` screens new ads in the inbox by title and evaluates the
+ready ones against your criteria, each ad in its own sandboxed `claude -p`
+process whose only tool is `search_profile`. It needs the profile corpus set
+up as above, the job-app env file, and a logged-in `claude` CLI on `PATH`.
+
+### Setup
+
+1. Write your criteria to `~/.config/job-agent/prompts/evaluate.md`
+   (`$XDG_CONFIG_HOME/job-agent/prompts/evaluate.md`). Start from
+   `agent/runner/prompts/evaluate.example.md`. The runner puts its own fixed
+   framing first (`agent/runner/prompts/evaluate.framing.md`): the ad is
+   untrusted data, facts come only from `facts` results, and doubt means
+   `unsure`.
+2. Optionally add the runner's keys to `config.json`; these are the defaults:
+
+   ```json
+   {
+     "titleRules": { "reject": [] },
+     "evaluation": { "concurrency": 2, "perRunCap": 10, "timeoutMs": 300000 }
+   }
+   ```
+
+   `titleRules.reject` holds phrases matched as whole words, ignoring case
+   (`intern` does not match `international`). A title that matches goes to
+   `title_rejected`; leave unclear words off the list so those ads get a full
+   evaluation. `concurrency` is 1–8.
+3. Run `npm run agent:sandbox-check` once, and again **after every `claude`
+   CLI update**. It runs two real `claude -p` probes and the CLI version that passed in
+   `~/.local/state/job-agent/sandbox-check.json`. `agent:evaluate` refuses to
+   run on any other version.
+
+### Commands
+
+- `npm run agent:sandbox-check` — prints `pass` or `FAIL` for each sandbox
+  property and exits 1 on any failure, recording nothing.
+- `npm run agent:evaluate` — moves `new` ads to `title_rejected`, or to
+  `awaiting_handover` for a hand-over source, and leaves automatic ones
+  `new`. It then checks Ollama: if Ollama is down, it prints
+  `evaluation skipped: <reason>`, exits 0 and touches no ready ad. Otherwise
+  it evaluates the oldest `perRunCap` ready ads into `suitable` or
+  `unsuitable`, and leaves the rest queued. An unsure result counts as
+  `suitable`. A failed step records an attempt with a fixed category
+  (`timeout`, `cli_failed`, `bad_output`, `invalid_result`), and the third
+  failed attempt moves the ad to `failed`.
+
 ## The default branch is PR-only
 
 Nothing lands on the default branch except by merged pull request. On a solo

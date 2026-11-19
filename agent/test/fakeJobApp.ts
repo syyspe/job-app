@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { answerAds } from './fakeJobAppAds.ts'
+import { readJson, sendJson } from './fakeHttp.ts'
+import type { FakeAd, FakeTransition } from './fakeJobAppAds.ts'
 
 export interface FakeAttachment {
   id: number
@@ -14,23 +17,16 @@ export interface FakeJobApp {
   username: string
   password: string
   attachments: FakeAttachment[]
+  ads: FakeAd[]
+  transitions: FakeTransition[]
   flagCalls: { id: number; pending: boolean }[]
   logins: number
-  // 'status' answers the pending list with a 500.
-  failure: 'none' | 'status'
+  // 'status' answers the pending list with a 500; 'malformed' answers the ad
+  // list with something that is not a list.
+  failure: 'none' | 'status' | 'malformed'
   // Drops the current session, so the next request is answered 401.
   expireSession: () => void
   close: () => Promise<void>
-}
-
-async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
-  const parts: Buffer[] = []
-  for await (const part of req) parts.push(part as Buffer)
-  return JSON.parse(Buffer.concat(parts).toString('utf8')) as Record<string, unknown>
-}
-
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body))
 }
 
 function toAttachment({ id, originalName, pending }: FakeAttachment) {
@@ -67,7 +63,6 @@ async function answerFlag({ fake, attachment }: FlagTarget, req: IncomingMessage
 
 function answerAttachments(state: State, req: IncomingMessage, res: ServerResponse): void {
   const { fake } = state
-  if (req.headers.cookie !== `session=${state.session}`) return sendJson(res, 401, { error: 'not logged in' })
   if (req.url === '/api/attachments/pending-sync') {
     if (fake.failure === 'status') return sendJson(res, 500, { error: 'internal server error' })
     return sendJson(res, 200, fake.attachments.filter((a) => a.pending).map(toAttachment))
@@ -79,10 +74,12 @@ function answerAttachments(state: State, req: IncomingMessage, res: ServerRespon
   res.writeHead(200, { 'content-type': 'text/plain' }).end(attachment.content)
 }
 
-// An HTTP stand-in for the four job-app endpoints the runner's client uses.
+// An HTTP stand-in for the job-app endpoints the runner's client uses.
 export async function startFakeJobApp(attachments: FakeAttachment[] = []): Promise<FakeJobApp> {
   const server = createServer((req, res) => {
     if (req.url === '/api/login' && req.method === 'POST') return void answerLogin(state, req, res)
+    if (req.headers.cookie !== `session=${state.session}`) return sendJson(res, 401, { error: 'not logged in' })
+    if (req.url?.startsWith('/api/ads')) return void answerAds(fake, req, res)
     answerAttachments(state, req, res)
   })
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
@@ -93,6 +90,8 @@ export async function startFakeJobApp(attachments: FakeAttachment[] = []): Promi
     username: 'runner',
     password: 'runner-password',
     attachments,
+    ads: [],
+    transitions: [],
     flagCalls: [],
     logins: 0,
     failure: 'none',
