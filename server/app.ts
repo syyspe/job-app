@@ -2,6 +2,7 @@ import express from 'express'
 import type { Application as ExpressApp } from 'express'
 import type Database from 'better-sqlite3'
 import { join } from 'node:path'
+import { createAdsRouter } from './routes/ads.ts'
 import { createApplicationsRouter } from './routes/applications.ts'
 import { createAttachmentsRouter } from './routes/attachments.ts'
 import { createAuthRouter } from './routes/auth.ts'
@@ -41,6 +42,7 @@ export function createApp(
   app.use('/api', createConfigRouter(pageSize))
   app.use('/api', createApplicationsRouter(db, uploadsDir))
   app.use('/api', createAttachmentsRouter(db, uploadsDir))
+  app.use('/api', createAdsRouter(db))
   app.use('/api/users', requireAdmin(db))
   app.use('/api', createUsersRouter(db, uploadsDir))
   if (staticDir) {

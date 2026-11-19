@@ -55,6 +55,20 @@ test('opening a database whose applications table predates the date columns migr
   db.close()
 })
 
+test('opening a database adds the ads table with its unique source key', () => {
+  const db = openDatabase(dbPath)
+  db.prepare("INSERT INTO users (id, username, password_hash) VALUES (1, 'u', 'h')").run()
+  const insert = db.prepare(
+    `INSERT INTO ads (user_id, source, source_mode, external_id, url, canonical_url, state)
+     VALUES (1, 'src', 'automatic', 'key', 'https://a.example', 'https://a.example', 'new')`,
+  )
+
+  insert.run()
+
+  expect(() => insert.run()).toThrow(/UNIQUE/)
+  db.close()
+})
+
 test('opening the same database twice leaves the migrated timestamps alone', () => {
   const first = openDatabase(dbPath)
   const before = first.prepare('SELECT created_at FROM applications WHERE id = 1').get() as {

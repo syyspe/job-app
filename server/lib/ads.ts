@@ -1,0 +1,211 @@
+import type Database from 'better-sqlite3'
+import type { AdRow } from '../models/ad.ts'
+import type { AdEvaluation, AdState } from '../types.ts'
+import { findTitleDuplicate, findUrlDuplicate } from './adDedup.ts'
+import {
+  blanksOnceReported,
+  blanksOnEntry,
+  canTransition,
+  clearsBody,
+  recordsAttempts,
+  retryTarget,
+} from './adStates.ts'
+import type { AdHandover, AdIngest, AdTransition } from './adValidation.ts'
+import { HttpError } from './httpError.ts'
+
+const MAX_ATTEMPTS = 3
+
+interface AdMove {
+  to: AdState
+  body?: string
+  evaluation?: AdEvaluation
+  lastError?: string
+  duplicateOf?: number | null
+}
+
+function readAd(db: Database.Database, id: number): AdRow {
+  return db.prepare('SELECT * FROM ads WHERE id = ?').get(id) as AdRow
+}
+
+export function requireAd(db: Database.Database, id: number, userId: number): AdRow {
+  const row = db.prepare('SELECT * FROM ads WHERE id = ? AND user_id = ?').get(id, userId) as
+    | AdRow
+    | undefined
+  if (!row) throw new HttpError(404, 'not found')
+  return row
+}
+
+export function listAds(db: Database.Database, userId: number, state?: AdState): AdRow[] {
+  const filter = state ?? null
+  return db
+    .prepare(
+      `SELECT * FROM ads
+        WHERE user_id = ? AND (? IS NULL OR state = ?)
+        ORDER BY first_seen_at DESC, id DESC`,
+    )
+    .all(userId, filter, filter) as AdRow[]
+}
+
+function movedRow(ad: AdRow, move: AdMove): AdRow {
+  const blank = ad.source_mode === 'handover' && blanksOnEntry(move.to)
+  return {
+    ...ad,
+    state: move.to,
+    body: clearsBody(move.to) ? null : (move.body ?? ad.body),
+    evaluation: move.evaluation ? JSON.stringify(move.evaluation) : ad.evaluation,
+    last_error: move.lastError ?? ad.last_error,
+    duplicate_of: move.duplicateOf ?? ad.duplicate_of,
+    title: blank ? '' : ad.title,
+    company: blank ? '' : ad.company,
+  }
+}
+
+function saveMove(db: Database.Database, row: AdRow): AdRow {
+  db.prepare(
+    `UPDATE ads
+        SET url = ?, canonical_url = ?, title = ?, company = ?, state = ?, body = ?,
+            evaluation = ?, duplicate_of = ?, attempts = ?, last_error = ?,
+            updated_at = datetime('now'), reported_at = NULL
+      WHERE id = ?`,
+  ).run(
+    row.url,
+    row.canonical_url,
+    row.title,
+    row.company,
+    row.state,
+    row.body,
+    row.evaluation,
+    row.duplicate_of,
+    row.attempts,
+    row.last_error,
+    row.id,
+  )
+  return readAd(db, row.id)
+}
+
+function insertAd(db: Database.Database, userId: number, ingest: AdIngest): AdRow {
+  const result = db
+    .prepare(
+      `INSERT INTO ads
+         (user_id, source, source_mode, external_id, url, canonical_url,
+          title, company, location, deadline, state)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+    )
+    .run(
+      userId,
+      ingest.source,
+      ingest.sourceMode,
+      ingest.externalId,
+      ingest.url,
+      ingest.canonicalUrl,
+      ingest.title,
+      ingest.company,
+      ingest.location,
+      ingest.deadline,
+    )
+  return readAd(db, Number(result.lastInsertRowid))
+}
+
+export function ingestAd(
+  db: Database.Database,
+  userId: number,
+  ingest: AdIngest,
+): { ad: AdRow; created: boolean } {
+  const existing = db
+    .prepare('SELECT * FROM ads WHERE user_id = ? AND source = ? AND external_id = ?')
+    .get(userId, ingest.source, ingest.externalId) as AdRow | undefined
+  if (existing) return { ad: existing, created: false }
+
+  const inserted = insertAd(db, userId, ingest)
+  const match = findUrlDuplicate(db, inserted)
+  if (!match) return { ad: inserted, created: true }
+  const duplicate = movedRow(inserted, { to: 'duplicate', duplicateOf: match.duplicateOf })
+  return { ad: saveMove(db, duplicate), created: true }
+}
+
+function enterReady(db: Database.Database, ad: AdRow, body: string): AdRow {
+  const ready = movedRow(ad, { to: 'ready', body })
+  const match = findUrlDuplicate(db, ready) ?? findTitleDuplicate(db, ready)
+  if (!match) return saveMove(db, ready)
+  return saveMove(db, movedRow(ready, { to: 'duplicate', duplicateOf: match.duplicateOf }))
+}
+
+function recordAttempt(db: Database.Database, ad: AdRow, error: string | undefined): AdRow {
+  if (!error || !recordsAttempts(ad.state)) {
+    throw new HttpError(409, `ad is already ${ad.state}`)
+  }
+  const counted = { ...ad, attempts: ad.attempts + 1, last_error: error }
+  if (counted.attempts >= MAX_ATTEMPTS) return saveMove(db, movedRow(counted, { to: 'failed' }))
+
+  db.prepare(
+    `UPDATE ads SET attempts = ?, last_error = ?, updated_at = datetime('now') WHERE id = ?`,
+  ).run(counted.attempts, error, ad.id)
+  return readAd(db, ad.id)
+}
+
+function retryAd(db: Database.Database, ad: AdRow, to: AdState): AdRow {
+  if (to !== retryTarget(ad.source_mode)) {
+    throw new HttpError(409, `a ${ad.source_mode} ad retries to ${retryTarget(ad.source_mode)}`)
+  }
+  const reset = { ...movedRow(ad, { to }), attempts: 0, last_error: null, evaluation: null }
+  return saveMove(db, reset)
+}
+
+function readyBody(transition: AdTransition): string {
+  if (!transition.body?.trim()) throw new HttpError(400, 'body is required to enter ready')
+  return transition.body
+}
+
+function plainMove({ to, evaluation, error }: AdTransition): AdMove {
+  if ((to === 'suitable' || to === 'unsuitable') && !evaluation) {
+    throw new HttpError(400, `evaluation is required when to is ${to}`)
+  }
+  return { to, evaluation, lastError: to === 'failed' ? error : undefined }
+}
+
+export function transitionAd(
+  db: Database.Database,
+  ad: AdRow,
+  transition: AdTransition,
+): AdRow {
+  const { to } = transition
+  if (to === ad.state) return recordAttempt(db, ad, transition.error)
+  if (!canTransition(ad.state, to)) {
+    throw new HttpError(409, `an ad cannot move from ${ad.state} to ${to}`)
+  }
+  if (ad.state === 'failed' && to !== 'dismissed') return retryAd(db, ad, to)
+  if (to === 'ready') return enterReady(db, ad, readyBody(transition))
+  return saveMove(db, movedRow(ad, plainMove(transition)))
+}
+
+export function handOverAd(db: Database.Database, ad: AdRow, handover: AdHandover): AdRow {
+  if (!canTransition(ad.state, 'ready')) {
+    throw new HttpError(409, `an ad cannot be handed over from ${ad.state}`)
+  }
+  const updated = {
+    ...ad,
+    url: handover.url ?? ad.url,
+    canonical_url: handover.canonicalUrl ?? ad.canonical_url,
+    title: handover.title ?? ad.title,
+    company: handover.company ?? ad.company,
+  }
+  return enterReady(db, updated, handover.text)
+}
+
+function markOneReported(db: Database.Database, ad: AdRow): void {
+  const blank = ad.source_mode === 'handover' && blanksOnceReported(ad.state)
+  db.prepare(`UPDATE ads SET reported_at = datetime('now'), title = ?, company = ? WHERE id = ?`).run(
+    blank ? '' : ad.title,
+    blank ? '' : ad.company,
+    ad.id,
+  )
+}
+
+/** Ids the user does not own are skipped. */
+export function markReported(db: Database.Database, userId: number, ids: number[]): void {
+  const owned = db.prepare('SELECT * FROM ads WHERE id = ? AND user_id = ?')
+  for (const id of ids) {
+    const ad = owned.get(id, userId) as AdRow | undefined
+    if (ad) markOneReported(db, ad)
+  }
+}

@@ -33,6 +33,31 @@ const SCHEMA = `
     updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS ads (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source         TEXT NOT NULL,
+    source_mode    TEXT NOT NULL,
+    external_id    TEXT NOT NULL,
+    url            TEXT NOT NULL,
+    canonical_url  TEXT NOT NULL,
+    title          TEXT NOT NULL DEFAULT '',
+    company        TEXT NOT NULL DEFAULT '',
+    location       TEXT NOT NULL DEFAULT '',
+    deadline       TEXT NOT NULL DEFAULT '',
+    state          TEXT NOT NULL,
+    body           TEXT,
+    evaluation     TEXT,
+    application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+    duplicate_of   INTEGER REFERENCES ads(id) ON DELETE SET NULL,
+    attempts       INTEGER NOT NULL DEFAULT 0,
+    last_error     TEXT,
+    first_seen_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    reported_at    TEXT,
+    UNIQUE (user_id, source, external_id)
+  );
+
   CREATE TABLE IF NOT EXISTS attachments (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     application_id INTEGER NOT NULL

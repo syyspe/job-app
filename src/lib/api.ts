@@ -1,4 +1,7 @@
 import type {
+  AdHandoverInput,
+  AdState,
+  AdSummary,
   AppConfig,
   Application,
   ApplicationInput,
@@ -171,6 +174,31 @@ export async function deleteAttachment(id: number): Promise<void> {
       credentials: 'same-origin',
     }),
   )
+}
+
+export async function listAds(): Promise<AdSummary[]> {
+  const response = await fetch('/api/ads', { credentials: 'same-origin' })
+  return parseJson(response)
+}
+
+export async function transitionAd(id: number, to: AdState): Promise<AdSummary> {
+  const response = await fetch(`/api/ads/${id}/transition`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ to }),
+  })
+  return parseJson(response)
+}
+
+export async function handoverAd(id: number, input: AdHandoverInput): Promise<AdSummary> {
+  const response = await fetch(`/api/ads/${id}/handover`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  return parseJson(response)
 }
 
 export function attachmentUrl(id: number): string {

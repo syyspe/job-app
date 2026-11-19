@@ -49,6 +49,9 @@ function stubFetch(meStatus: number, me: User = sampleUser) {
       if (url.endsWith('/api/applications')) {
         return new Response(JSON.stringify(sampleApplications), { status: 200 })
       }
+      if (url.endsWith('/api/ads')) {
+        return new Response(JSON.stringify([]), { status: 200 })
+      }
       return new Response(null, { status: 404 })
     }),
   )
@@ -106,6 +109,20 @@ test('an admin can switch to the admin view and back', async () => {
 
   await user.click(await screen.findByRole('button', { name: 'Admin' }))
   expect(await screen.findByRole('heading', { name: 'Add a user' })).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Applications' }))
+  expect(
+    await screen.findByRole('heading', { name: 'Add an application' }),
+  ).toBeVisible()
+})
+
+test('a user can switch to the ad inbox and back', async () => {
+  const user = userEvent.setup()
+  stubFetch(200, basicUser)
+  renderApp()
+
+  await user.click(await screen.findByRole('button', { name: 'Ad inbox' }))
+  expect(await screen.findByRole('heading', { name: 'Ad inbox' })).toBeVisible()
 
   await user.click(screen.getByRole('button', { name: 'Applications' }))
   expect(

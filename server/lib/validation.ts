@@ -23,7 +23,7 @@ function text(value: unknown): string {
 }
 
 // Express 5 leaves req.body undefined when no parser matched the request.
-function fieldsOf(body: unknown): Record<string, unknown> {
+export function fieldsOf(body: unknown): Record<string, unknown> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     throw new HttpError(400, 'request body must be a JSON object')
   }

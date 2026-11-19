@@ -15,7 +15,7 @@ longer exists, fix it or delete the line — don't preserve it.
 ## `src/` — the React app
 
 `main.tsx` mounts. `App.tsx` is the auth shell: login state, login/logout,
-and the `<main>`/`<h1>` frame. `types.ts` and the four CSS files sit beside
+and the `<main>`/`<h1>` frame. `types.ts` and the five CSS files sit beside
 them.
 
 The CSS splits by scope, and a value belongs to exactly one file:
@@ -26,6 +26,7 @@ The CSS splits by scope, and a value belongs to exactly one file:
 | `App.css` | The app frame — nav, `main`, the layout grid, panels, forms, the sort bar, toasts |
 | `applications.css` | The list surface — rows, the status spine, the chip, detail, attachments, empty state, the pager |
 | `admin.css` | The admin surface — user rows, the role spine and control, the confirm clusters |
+| `ads.css` | The ad inbox surface — the state filter, ad rows and their spine, the hand-over form |
 
 New rules read tokens from `index.css` rather than inventing values.
 
@@ -41,8 +42,10 @@ Presentational components, each with a test beside it. By surface:
   `ArchivedToggle`/`Pagination` at the foot of the list.
 - **Admin** — `AdminView` (with its local `useUsers` hook) plus `UserForm`,
   `UserList` and `UserRow`.
-- **Frame** — `NavBar`, which switches between the two views and shows the
-  Admin control to admins only; `ToastProvider` and `ToastHost`.
+- **Ad inbox** — `AdsView` (with its local `useAds` hook and the state filter)
+  over `AdList`, `AdRow` and `AdHandoverForm`.
+- **Frame** — `NavBar`, which switches between the views and shows the Admin
+  control to admins only; `ToastProvider` and `ToastHost`.
 
 ### `src/lib/`
 
@@ -52,6 +55,8 @@ Presentational components, each with a test beside it. By surface:
 - `apiAction.ts` — `useApiAction(onUnauthorized)`, the `run` wrapper both
   data hooks share: it shows the success toast, and on `UnauthorizedError`
   shows the session-expired toast and calls `onUnauthorized`.
+- `adStates.ts` — `AD_STATE_LABELS`, the filter's display order, and which
+  actions each ad state offers.
 - `paging.ts` — `paginate`, the pure one-page-at-a-time slice. The page size
   comes from `GET /api/config`; a null size means one page holding
   everything, which is what the list shows until that call answers.
@@ -84,8 +89,8 @@ that enforces it.
 
 ### `server/routes/`
 
-One router factory per resource, plus its tests: `applications.ts`,
-`attachments.ts`, `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
+One router factory per resource, plus its tests: `ads.ts` (the ad inbox),
+`applications.ts`, `attachments.ts`, `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
 (`/config`, the page size the client pages the list by) and `users.ts`
 (admin-only account management).
 
@@ -99,6 +104,12 @@ Helpers with no Express dependency:
 
 - `validation.ts` — input checks, and the server's `ApplicationInput`.
 - `applications.ts` — `touchApplication`, which bumps `updated_at`.
+- `adStates.ts` — the ad state tables: allowed transitions, and which states
+  clear the text or blank a hand-over ad's title and company.
+- `adDedup.ts` — `canonicalUrl`, `normaliseText` and the two duplicate lookups.
+- `adValidation.ts` — request parsing for each ad route.
+- `ads.ts` — the ad database operations: ingest, transition, hand-over,
+  reporting.
 - `files.ts` — attachment storage.
 - `passwords.ts` — hashing and session tokens.
 - `cookies.ts` — reads the session cookie. Express 5 doesn't parse cookies,
@@ -133,6 +144,8 @@ Helpers with no Express dependency:
 - `seed.ts` — the `npm run seed` CLI entry point.
 - `test/auth.ts` — `loginAs`, a test helper that logs in and returns a cookie
   header string for route tests to pass by hand.
+- `test/adsApi.ts` — `withAdsApi` and the request helpers the `ads.*.test.ts`
+  route tests share.
 
 ## `mcp/` — the stdio MCP server
 
@@ -157,7 +170,7 @@ No MCP dependency:
 
 ### `mcp/tools/`
 
-One file per tool group (`applications.ts`, `attachments.ts`), each exporting
+One file per tool group (`ads.ts`, `applications.ts`, `attachments.ts`), each exporting
 a `register*Tools(server, client)`. Tool schemas are zod. A handler signals
 failure by **throwing**; the SDK turns that into the tool error the user
 reads.

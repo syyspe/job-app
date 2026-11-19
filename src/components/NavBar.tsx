@@ -1,6 +1,12 @@
 import type { User } from '../types.ts'
 
-export type View = 'applications' | 'admin'
+export type View = 'ads' | 'applications' | 'admin'
+
+const NAV_ITEMS: { view: View; label: string; adminOnly: boolean }[] = [
+  { view: 'ads', label: 'Ad inbox', adminOnly: false },
+  { view: 'applications', label: 'Applications', adminOnly: false },
+  { view: 'admin', label: 'Admin', adminOnly: true },
+]
 
 interface NavBarProps {
   user: User | null
@@ -10,20 +16,25 @@ interface NavBarProps {
 }
 
 export function NavBar({ user, view, onViewChange, onLogout }: NavBarProps) {
+  const items = NAV_ITEMS.filter(
+    (item) => item.view !== view && (!item.adminOnly || user?.role === 'admin'),
+  )
+
   return (
     <nav className="nav-bar">
       <h1>Job applications</h1>
       {user && (
         <div className="nav-bar-session">
-          {user.role === 'admin' && (
+          {items.map((item) => (
             <button
+              key={item.view}
               type="button"
               className="button"
-              onClick={() => onViewChange(view === 'admin' ? 'applications' : 'admin')}
+              onClick={() => onViewChange(item.view)}
             >
-              {view === 'admin' ? 'Applications' : 'Admin'}
+              {item.label}
             </button>
-          )}
+          ))}
           <span>{user.username}</span>
           <button type="button" className="button" onClick={onLogout}>
             Log out

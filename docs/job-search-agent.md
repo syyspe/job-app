@@ -97,7 +97,8 @@ New table `ads`, scoped by `user_id` like `applications`:
 |---|---|
 | `id`, `user_id` | `user_id` cascades on user deletion |
 | `source`, `external_id` | `UNIQUE (user_id, source, external_id)`; the id falls back to the canonical URL |
-| `url`, `canonical_url` | |
+| `source_mode` | `automatic` or `handover`, required at ingest; an existing row keeps its stored mode |
+| `url`, `canonical_url` | Only `http` and `https` URLs are accepted |
 | `title`, `company`, `location`, `deadline` | Text, empty when unknown |
 | `state` | See below |
 | `body` | Nullable ad text |
@@ -135,6 +136,24 @@ Allowed transitions; the server answers anything else with 409:
 `drafted` is reached only through `POST /api/ads/:id/draft`. The transition
 route answers 409 for it, so no ad is marked drafted without an application.
 
+What a transition must carry:
+
+- **`failed`** requires `error`, so `gone` and other direct failures always
+  carry a category. `error` must match `^[a-z0-9_]{1,40}$`, which keeps ad text
+  out of `last_error`.
+- **`suitable` and `unsuitable`** require `evaluation`: `{verdict, fitSummary,
+  reasons}`, where `verdict` equals `to`, `fitSummary` is a string and `reasons`
+  a string array.
+- **`ready`** requires a non-empty `body`.
+
+**Recording a failed attempt.** A transition with `to` equal to the current
+state and an `error` adds one to `attempts` and stores `last_error`. It works
+from `new`, `ready` and `suitable`. The third attempt moves the ad to `failed`
+on the server. Any other same-state request is 409.
+
+Retrying from `failed` must target the ad's mode, otherwise 409, and resets
+`attempts`, `last_error` and `evaluation`.
+
 An unsure evaluation counts as `suitable`, and the doubt becomes a question in
 the draft. A block or rate-limit response does not count as an attempt: the ad
 stays `new` for the next run. A `gone` fetch result moves the ad straight to
@@ -157,8 +176,18 @@ and company anew. This keeps stored Duunitori content to what the review needs.
    included. Canonical means lowercase host, no fragment, no tracking
    parameters, no trailing slash.
 3. Normalised company and title match another ad from the last 90 days or any
-   application's company and role. This rule is skipped while the company is
-   unknown, and runs when the ad reaches `ready`.
+   application's company and role. This rule is skipped while the company or
+   title is unknown.
+
+Rules 2 and 3 both run when an ad reaches `ready`. A match moves it on to
+`duplicate` in the same transaction, and the response is 200 with the final
+row. Ads in state `duplicate` are never match targets, so `duplicate_of` points
+at an original, and a match against an application leaves it null. Rule 3 also
+skips a later ad still in `new` or `awaiting_handover`, so the earlier ad
+survives whichever of the two reaches `ready` first. An earlier ad waiting in
+`awaiting_handover` does stay a target: a repeat from an automatic source is a
+`duplicate`, even if the earlier ad later expires, so one job never reaches the
+user twice.
 
 ## 5. Inbox API
 
