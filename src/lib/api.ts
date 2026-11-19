@@ -167,6 +167,19 @@ export async function uploadAttachment(
   return parseJson(response)
 }
 
+export async function setAttachmentProfileSync(
+  id: number,
+  pending: boolean,
+): Promise<Attachment> {
+  const response = await fetch(`/api/attachments/${id}/profile-sync`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pending }),
+  })
+  return parseJson(response)
+}
+
 export async function deleteAttachment(id: number): Promise<void> {
   await checkOk(
     await fetch(`/api/attachments/${id}`, {

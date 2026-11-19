@@ -36,9 +36,17 @@ export function migrateAttachmentUploadedAt(db: Database.Database): void {
   db.exec(`ALTER TABLE attachments ADD COLUMN uploaded_at TEXT NOT NULL DEFAULT ''`)
 }
 
+export function migrateAttachmentProfileSync(db: Database.Database): void {
+  const columns = db.pragma('table_info(attachments)') as { name: string }[]
+  if (columns.some((column) => column.name === 'profile_sync')) return
+
+  db.exec('ALTER TABLE attachments ADD COLUMN profile_sync INTEGER NOT NULL DEFAULT 0')
+}
+
 export function migrate(db: Database.Database): void {
   migrateApplicationDates(db)
   migrateApplicationArchived(db)
   migrateUserRole(db)
   migrateAttachmentUploadedAt(db)
+  migrateAttachmentProfileSync(db)
 }

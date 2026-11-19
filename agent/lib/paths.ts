@@ -13,6 +13,11 @@ export function configPath(env: Env): string {
   return join(base, 'job-agent', 'config.json')
 }
 
+export function envPath(env: Env): string {
+  const base = env.XDG_CONFIG_HOME || join(home(env), '.config')
+  return join(base, 'job-agent', 'env')
+}
+
 export function indexPath(env: Env): string {
   const base = env.XDG_DATA_HOME || join(home(env), '.local', 'share')
   return join(base, 'job-agent', 'profile.db')

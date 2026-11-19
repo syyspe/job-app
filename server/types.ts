@@ -30,6 +30,7 @@ export interface Attachment {
   originalName: string
   mimeType: string
   uploadedAt: string
+  profileSyncPending: boolean
 }
 
 export interface Application {

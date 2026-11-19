@@ -126,7 +126,7 @@ synthetic.
 
 | Path | Holds |
 |---|---|
-| `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets |
+| `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets: `JOBAPP_API_URL`, `JOBAPP_USERNAME`, `JOBAPP_PASSWORD` |
 | `~/.config/job-agent/config.json` | Recipient, source switches, caps, `handoverWaitDays`, title rules, corpus paths, file name prefix, Ollama URL and embedding model |
 | `~/.config/job-agent/prompts/` | Headless evaluation and drafting rules adapted from the three job application skills |
 | `~/.local/state/job-agent/` | Run lock, mail watermarks, daily counters, unreported source failures, logs |
@@ -144,9 +144,13 @@ The config keys `035-profile-corpus` owns, ignoring every other key:
   "corpus": [
     { "path": "/abs/path/cv-templates", "label": "facts" },
     { "path": "/abs/path/letters", "label": "style" }
-  ]
+  ],
+  "syncFolder": "/abs/path/synced"
 }
 ```
+
+`syncFolder` is optional, owned by `035a-corpus-sync`. When set, it joins the
+corpus as one more `style` entry, so every command indexes it.
 
 `path` is absolute, a file or a folder. A folder is walked recursively for
 `.txt` and `.md` files, which inherit its label. Other file types are skipped
@@ -386,6 +390,20 @@ attachment name and body. PDFs are never rendered by the agent.
   job-app credentials and no import from `mcp/` or `server/`.
   `@modelcontextprotocol/sdk` and `zod` are approved for `agent/` as well as
   `mcp/`.
+- **Corpus sync** (`035a-corpus-sync`). The user marks an attachment "Add to
+  profile" in the UI (`profile_sync` on `attachments`). `npm run profile:sync`
+  (`agent/runner/commands/sync.ts`) checks Ollama first, and exits 1 with
+  nothing copied and every mark kept if the check fails. Then it lists the
+  marked attachments through `GET /api/attachments/pending-sync`. Each one is
+  copied to `syncFolder` as `<id>-<name>`, where the name is the original
+  file's basename with every character outside `[A-Za-z0-9._-]` replaced by
+  `_`. Any earlier `<id>-*` copy is removed first, so a renamed re-upload
+  replaces it. The index is rebuilt incrementally. Only after the build
+  completes are the marks cleared (`PUT /api/attachments/:id/profile-sync`),
+  so a failed run keeps them and the next run rewrites the copies.
+  `syncProfile` in `agent/runner/lib/sync.ts` does no health check of its own
+  and is what `039-daily-run` calls. Copies and their index entries are the
+  user's to delete by hand.
 - Every search needs the laptop, because the query must be embedded too. The
   runner checks the endpoint before the evaluation and draft steps. If it is
   unreachable, collection and title screening still run, evaluation and

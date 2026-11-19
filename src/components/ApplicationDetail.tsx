@@ -8,6 +8,7 @@ interface ApplicationDetailProps {
   onUpdate: (input: ApplicationInput) => void
   onDelete: () => void
   onUploadAttachment: (file: File) => void
+  onSetProfileSync: (attachmentId: number, pending: boolean) => void
   onRemoveAttachment: (attachmentId: number) => void
   onSetArchived: (archived: boolean) => void
 }
@@ -56,6 +57,7 @@ export function ApplicationDetail({
   onUpdate,
   onDelete,
   onUploadAttachment,
+  onSetProfileSync,
   onRemoveAttachment,
   onSetArchived,
 }: ApplicationDetailProps) {
@@ -79,6 +81,7 @@ export function ApplicationDetail({
       <AttachmentList
         attachments={application.attachments}
         onUpload={onUploadAttachment}
+        onSetProfileSync={onSetProfileSync}
         onRemove={onRemoveAttachment}
       />
     </ApplicationForm>

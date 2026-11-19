@@ -207,8 +207,8 @@ tool the agent's `claude -p` steps get.
 ### Config
 
 Settings live outside the repo, in `~/.config/job-agent/config.json`
-(`$XDG_CONFIG_HOME/job-agent/config.json` when that is set). This stream reads
-three keys and ignores the rest:
+(`$XDG_CONFIG_HOME/job-agent/config.json` when that is set). The profile
+commands read these keys and ignore the rest:
 
 ```json
 {
@@ -217,7 +217,8 @@ three keys and ignores the rest:
   "corpus": [
     { "path": "/home/you/applications/cv-templates", "label": "facts" },
     { "path": "/home/you/applications/sent-letters", "label": "style" }
-  ]
+  ],
+  "syncFolder": "/home/you/applications/synced"
 }
 ```
 
@@ -228,6 +229,19 @@ three keys and ignores the rest:
 - `facts` is the source of truth about you. `style` is material kept only as
   examples of tone: earlier letters may contain errors, so search results
   carry the label and a `style` result never supplies a fact.
+- `syncFolder` (optional, absolute) is where `profile:sync` puts the
+  attachments you mark in the UI. It is indexed as one more `style` entry, so
+  it must not sit inside another corpus folder. `profile:sync` creates it.
+  Create it by hand if you run `profile:index` before the first sync.
+
+`profile:sync` also needs job-app credentials, in `~/.config/job-agent/env`
+(mode 600; `$XDG_CONFIG_HOME/job-agent/env`). The file is parsed, not sourced:
+
+```bash
+JOBAPP_API_URL=http://localhost:3001
+JOBAPP_USERNAME=you
+JOBAPP_PASSWORD=...
+```
 
 The index is written to `~/.local/share/job-agent/profile.db`
 (`$XDG_DATA_HOME/job-agent/profile.db`). It is derived data: delete it and
@@ -264,6 +278,10 @@ queries to judge it on your own corpus.
   `embeddingModel` re-embeds everything.
 - `npm run profile:search -- "<query>" [facts|style]` — prints the top five
   results with score, label and source.
+- `npm run profile:sync` — copies every attachment marked "Add to profile" in
+  the UI into `syncFolder` as `<id>-<name>`, rebuilds the index, then clears
+  the marks. It checks Ollama first and changes nothing if the check fails. A
+  failed build keeps the marks for the next run.
 - `npm run profile:mcp` — the stdio MCP server with the single
   `search_profile` tool. It needs no job-app credentials.
 

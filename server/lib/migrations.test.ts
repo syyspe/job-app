@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import {
   migrateApplicationArchived,
   migrateApplicationDates,
+  migrateAttachmentProfileSync,
   migrateAttachmentUploadedAt,
   migrateUserRole,
 } from './migrations.ts'
@@ -153,4 +154,26 @@ test('migrating uploaded_at twice is a no-op the second time', () => {
     uploaded_at: string
   }
   expect(attachment.uploaded_at).toBe('2026-01-01 00:00:00')
+})
+
+test('migrating a legacy database leaves existing attachments unmarked for profile sync', () => {
+  migrateAttachmentProfileSync(db)
+
+  const attachment = db.prepare('SELECT * FROM attachments WHERE id = 1').get() as {
+    original_name: string
+    profile_sync: number
+  }
+  expect(attachment.original_name).toBe('cv.pdf')
+  expect(attachment.profile_sync).toBe(0)
+})
+
+test('migrating profile_sync twice is a no-op the second time', () => {
+  migrateAttachmentProfileSync(db)
+  db.prepare('UPDATE attachments SET profile_sync = 1 WHERE id = 1').run()
+
+  expect(() => migrateAttachmentProfileSync(db)).not.toThrow()
+  const attachment = db.prepare('SELECT profile_sync FROM attachments WHERE id = 1').get() as {
+    profile_sync: number
+  }
+  expect(attachment.profile_sync).toBe(1)
 })

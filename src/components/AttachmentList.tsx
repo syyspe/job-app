@@ -4,20 +4,53 @@ import type { Attachment } from '../types.ts'
 
 interface AttachmentItemProps {
   attachment: Attachment
+  onSetProfileSync: (id: number, pending: boolean) => void
   onRemove: (id: number) => void
 }
 
-function AttachmentItem({ attachment, onRemove }: AttachmentItemProps) {
+function ProfileSyncToggle({ attachment, onSetProfileSync }: Omit<AttachmentItemProps, 'onRemove'>) {
+  const { id, originalName, profileSyncPending } = attachment
+  if (!profileSyncPending) {
+    return (
+      <button
+        type="button"
+        className="button"
+        aria-label={`Add ${originalName} to profile`}
+        onClick={() => onSetProfileSync(id, true)}
+      >
+        Add to profile
+      </button>
+    )
+  }
+  return (
+    <>
+      <span className="sync-pending">Pending profile sync</span>
+      <button
+        type="button"
+        className="button"
+        aria-label={`Don't add ${originalName} to profile`}
+        onClick={() => onSetProfileSync(id, false)}
+      >
+        Don&apos;t add
+      </button>
+    </>
+  )
+}
+
+function AttachmentItem({ attachment, onSetProfileSync, onRemove }: AttachmentItemProps) {
   return (
     <li className="attachment-item">
       <a href={attachmentUrl(attachment.id)}>{attachment.originalName}</a>
-      <button
-        type="button"
-        className="button button-danger"
-        onClick={() => onRemove(attachment.id)}
-      >
-        Remove file
-      </button>
+      <div className="attachment-actions">
+        <ProfileSyncToggle attachment={attachment} onSetProfileSync={onSetProfileSync} />
+        <button
+          type="button"
+          className="button button-danger"
+          onClick={() => onRemove(attachment.id)}
+        >
+          Remove file
+        </button>
+      </div>
     </li>
   )
 }
@@ -25,12 +58,14 @@ function AttachmentItem({ attachment, onRemove }: AttachmentItemProps) {
 interface AttachmentListProps {
   attachments: Attachment[]
   onUpload: (file: File) => void
+  onSetProfileSync: (id: number, pending: boolean) => void
   onRemove: (id: number) => void
 }
 
 export function AttachmentList({
   attachments,
   onUpload,
+  onSetProfileSync,
   onRemove,
 }: AttachmentListProps) {
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -48,6 +83,7 @@ export function AttachmentList({
           <AttachmentItem
             key={attachment.id}
             attachment={attachment}
+            onSetProfileSync={onSetProfileSync}
             onRemove={onRemove}
           />
         ))}

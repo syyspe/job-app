@@ -32,7 +32,9 @@
   `npm run profile:search -- "<query>" [facts|style]`, `npm run profile:mcp`
   (the `search_profile` stdio server). They read
   `~/.config/job-agent/config.json`, not `.env`, and need the LAN Ollama
-  service — see README's "Profile corpus" section.
+  service — see README's "Profile corpus" section. `npm run profile:sync`
+  copies the attachments marked "Add to profile" into `syncFolder` and
+  rebuilds; it also reads job-app credentials from `~/.config/job-agent/env`.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
@@ -88,9 +90,9 @@ with no `failed` line. Playwright: `N passed`.
   fields; log IDs, never bodies, headers, cookies, passwords or usernames.
   Outside the logger: CLI config errors (`server/seed.ts`, `server/index.ts`
   before the logger exists) stay one plain stderr line + exit 2, and `mcp/`
-  is outside this contract — stdout is its JSON-RPC channel. So is
-  `agent/profile/`: its commands print results to stdout, its MCP entry
-  writes nothing there.
+  is outside this contract — stdout is its JSON-RPC channel. So are
+  `agent/profile/` and `agent/runner/commands/`: their commands print results
+  to stdout, and the profile MCP entry writes nothing there.
 - UI: extend the existing visual language rather than adding a second one:
   IBM Plex Sans, the tokens in `src/index.css`, and list rows with the 4px
   status spine. Colour shows what needs the user; closed items recede with a
@@ -114,10 +116,12 @@ with no `failed` line. Playwright: `N passed`.
   `server.ts` is `createMcpServer(client)`, wiring only; `lib/` carries no MCP
   dependency; `tools/` is one file per tool group, each exporting a
   `register*Tools(server, client)` with zod schemas.
-- `agent/` — the job search agent's own processes, starting with
-  `agent/profile/`: the profile index commands and the `search_profile` stdio
-  MCP server. No job-app credentials, no import from `server/` or `mcp/`, and
-  nothing in its MCP entry writes to stdout.
+- `agent/` — the job search agent's own processes. `agent/profile/` holds the
+  profile index commands and the `search_profile` stdio MCP server, with no
+  job-app credentials and nothing in its MCP entry writing to stdout.
+  `agent/runner/` holds the job-app credentials (`profile:sync`, later the
+  daily run). It may import `agent/profile/lib/`, never the reverse. Nothing
+  in `agent/` imports `server/` or `mcp/`.
 - `public/` — served verbatim at the site root, not processed by Vite.
 - `e2e/` — Playwright specs, configured by `playwright.config.ts`.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are

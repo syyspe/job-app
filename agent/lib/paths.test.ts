@@ -1,12 +1,13 @@
 // @vitest-environment node
 import { expect, test } from 'vitest'
-import { configPath, indexPath } from './paths.ts'
+import { configPath, envPath, indexPath } from './paths.ts'
 
 test('the XDG variables win over HOME', () => {
   const env = { HOME: '/home/u', XDG_CONFIG_HOME: '/cfg', XDG_DATA_HOME: '/data' }
 
   expect(configPath(env)).toBe('/cfg/job-agent/config.json')
   expect(indexPath(env)).toBe('/data/job-agent/profile.db')
+  expect(envPath(env)).toBe('/cfg/job-agent/env')
 })
 
 test('without XDG variables the paths fall back to HOME', () => {
@@ -14,6 +15,7 @@ test('without XDG variables the paths fall back to HOME', () => {
 
   expect(configPath(env)).toBe('/home/u/.config/job-agent/config.json')
   expect(indexPath(env)).toBe('/home/u/.local/share/job-agent/profile.db')
+  expect(envPath(env)).toBe('/home/u/.config/job-agent/env')
 })
 
 test('an unset HOME is a config error', () => {

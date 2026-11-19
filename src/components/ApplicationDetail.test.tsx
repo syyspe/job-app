@@ -25,6 +25,7 @@ const application: Application = {
       originalName: 'resume.pdf',
       mimeType: 'application/pdf',
       uploadedAt: '2026-01-15 09:00:00',
+      profileSyncPending: false,
     },
   ],
 }
@@ -38,6 +39,7 @@ function renderDetail(overrides: Partial<DetailProps> = {}) {
       onUpdate={vi.fn()}
       onDelete={vi.fn()}
       onUploadAttachment={vi.fn()}
+      onSetProfileSync={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       {...overrides}
@@ -45,11 +47,12 @@ function renderDetail(overrides: Partial<DetailProps> = {}) {
   )
 }
 
-test('buttons appear in order: Remove file, Save, Archive, Delete application', () => {
+test('buttons appear in order: Add to profile, Remove file, Save, Archive, Delete application', () => {
   renderDetail()
 
   const buttons = screen.getAllByRole('button').map((button) => button.textContent)
   expect(buttons).toEqual([
+    'Add to profile',
     'Remove file',
     'Save',
     'Archive',

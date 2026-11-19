@@ -63,6 +63,9 @@ Server and client:
 - `src/components/AttachmentList.tsx`: an `onSetProfileSync(id, pending)` prop
   and the toggle in each row.
 - `src/components/ApplicationDetail.tsx`: passes `onSetProfileSync` through.
+- `src/components/ApplicationList.tsx`: passes `onSetProfileSync` through
+  too. It sits between `ApplicationsView` and `ApplicationDetail` (added in
+  Build).
 - `src/components/ApplicationsView.tsx`: `handleSetProfileSync` through
   `change(...)`. Toasts: `Marked for profile sync` and `Profile mark removed`.
 - `src/applications.css`: an `.attachment-actions` group (flex, wrap, gap
@@ -80,6 +83,8 @@ Agent:
   string[]`, moved out of `commands/build.ts`'s `printSummary` so the sync
   can print the same lines.
 - `agent/profile/commands/build.ts`: prints with `formatBuildSummary`.
+- `agent/profile/lib/config.ts` also exports `readConfigFile`, which
+  `env.ts` reuses for the same `file not found` error (added in Build).
 - `agent/runner/lib/env.ts`: `loadJobAppEnv(path)`. It reads the file with
   `util.parseEnv` (no `process.env` mutation) and returns `{ baseUrl,
   username, password }` from `JOBAPP_API_URL`, `JOBAPP_USERNAME` and
@@ -90,7 +95,8 @@ Agent:
   `listPendingSync()`, `downloadAttachment(id): Promise<Uint8Array>` and
   `setProfileSync(id, pending)`. It logs in lazily through `/api/login` and
   keeps the session cookie, retrying once on a 401, the same flow as
-  `mcp/lib/client.ts` but written here rather than imported. Its own
+  `mcp/lib/client.ts` but written here rather than imported. Its config is the
+  env plus `envPath`, which the login-failure message names (added in Build). Its own
   `PendingAttachment { id, originalName }` type covers the fields the sync
   reads. Every failure is a `CliError(1, …)`, as listed under Tests.
 - `agent/runner/lib/sync.ts`: `syncProfile({ jobApp, config, store, ollama })`
