@@ -1,7 +1,7 @@
 # Daily job search agent: cross-stream contracts
 
-What the streams `034` to `039` agree on. A stream that needs to change anything
-here changes this file in the same PR. The feature's goals are in
+What the streams listed under [Streams](#streams) agree on. A stream that needs
+to change anything here changes this file in the same PR. The feature's goals are in
 [brief 033](../brief/033-job-search-agent.md).
 
 ```text
@@ -27,6 +27,42 @@ This design refines brief 033 in two places:
 - **Fan-out** uses parallel `claude -p` processes rather than subagents, so one
   hostile ad cannot influence the judgement of another.
 - **The timer** is on the Windows side, because this WSL install has no systemd.
+
+## Streams
+
+| Stream | Brief | State | Needs |
+|---|---|---|---|
+| `033-job-search-agent` | committed | done | — |
+| `034-ad-inbox` | committed | done | — |
+| `035-profile-corpus` | committed | done | — |
+| `035a-corpus-sync` | not written | open | 035 |
+| `036-ad-evaluation` | committed | open | 034, 035 |
+| `037-application-drafts` | committed | open | 036 |
+| `038-alert-sources` | committed | open | 034 |
+| `039-daily-run` | committed | open | 035a, 037, 038 |
+
+`035a-corpus-sync` adds an "Add to profile" action on an application, which
+sets a flag in job-app. A runner-side `profile:sync` command then copies the
+flagged applications' CV and cover letter attachments into a `style` corpus
+folder, runs the incremental index build and clears the flags. Marking is by
+the UI action only. `039-daily-run` runs the sync each day. The letter suffix
+keeps it in build order next to 035 without taking a new number.
+
+### Picking the next stream
+
+For `/sdlc` Stage 1 when pointed at this file:
+
+- The next stream is the first `open` row, top to bottom, whose **Needs** are
+  all `done`. Use its slug as written; don't take a new number from the sdlc
+  numbering command.
+- Before starting it, check `git branch -a --list '*<slug>*'`. A branch means
+  the stream is already in progress elsewhere, because this table on the
+  default branch only changes on merge. Take the next eligible row instead.
+- Brief **committed**: Stage 1 is already done. Create the branch and go to
+  Stage 2. Brief **not written**: Stage 1 writes `brief/<slug>.md` from
+  `brief/TEMPLATE.md`, using this file's sections as its contract.
+- Each stream updates its own row: `in progress` in its plan commit, `done` in
+  its PR. A stream that adds a follow-up stream adds its row in the same commit.
 
 ## 1. Pipeline and runtime
 
@@ -88,6 +124,27 @@ synthetic.
 | `~/.config/job-agent/prompts/` | Headless evaluation and drafting rules adapted from the three job application skills |
 | `~/.local/state/job-agent/` | Run lock, mail watermarks, daily counters, unreported source failures, logs |
 | `~/.local/share/job-agent/` | Profile index |
+
+Each path follows `$XDG_CONFIG_HOME`, `$XDG_STATE_HOME` or `$XDG_DATA_HOME`
+when set. The profile index is `~/.local/share/job-agent/profile.db`.
+
+The config keys `035-profile-corpus` owns, ignoring every other key:
+
+```json
+{
+  "ollamaUrl": "http://<laptop>:11434",
+  "embeddingModel": "<model>",
+  "corpus": [
+    { "path": "/abs/path/cv-templates", "label": "facts" },
+    { "path": "/abs/path/letters", "label": "style" }
+  ]
+}
+```
+
+`path` is absolute, a file or a folder. A folder is walked recursively for
+`.txt` and `.md` files, which inherit its label. Other file types are skipped
+and listed in the build summary. A file reachable from two entries is a
+config error.
 
 ## 4. Ad inbox data
 
@@ -293,11 +350,35 @@ attachment name and body. PDFs are never rendered by the agent.
 - Embeddings come from the Ollama service on the user's other laptop, inside
   the home LAN. Corpus text and queries never leave the LAN. The address and
   model name live in private config, never in the repo.
-- The vector store is embedded or local to this machine. ChromaDB is the
-  user's example; `035-profile-corpus` chooses it or an equivalent, and the
-  choice needs dependency approval.
-- The index records the embedding model it was built with. A different
-  configured model means a rebuild, and search refuses to mix the two.
+- The vector store is plain SQLite through `better-sqlite3`, already a
+  dependency: chunks and their vectors as Float32 blobs, ranked by cosine
+  similarity in JS. That is comfortable to about 10k chunks (about 40 MB at
+  1024 dimensions, 10–20 ms a search). Storage sits behind
+  `agent/profile/lib/store.ts` alone, so moving to `sqlite-vec` later is one
+  file plus a rebuild. The index is derived data, never a source of truth.
+- `npm run profile:index` is run by the user. It stores a SHA-256 per file and
+  its label; a rerun embeds only new or changed files, drops deleted ones and
+  skips the rest. Each file is replaced in its own transaction, so an
+  interrupted build leaves every file either old and consistent or new.
+- The index records the embedding model it was built with, written only when
+  a build completes. A different configured model wipes the index and
+  re-embeds everything, so an interrupted model change leaves an index with
+  no completed model rather than a mixed one.
+- Search refuses when the index is missing, has no completed model, or was
+  built with a model or vector dimension other than the configured one. The
+  error says to run `npm run profile:index`.
+- `checkOllama(config)` in `agent/profile/lib/ollama.ts` is the health check
+  the runner calls. It reads `GET /api/tags` with a 3 s timeout, and `model`
+  or `model:latest` counts as present. It returns `{ ok: true }` or
+  `{ ok: false, reason }` with `reason` one of `unreachable`, `bad_response`
+  or `model_missing`, fixed categories fit for the summary's source failures.
+  It returns rather than throws, because the runner recovers by skipping
+  evaluation and drafting.
+- `search_profile` runs from `agent/profile/`, the start of the `agent/` tree
+  the runner joins in `036-ad-evaluation`. It is its own process with no
+  job-app credentials and no import from `mcp/` or `server/`.
+  `@modelcontextprotocol/sdk` and `zod` are approved for `agent/` as well as
+  `mcp/`.
 - Every search needs the laptop, because the query must be embedded too. The
   runner checks the endpoint before the evaluation and draft steps. If it is
   unreachable, collection and title screening still run, evaluation and

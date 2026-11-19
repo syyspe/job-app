@@ -17,6 +17,10 @@
     "seed": "node --env-file-if-exists=.env server/seed.ts",
     "lint": "oxlint",
     "mcp": "node mcp/index.ts",
+    "profile:index": "node agent/profile/commands/build.ts",
+    "profile:health": "node agent/profile/commands/health.ts",
+    "profile:search": "node agent/profile/commands/search.ts",
+    "profile:mcp": "node agent/profile/index.ts",
     "preview": "vite preview",
     "start": "npm run build && node --env-file-if-exists=.env server/index.ts"
   },

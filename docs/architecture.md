@@ -181,6 +181,58 @@ reads.
   ephemeral port and links a real MCP client to the server in memory, so
   tools are exercised over the protocol.
 
+## `agent/` — the job search agent
+
+The start of the tree the daily runner joins in `036-ad-evaluation`. It is its
+own process: it imports nothing from `server/` or `mcp/` and holds no job-app
+credentials. Its contracts are in `docs/job-search-agent.md`.
+
+### `agent/lib/`
+
+- `paths.ts` — `configPath(env)` and `indexPath(env)`, from `XDG_CONFIG_HOME` /
+  `XDG_DATA_HOME` or the `HOME` defaults.
+- `cliError.ts` — `CliError(exitCode, message)`, the one agent error type, and
+  `runCommand(main)`, the edge-out handler every entry point runs under: a
+  `CliError` becomes one stderr line and its exit code; anything else
+  propagates with its stack.
+
+### `agent/profile/` — the profile corpus
+
+`index.ts` is the stdio MCP server the `claude -p` steps get as their only
+tool (`npm run profile:mcp`): it loads the config and registers
+`search_profile` through `server.ts`'s `createProfileServer(search)`, which
+offers that one tool and nothing else. **Nothing in its entry writes to
+stdout.** Each call opens the index read-only for that search alone, so a
+missing or rebuilt index shows up per call, as a tool error.
+
+`commands/` holds the three user commands: `build.ts` (`profile:index`,
+health check first), `health.ts` (`profile:health`) and `search.ts`
+(`profile:search`).
+
+`lib/`:
+
+- `config.ts` — `loadProfileConfig(path)`, the zod check of the keys this
+  stream owns in `~/.config/job-agent/config.json`; other keys are ignored.
+- `corpus.ts` — `listCorpusFiles(entries)`: walks folders for `.txt`/`.md`,
+  lists the rest as skipped, rejects a file reached from two entries.
+- `chunk.ts` — `chunkText(text)`: paragraphs packed up to 1500 characters.
+- `ollama.ts` — `createOllama({url, model}).embed(texts)` and
+  `checkOllama(config)`, which returns a fixed reason rather than throwing.
+- `store.ts` — the only file that knows the index is plain SQLite with
+  Float32 vector blobs: `openIndex`, `openReadonlyIndex`.
+- `build.ts` — `buildIndex`: incremental by SHA-256 and label, wipes on a
+  model change, records the model only once the build completes.
+- `search.ts` — `searchIndex` / `searchIndexFile`: brute-force cosine, and
+  the refusals (no index, no completed build, other model, other dimension).
+
+### `agent/test/`
+
+- `fakeOllama.ts` — an HTTP stand-in on port 0 with deterministic trigram
+  vectors, a request counter and switchable failures.
+- `profileFixture.ts` — a temp `HOME` with a synthetic corpus and config, and
+  `runNode`, an async spawn so the fake can answer the child process.
+- `tempDir.ts`, `runCommandFixture.ts`.
+
 ## The rest of the tree
 
 - `public/` — served verbatim at the site root, not processed by Vite.
