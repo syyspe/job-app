@@ -35,18 +35,25 @@ This design refines brief 033 in two places:
 | `033-job-search-agent` | committed | done | — |
 | `034-ad-inbox` | committed | done | — |
 | `035-profile-corpus` | committed | done | — |
-| `035a-corpus-sync` | not written | open | 035 |
+| `035a-corpus-sync` | committed | open | 035 |
 | `036-ad-evaluation` | committed | open | 034, 035 |
 | `037-application-drafts` | committed | open | 036 |
 | `038-alert-sources` | committed | open | 034 |
 | `039-daily-run` | committed | open | 035a, 037, 038 |
+| `040-markdown-attachments` | not written | open | 035a, 037 |
 
-`035a-corpus-sync` adds an "Add to profile" action on an application, which
-sets a flag in job-app. A runner-side `profile:sync` command then copies the
-flagged applications' CV and cover letter attachments into a `style` corpus
-folder, runs the incremental index build and clears the flags. Marking is by
-the UI action only. `039-daily-run` runs the sync each day. The letter suffix
-keeps it in build order next to 035 without taking a new number.
+`035a-corpus-sync` adds an "Add to profile" action in the UI, where the user
+picks which of an application's attachments to mark; job-app stores a flag on
+each. A runner-side `profile:sync` command then copies the marked attachments
+into a `style` corpus folder, replacing an earlier copy of the same
+attachment, runs the incremental index build and clears the flags. Marking is
+by the UI action only, and a mark can be removed before the sync. `039-daily-run`
+runs the sync each day. The letter suffix keeps it in build order next to 035
+without taking a new number.
+
+`040-markdown-attachments` switches the agent's text attachments from `.txt` to
+`.md` (section 7), after which the corpus walk (section 3) reads `.md` files
+only.
 
 ### Picking the next stream
 
