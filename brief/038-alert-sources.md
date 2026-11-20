@@ -15,8 +15,8 @@ limited requests, and no automatic fetching from Duunitori.
 
 1. The runner reads alert emails from a new dedicated mailbox and has no access
    to my personal mail.
-2. Connectors exist for Academic Work, Kuntarekry, Valtiolle.fi and Duunitori,
-   and each can be switched off without touching the others.
+2. Connectors exist for Academic Work, Valtiolle.fi, Nordea careers and
+   Duunitori, and each can be switched off without touching the others.
 3. New candidates reach the inbox through `POST /api/ads`, and the mail watermark
    advances only after ingest succeeds.
 4. `PoliteHttp` enforces each source's daily cap and pauses, sends no credentials
@@ -49,6 +49,8 @@ checked and the date recorded in private config.
 - Logging in to any job site.
 - Automatic fetching from Duunitori.
 - Barona and Työmarkkinatori as sources.
+- Kuntarekry as a source: it has no job-watch alert to read (settled in the
+  plan, 2026-11-20).
 - The timer and the summary email.
 
 ## Related streams
@@ -58,6 +60,13 @@ checked and the date recorded in private config.
 - After: `039-daily-run` schedules collection and reports source failures.
 
 ## Open questions
+
+Settled in `plans/038-alert-sources.plan.md` (2026-11-20): Kuntarekry is out
+and Nordea careers is in. Real samples go in a private local folder. Each
+source's cap defaults to 20 opened ads a day, 15 s apart. The runner reads a
+new dedicated Gmail account over IMAP with `imapflow` and `mailparser`
+(approved). The terms of each automatic source stay the user's to check before
+enabling it.
 
 - Do the Kuntarekry and Valtiolle.fi terms allow this use?
 - Do Kuntarekry or Valtiolle.fi offer a feed an individual may use, or are alert
