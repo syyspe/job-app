@@ -85,6 +85,16 @@ test('an updated CLI is probed once and the record rewritten', async () => {
   expect(readCheckRecord(stateDir)?.cliVersion).toBe('9.9.9')
 })
 
+test('a missing CLI rejects naming it and runs no probe', async () => {
+  const probes = vi.fn(passing)
+  const claudeBin = join(dir.root, 'no-claude')
+
+  await expect(ensureSandboxVerified({ claudeBin, stateDir, runProbes: probes, now })).rejects.toMatchObject({
+    message: `${claudeBin} not found on PATH`,
+  })
+  expect(probes).not.toHaveBeenCalled()
+})
+
 test('failing probes throw naming the failed properties and keep the old record', async () => {
   writeCheckRecord(stateDir, { cliVersion: '9.9.8', checkedAt: '' })
 
