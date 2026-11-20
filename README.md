@@ -468,9 +468,10 @@ before you fix the connector. The tests use synthetic fixtures only.
 
 `agent:run` does the whole pipeline once: collect, dismiss expired
 hand-overs, sync the profile, evaluate, draft, and email you one summary
-when there is something new, or on every run if you set `alwaysSend`. Windows Task Scheduler starts it every evening.
-Everything above it must already be set up: the profile corpus, ad
-evaluation, ad drafting and alert sources.
+when there is something new, or on every run if you set `alwaysSend`.
+Windows Task Scheduler starts it every evening. Everything above it must
+already be set up: the profile corpus, ad evaluation, ad drafting and alert
+sources.
 
 ### Setup
 
