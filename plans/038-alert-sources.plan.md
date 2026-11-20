@@ -47,7 +47,7 @@ Decided with the user (2026-11-20):
 - `agent/runner/lib/env.ts`: `loadMailEnv(path)` reads `MAIL_IMAP_HOST`,
   `MAIL_USERNAME` and `MAIL_PASSWORD` from the same env file, parsed but never
   loaded into `process.env`. A missing key is `CliError(2)`.
-- `agent/runner/lib/runnerConfig.ts`: `loadSourcesConfig(path, connectorIds)`
+- `agent/runner/lib/runnerConfig.ts`: `loadSourcesConfig(path, connectors)`
   reads the `sources` key (see Contracts).
 - `agent/runner/lib/mailbox.ts` (new): `openMailbox(env)` returns
   `{ uidValidity, messagesAfter(uid): AsyncIterable<AlertMessage>, close() }`.
@@ -58,7 +58,7 @@ Decided with the user (2026-11-20):
   (temp file + rename). They are `mail-watermark.json`, `source-counters.json` and
   `source-failures.json` (shapes under Contracts).
 - `agent/runner/lib/politeHttp.ts` (new): `createPoliteHttp({ sourceId, hosts,
-  dailyOpenCap, minDelayMs, counters, fetch, sleep })`, with `fetch` and `sleep`
+  dailyOpenCap, minDelayMs, counters, fetch, now, sleep })`, with `fetch`, `now` and `sleep`
   injected for tests.
 - `agent/runner/lib/sources/types.ts` (new): section 6's types, plus
   `AlertMessage` and the `PoliteHttp` interface.
@@ -73,7 +73,7 @@ Decided with the user (2026-11-20):
   unchanged out of `evaluationRun.ts`, which now imports them. Collect and
   evaluate both screen.
 - `agent/runner/lib/collectRun.ts` (new): `runCollect({ mailbox, jobApp,
-  connectors, sources, titleRules, state, httpFor })` covers collect, then
+  connectors, sources, titleRules, state, today, httpFor })` covers collect, then
   screen, then fetch, and returns a `CollectReport`.
 - `agent/runner/commands/collect.ts` (new): wiring only, under `runCommand`. It
   needs no sandbox gate, because no `claude -p` runs.
@@ -263,6 +263,33 @@ Fixed by this plan (written into `docs/job-search-agent.md` §3/§6 in step 10):
   `duunitori` enabled (no page fetch) shows ingested ads reaching
   `awaiting_handover`. An automatic source is tried only once the user has
   recorded its `termsCheckedOn`.
+
+## Departures during the build
+
+- `loadSourcesConfig` takes the connectors' `{ id, mode }`, not just their ids:
+  the terms refusal needs each source's mode.
+- `createPoliteHttp` also takes `now`, so the delay tests are exact.
+  `runCollect` takes `today`, the date that failure records carry.
+- When the cap is reached, `get` answers `failed: daily_cap` without a request.
+  `runCollect` checks `dayEnded` before each ad, so it never sees that answer.
+- A state file that doesn't parse or has the wrong shape is exit 2
+  (`<path>: not a valid state file; fix or delete it`).
+- **Valtiolle.fi's ad text comes from the page's `<article>`, not from the
+  JSON-LD description.** The description leaves out the requirements, the
+  offer, the contacts and the locations. Company and deadline still come
+  from the `JobPosting`. Academic Work and Nordea careers pages carry no
+  JSON-LD, so each connector cuts its ad from the page markup. Valtiolle's
+  alert links go only through Mailjet's tracker. The target URL sits
+  base64url-encoded in the tracker path, so the connector decodes it from
+  the email and never requests the tracker.
+- Duunitori's alert dates have no year. The connector takes the next such
+  date on or after the alert's own date. It also ignores the "Näitkö jo
+  nämä?" recommendations that follow the matched ads.
+- A rejected login is tested at the unit level (`connectError`), since no fake
+  IMAP server exists. Unreachable is also tested end to end, against a closed
+  local port.
+- No sample shows a closed-ad page for any automatic source, so a closed ad
+  is `gone` only through a 404 or 410.
 
 ## Risks / rollback
 

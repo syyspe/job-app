@@ -11,6 +11,7 @@ export interface FakeEvaluation {
 export interface FakeAd {
   id: number
   source: string
+  externalId: string
   sourceMode: 'automatic' | 'handover'
   title: string
   company: string
@@ -28,6 +29,9 @@ export interface FakeAd {
 export interface FakeTransition {
   id: number
   to: string
+  body?: string
+  company?: string
+  deadline?: string
   evaluation?: FakeEvaluation
   error?: string
 }
@@ -41,6 +45,7 @@ export interface FakeDraft {
 export function fakeAd(fields: Partial<FakeAd> & { id: number }): FakeAd {
   return {
     source: 'testsource',
+    externalId: `ext-${fields.id}`,
     sourceMode: 'automatic',
     title: `Developer ${fields.id}`,
     company: 'Example Oy',
@@ -61,17 +66,27 @@ function summary({ body: _body, ...rest }: FakeAd) {
   return rest
 }
 
+function recordAttempt(ad: FakeAd, error: string): void {
+  ad.attempts += 1
+  ad.lastError = error
+  if (ad.attempts >= 3) ad.state = 'failed'
+}
+
 // Same-state with an error records an attempt, and the third one fails the
-// ad, as the server does. Anything else just moves the ad.
+// ad, as the server does. Anything else just moves the ad, filling company
+// and deadline only while they are empty.
 function applyTransition(ad: FakeAd, transition: FakeTransition): void {
-  if (transition.to === ad.state && transition.error) {
-    ad.attempts += 1
-    ad.lastError = transition.error
-    if (ad.attempts >= 3) ad.state = 'failed'
-    return
-  }
-  ad.state = transition.to
-  ad.evaluation = transition.evaluation ?? ad.evaluation
+  if (transition.to === ad.state && transition.error) return recordAttempt(ad, transition.error)
+  moveAd(ad, transition)
+}
+
+function moveAd(ad: FakeAd, { to, error, evaluation, body, company, deadline }: FakeTransition): void {
+  ad.state = to
+  if (to === 'failed') ad.lastError = error ?? null
+  ad.evaluation = evaluation ?? ad.evaluation
+  ad.body = body ?? ad.body
+  ad.company ||= company ?? ''
+  ad.deadline ||= deadline ?? ''
 }
 
 interface TransitionTarget {
@@ -112,9 +127,24 @@ async function answerDraft({ fake, ad }: TransitionTarget, req: IncomingMessage,
   sendJson(res, 201, { ad, application: { id: 100 + fake.drafts.length } })
 }
 
+// Idempotent on (source, externalId), as on the server: 201 new, 200 known.
+// Ads are stamped in ingest order, so the list stays newest first.
+async function answerIngest(fake: FakeJobApp, req: IncomingMessage, res: ServerResponse) {
+  const input = (await readJson(req)) as Partial<FakeAd> & { source: string; externalId: string }
+  if (fake.ingestFailsFor === input.externalId) return sendJson(res, 500, { error: 'internal server error' })
+  const known = fake.ads.find((ad) => ad.source === input.source && ad.externalId === input.externalId)
+  if (known) return sendJson(res, 200, summary(known))
+  const id = fake.ads.length + 1
+  const ad = fakeAd({ ...input, id, company: input.company ?? '', location: input.location ?? '', deadline: input.deadline ?? '' })
+  ad.firstSeenAt = `2026-12-01 08:00:${String(id).padStart(2, '0')}`
+  fake.ads.push(ad)
+  sendJson(res, 201, summary(ad))
+}
+
 // Lists newest first, like the real API.
 export function answerAds(fake: FakeJobApp, req: IncomingMessage, res: ServerResponse): void {
   const url = new URL(req.url ?? '', 'http://fake')
+  if (url.pathname === '/api/ads' && req.method === 'POST') return void answerIngest(fake, req, res)
   if (url.pathname === '/api/ads') {
     if (fake.failure === 'malformed') return sendJson(res, 200, { ads: 'nope' })
     const listed = fake.ads.filter((ad) => ad.state === url.searchParams.get('state'))

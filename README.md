@@ -391,6 +391,79 @@ including the sandbox check.
   (for example a 409 because the ad was drafted in the meantime) stops the
   run with exit 1.
 
+## Alert sources
+
+`agent:collect` reads new job alert emails from a mailbox used for nothing
+else, turns them into ads in the inbox, screens their titles, then fetches
+the full ad pages of the automatic sources. It runs no `claude -p` step, so
+it needs no sandbox check. The sources are:
+
+| Id | Site | Mode |
+|---|---|---|
+| `academicwork` | Academic Work | automatic: the ad page is fetched |
+| `valtiolle` | Valtiolle.fi | automatic |
+| `nordea` | Nordea careers | automatic |
+| `duunitori` | Duunitori | hand-over: never fetched; the ad waits in `awaiting_handover` |
+
+### Setup
+
+1. Create a Gmail account used only for job alerts, turn on 2-step
+   verification and make an app password for it. Move each site's alert
+   subscription to that address, with no forwarding from your own mailbox.
+2. Add the mail keys to `~/.config/job-agent/env`, next to the job-app ones:
+
+   ```sh
+   MAIL_IMAP_HOST=imap.gmail.com
+   MAIL_USERNAME=<the alert address>
+   MAIL_PASSWORD=<the app password>
+   ```
+
+   The mailbox is opened read-only: nothing is marked read, moved or deleted.
+3. Check each automatic site's terms of use. Once a site's terms allow
+   fetching its public ad pages, record the date you checked them. A source
+   left out of `sources` is disabled, and an automatic source can't be
+   enabled without `termsCheckedOn`:
+
+   ```json
+   {
+     "sources": {
+       "duunitori": { "enabled": true },
+       "valtiolle": { "enabled": true, "termsCheckedOn": "2026-11-20" },
+       "nordea": { "enabled": false },
+       "academicwork": { "enabled": false }
+     }
+   }
+   ```
+
+   Each source also takes `dailyOpenCap` (pages opened per day, default 20)
+   and `minDelayMs` (the pause between its requests, default 15000, at least
+   1000). If a site's terms rule fetching out, switching its connector's
+   `mode` to `handover` is a one-line change.
+
+The parsers were written from real alerts and pages kept in
+`~/.config/job-agent/samples/<source>/`, outside the repository. When a
+site changes its alert layout, its connector finds nothing and the run
+records an `empty_alert` failure for that source. Save a fresh sample there
+before you fix the connector. The tests use synthetic fixtures only.
+
+### Command
+
+- `npm run agent:collect` reads the messages that arrived since its last run
+  and ingests each candidate with its source and the site's ad id. A repeat
+  of a known ad isn't added again. Then it screens `new` ads as
+  `agent:evaluate` does, and fetches each enabled automatic source's oldest
+  `new` ads, up to that source's daily cap. A fetched ad goes to `ready`, or
+  to `duplicate` when it matches an earlier ad or application. A page that
+  is gone moves the ad to `failed`. Any other fetch failure records an
+  attempt, and the third moves the ad to `failed`. A 401, 403, 429 or 503
+  answer stops that source for the day without counting an attempt, and is
+  recorded as a `blocked` source failure. The command prints one line per
+  enabled source, a `screened:` line and the number of ads left `new`.
+  Configuration errors exit 2. An unreachable mailbox, a rejected mail login
+  or a job-app failure exits 1. Its position in the mailbox is kept in
+  `~/.local/state/job-agent/mail-watermark.json` and advances one message at
+  a time, so a failed run reads the unfinished message again next time.
+
 ## The default branch is PR-only
 
 Nothing lands on the default branch except by merged pull request. On a solo

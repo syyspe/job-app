@@ -140,3 +140,32 @@ test('a draft the server refuses is a CliError naming the request', async () => 
     message: 'job-app POST /api/ads/1/draft: 409 an ad cannot be drafted from drafted',
   })
 })
+
+test('ingests an ad: 201 is new, a repeat of its key is 200 and the existing ad', async () => {
+  const jobApp = client()
+  const input = { source: 'src', sourceMode: 'automatic' as const, externalId: 'A1', url: 'https://jobs.example/A1', title: 'Tester' }
+
+  const first = await jobApp.ingestAd(input)
+  const again = await jobApp.ingestAd({ ...input, title: 'Changed' })
+
+  expect(first).toMatchObject({ created: true, ad: { source: 'src', externalId: 'A1', title: 'Tester', state: 'new' } })
+  expect(again).toEqual({ created: false, ad: first.ad })
+  expect(fake.ads).toHaveLength(1)
+})
+
+test('a failed ingest is an exit-1 error naming the route', async () => {
+  fake.ingestFailsFor = 'A1'
+
+  await expect(
+    client().ingestAd({ source: 'src', sourceMode: 'handover', externalId: 'A1', url: 'https://jobs.example/A1', title: 'T' }),
+  ).rejects.toMatchObject({ exitCode: 1, message: 'job-app POST /api/ads: 500 internal server error' })
+})
+
+test('a ready transition carries the body, company and deadline', async () => {
+  fake.ads.push(fakeAd({ id: 1, company: '' }))
+
+  await client().transitionAd(1, { to: 'ready', body: 'Text', company: 'Page Oy', deadline: '2026-12-31' })
+
+  expect(fake.transitions).toEqual([{ id: 1, to: 'ready', body: 'Text', company: 'Page Oy', deadline: '2026-12-31' }])
+  expect(fake.ads[0]).toMatchObject({ state: 'ready', body: 'Text', company: 'Page Oy', deadline: '2026-12-31' })
+})

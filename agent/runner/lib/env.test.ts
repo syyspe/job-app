@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
-import { loadJobAppEnv } from './env.ts'
+import { loadJobAppEnv, loadMailEnv } from './env.ts'
 
 let dir: TempDir
 
@@ -40,5 +40,22 @@ test('a missing variable is an exit-2 error naming it', () => {
 
   expect(() => loadJobAppEnv(path)).toThrow(
     expect.objectContaining({ exitCode: 2, message: `${path}: JOBAPP_PASSWORD is not set` }),
+  )
+})
+
+const mail = 'MAIL_IMAP_HOST=imap.mail.example\nMAIL_USERNAME=alerts@mail.example\nMAIL_PASSWORD="app pass"\n'
+
+test('reads the three mail variables from the same file', () => {
+  const path = dir.write('env', `${complete}${mail}`)
+
+  expect(loadMailEnv(path)).toEqual({ host: 'imap.mail.example', username: 'alerts@mail.example', password: 'app pass' })
+  expect(process.env.MAIL_PASSWORD).toBeUndefined()
+})
+
+test('a missing mail variable is an exit-2 error naming it', () => {
+  const path = dir.write('env', mail.replace(/MAIL_IMAP_HOST=.*\n/, ''))
+
+  expect(() => loadMailEnv(path)).toThrow(
+    expect.objectContaining({ exitCode: 2, message: `${path}: MAIL_IMAP_HOST is not set` }),
   )
 })

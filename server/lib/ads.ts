@@ -80,7 +80,7 @@ function movedRow(ad: AdRow, move: AdMove): AdRow {
 function saveMove(db: Database.Database, row: AdRow): AdRow {
   db.prepare(
     `UPDATE ads
-        SET url = ?, canonical_url = ?, title = ?, company = ?, state = ?, body = ?,
+        SET url = ?, canonical_url = ?, title = ?, company = ?, deadline = ?, state = ?, body = ?,
             evaluation = ?, application_id = ?, duplicate_of = ?, attempts = ?, last_error = ?,
             updated_at = datetime('now'), reported_at = NULL
       WHERE id = ?`,
@@ -89,6 +89,7 @@ function saveMove(db: Database.Database, row: AdRow): AdRow {
     row.canonical_url,
     row.title,
     row.company,
+    row.deadline,
     row.state,
     row.body,
     row.evaluation,
@@ -169,6 +170,11 @@ function retryAd(db: Database.Database, ad: AdRow, to: AdState): AdRow {
   return saveMove(db, reset)
 }
 
+// Before the dedup rules run, so a company only the page names feeds rule 3.
+function withPageFields(ad: AdRow, { company, deadline }: AdTransition): AdRow {
+  return { ...ad, company: ad.company || (company ?? ''), deadline: ad.deadline || (deadline ?? '') }
+}
+
 function readyBody(transition: AdTransition): string {
   if (!transition.body?.trim()) throw new HttpError(400, 'body is required to enter ready')
   return transition.body
@@ -192,7 +198,7 @@ export function transitionAd(
     throw new HttpError(409, `an ad cannot move from ${ad.state} to ${to}`)
   }
   if (ad.state === 'failed' && to !== 'dismissed') return retryAd(db, ad, to)
-  if (to === 'ready') return enterReady(db, ad, readyBody(transition))
+  if (to === 'ready') return enterReady(db, withPageFields(ad, transition), readyBody(transition))
   return saveMove(db, movedRow(ad, plainMove(transition)))
 }
 
