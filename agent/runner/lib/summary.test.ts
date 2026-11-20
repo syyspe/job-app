@@ -2,7 +2,7 @@
 import { expect, test } from 'vitest'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import type { FakeAd } from '../../test/fakeJobAppAds.ts'
-import { composeSummary } from './summary.ts'
+import { composeSummary, isEmpty } from './summary.ts'
 import type { AdSummary } from './jobApp.ts'
 
 const appUrl = 'https://jobs.lan.example'
@@ -12,8 +12,20 @@ function ad(fields: Partial<FakeAd> & { id: number }): AdSummary {
   return summary
 }
 
-test('nothing to report composes no summary', () => {
-  expect(composeSummary({ ads: [], sourceFailures: [], problems: [], appUrl })).toBeNull()
+test('nothing to report composes the empty summary', () => {
+  expect(composeSummary({ ads: [], sourceFailures: [], problems: [], appUrl })).toEqual({
+    subject: 'job agent: 0 drafts, 0 title rejected, 0 failed, 0 source failures, 0 problems',
+    text: `Open job-app: ${appUrl}\n`,
+  })
+})
+
+test('isEmpty is true only when every list is empty', () => {
+  const empty = { ads: [], sourceFailures: [], problems: [] }
+
+  expect(isEmpty(empty)).toBe(true)
+  expect(isEmpty({ ...empty, ads: [ad({ id: 1, state: 'failed' })] })).toBe(false)
+  expect(isEmpty({ ...empty, sourceFailures: [{ source: 'valtiolle', date: '2026-11-20', kind: 'blocked' }] })).toBe(false)
+  expect(isEmpty({ ...empty, problems: [{ step: 'evaluate', message: 'down' }] })).toBe(false)
 })
 
 test('every non-empty list gets its own section, and the subject counts them', () => {
@@ -29,8 +41,8 @@ test('every non-empty list gets its own section, and the subject counts them', (
     appUrl,
   })
 
-  expect(summary?.subject).toBe('job agent: 2 drafts, 1 title rejected, 1 failed, 1 source failure, 1 problem')
-  expect(summary?.text).toBe(
+  expect(summary.subject).toBe('job agent: 2 drafts, 1 title rejected, 1 failed, 1 source failure, 1 problem')
+  expect(summary.text).toBe(
     [
       'Drafts (2)',
       '- Developer, Acme (application 101)',
@@ -57,8 +69,8 @@ test('every non-empty list gets its own section, and the subject counts them', (
 test('only a problem still composes a summary with just that section', () => {
   const summary = composeSummary({ ads: [], sourceFailures: [], problems: [{ step: 'collect', message: 'x' }], appUrl })
 
-  expect(summary?.subject).toBe('job agent: 0 drafts, 0 title rejected, 0 failed, 0 source failures, 1 problem')
-  expect(summary?.text).toBe(`Problems (1)\n- collect: x\n\nOpen job-app: ${appUrl}\n`)
+  expect(summary.subject).toBe('job agent: 0 drafts, 0 title rejected, 0 failed, 0 source failures, 1 problem')
+  expect(summary.text).toBe(`Problems (1)\n- collect: x\n\nOpen job-app: ${appUrl}\n`)
 })
 
 test('line breaks and control characters in ad text become spaces', () => {
@@ -71,5 +83,5 @@ test('line breaks and control characters in ad text become spaces', () => {
     appUrl,
   })
 
-  expect(summary?.text.split('\n')[1]).toBe('- Developer  Subject: forged  end, Acme, s: u')
+  expect(summary.text.split('\n')[1]).toBe('- Developer  Subject: forged  end, Acme, s: u')
 })

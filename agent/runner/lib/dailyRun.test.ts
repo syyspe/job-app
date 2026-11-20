@@ -67,6 +67,7 @@ interface Overrides {
   send?: DailyRunOptions['send']
   openMailbox?: DailyRunOptions['openMailbox']
   evaluate?: () => Promise<EvaluationOutcome>
+  alwaysSend?: boolean
 }
 
 function options(overrides: Overrides = {}): DailyRunOptions {
@@ -87,7 +88,7 @@ function options(overrides: Overrides = {}): DailyRunOptions {
       evaluate: overrides.evaluate ?? (async () => (steps.push('evaluate'), suitable)),
     },
     drafting: { config: drafting, write: async () => (steps.push('draft'), written), today: '2026-11-20' },
-    summary: { recipient: 'me@mail.example', appUrl: 'https://jobs.lan.example' },
+    summary: { recipient: 'me@mail.example', alwaysSend: overrides.alwaysSend ?? false, appUrl: 'https://jobs.lan.example' },
     send: overrides.send ?? (async (message) => void (steps.push('send'), sent.push(message))),
     now: () => NOW,
   }
@@ -111,6 +112,15 @@ test('nothing to report sends no mail', async () => {
 
   expect(report.sent).toBe(false)
   expect(sent).toEqual([])
+})
+
+test('nothing to report with alwaysSend sends the empty summary', async () => {
+  const report = await runDaily(options({ alwaysSend: true }))
+
+  expect(report.sent).toBe(true)
+  expect(sent).toHaveLength(1)
+  expect(sent[0].subject).toBe('job agent: 0 drafts, 0 title rejected, 0 failed, 0 source failures, 0 problems')
+  expect(sent[0].text).toContain('Open job-app:')
 })
 
 test('ads already reported are not reported again', async () => {
