@@ -125,9 +125,9 @@ const upload: DraftUpload = {
   link: 'https://jobs.example/1',
   notes: 'Fits.\n\nq1: Why?',
   files: {
-    coverLetter: { name: 'T_Hakemus_Ääkkönen_Oy_FI.txt', text: 'Hei [[ASK:q1]]' },
-    cv: { name: 'T_CV_Ääkkönen_Oy_FI.txt', text: 'CV' },
-    ad: { name: 'Ääkkönen_Oy_Test_Lead_ilmoitus.txt', text: 'Ad' },
+    coverLetter: { name: 'T_Hakemus_Ääkkönen_Oy_FI.md', text: 'Hei [[ASK:q1]]' },
+    cv: { name: 'T_CV_Ääkkönen_Oy_FI.md', text: 'CV' },
+    ad: { name: 'Ääkkönen_Oy_Test_Lead_ilmoitus.md', text: 'Ad' },
   },
 }
 
@@ -137,7 +137,13 @@ test('draftAd sends the fields and the three files as multipart', async () => {
   expect(await client().draftAd(1, upload)).toEqual({ applicationId: 101 })
 
   const { files, ...fields } = upload
-  expect(fake.drafts).toEqual([{ id: 1, fields, files }])
+  const type = 'text/markdown; charset=utf-8'
+  const sent = {
+    coverLetter: { ...files.coverLetter, type },
+    cv: { ...files.cv, type },
+    ad: { ...files.ad, type },
+  }
+  expect(fake.drafts).toEqual([{ id: 1, fields, files: sent }])
 })
 
 test('a draft the server refuses is a CliError naming the request', async () => {

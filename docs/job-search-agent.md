@@ -554,23 +554,25 @@ Model output, validated by the runner:
   ```
 
   The questions block is left out when there are none.
-- **Attachments.** All `.txt`, all stored in job-app only. The agent never
+- **Attachments.** All `.md` (`text/markdown`), all stored in job-app only. The agent never
   writes to the applications folder.
 
 | File | Name |
 |---|---|
-| Cover letter (FI) | `<prefix>_Hakemus_<Company>_FI.txt` |
-| Cover letter (EN) | `<prefix>_CoverLetter_<Company>_EN.txt` |
-| CV | `<prefix>_CV_<Company>_<FI\|EN>.txt` |
-| Saved ad | `<Company>_<Role>_ilmoitus.txt` or `_ad.txt`, with a header of source URL, apply URL or email, and saved date |
+| Cover letter (FI) | `<prefix>_Hakemus_<Company>_FI.md` |
+| Cover letter (EN) | `<prefix>_CoverLetter_<Company>_EN.md` |
+| CV | `<prefix>_CV_<Company>_<FI\|EN>.md` |
+| Saved ad | `<Company>_<Role>_ilmoitus.md` or `_ad.md`, with a header of source URL, apply URL or email, and saved date |
 
 `<Company>` and `<Role>` keep Unicode letters, digits and `-`. Every other run
 of characters becomes one `_`, ends are trimmed, the result is capped at 40
-characters, and it falls back to `Unknown`. The saved ad's header is labelled
-in the draft's language, and `applyTo` falls back to the ad URL.
+characters, and it falls back to `Unknown`. The saved ad's header is a
+Markdown list (`- Source: …`, `- Apply to: …`, `- Saved: …`) labelled in the
+draft's language, and `applyTo` falls back to the ad URL.
 
 An email application's cover letter file holds the recipient, subject,
-attachment name and body. PDFs are never rendered by the agent.
+attachment name and body. The attachment it names is the CV as the `.pdf` the
+user renders from the `.md`. PDFs are never rendered by the agent.
 
 ## 8. Profile corpus and embeddings
 

@@ -20,7 +20,7 @@ The runner puts its fixed framing (draft.framing.md) before this file.
 
 ## CV
 
-- Keep the template's section order. Move the most relevant role's bullets
+- Keep the template's Markdown headings and its section order. Move the most relevant role's bullets
   first and drop bullets the ad gives no reason to keep.
 - Keep every employer and date in the template, even when shortened to one
   line.

@@ -175,7 +175,7 @@ function draftForm({ files, ...fields }: DraftUpload): FormData {
   const form = new FormData()
   for (const [name, value] of Object.entries(fields)) form.append(name, value)
   for (const [name, file] of Object.entries(files)) {
-    form.append(name, new Blob([file.text], { type: 'text/plain; charset=utf-8' }), file.name)
+    form.append(name, new Blob([file.text], { type: 'text/markdown; charset=utf-8' }), file.name)
   }
   return form
 }
