@@ -40,7 +40,7 @@ This design refines brief 033 in two places:
 | `037-application-drafts` | committed | done | 036 |
 | `038-alert-sources` | committed | done | 034 |
 | `039-daily-run` | committed | done | 035a, 037, 038 |
-| `040-markdown-attachments` | committed | in progress | 035a, 037 |
+| `040-markdown-attachments` | committed | done | 035a, 037 |
 
 `035a-corpus-sync` adds an "Add to profile" action in the UI, where the user
 picks which of an application's attachments to mark; job-app stores a flag on
@@ -554,8 +554,8 @@ Model output, validated by the runner:
   ```
 
   The questions block is left out when there are none.
-- **Attachments.** All `.md` (`text/markdown`), all stored in job-app only. The agent never
-  writes to the applications folder.
+- **Attachments.** All `.md` (`text/markdown`), all stored in job-app only.
+  The agent never writes to the applications folder.
 
 | File | Name |
 |---|---|
