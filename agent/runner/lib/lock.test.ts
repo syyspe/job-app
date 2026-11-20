@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
+import { startFakeRunHolder } from '../../test/fakeRunHolder.ts'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
 import { acquireRunLock } from './lock.ts'
@@ -31,12 +32,24 @@ test('taking the lock writes this pid, and releasing it removes the file', () =>
   expect(existsSync(path)).toBe(false)
 })
 
-test('a lock held by a live process is refused naming its pid', () => {
+test('a lock held by a live run is refused naming its pid', () => {
+  const holder = startFakeRunHolder()
+  try {
+    writeFileSync(join(dir.root, 'run.lock'), String(holder.pid))
+
+    expect(() => acquireRunLock(dir.root)).toThrow(
+      expect.objectContaining({ exitCode: 1, message: `another run is in progress (pid ${holder.pid})` }),
+    )
+  } finally {
+    holder.stop()
+  }
+})
+
+test('a lock whose pid now belongs to another process is taken over', () => {
+  writeFileSync(join(dir.root, 'run.lock'), String(process.pid))
   const release = acquireRunLock(dir.root)
 
-  expect(() => acquireRunLock(dir.root)).toThrow(
-    expect.objectContaining({ exitCode: 1, message: `another run is in progress (pid ${process.pid})` }),
-  )
+  expect(readFileSync(join(dir.root, 'run.lock'), 'utf8')).toBe(String(process.pid))
   release()
 })
 

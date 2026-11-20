@@ -317,8 +317,10 @@ criteria that follow it. `prompts/draft.framing.md` and
   ones a sent summary covered), each a JSON file written through a temp file
   and a rename; `localDate(now)`.
 - `lock.ts` — `acquireRunLock(stateDir)` → `release`: `run.lock` created
-  exclusively with the pid; a live holder is `CliError(1, …)`, a dead or
-  unreadable one is removed and the lock taken once more.
+  exclusively with the pid; a holder whose `/proc/<pid>/cmdline` still names
+  `agent/runner/commands/run.ts` is `CliError(1, …)`; any other holder (gone,
+  reused by an unrelated process, or unreadable) is removed and the lock
+  taken once more.
 - `handoverExpiry.ts` — `handoverExpired(ad, { waitDays, now })` (UTC
   first-seen plus the wait, or past an ISO deadline's local day) and
   `dismissExpiredHandovers(jobApp, options)`.

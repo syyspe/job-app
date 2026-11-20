@@ -159,6 +159,10 @@ the API isn't answering; the documented run time is 20:00.
 - `DailyReport` keeps the skip (`skipped`) apart from step `failures`, so a
   skip alone exits 0. A failed send or `markReported` is a `summary` failure,
   and the command prints `summary: not sent` for the first.
+- Added in Ship, after review: the lock's liveness check reads
+  `/proc/<pid>/cmdline` instead of `process.kill(pid, 0)`, and a holder
+  counts only while its command line names `agent/runner/commands/run.ts`.
+  A pid reused after a reboot no longer blocks every later run.
 
 ## Work order
 

@@ -7,6 +7,7 @@ import { startFakeJobApp } from '../../test/fakeJobApp.ts'
 import type { FakeJobApp } from '../../test/fakeJobApp.ts'
 import { UNREACHABLE_URL } from '../../test/fakeOllama.ts'
 import { runNode } from '../../test/profileFixture.ts'
+import { startFakeRunHolder } from '../../test/fakeRunHolder.ts'
 import type { RunResult } from '../../test/profileFixture.ts'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
@@ -81,11 +82,16 @@ test('an env file without MAIL_SMTP_HOST exits 2', async () => {
   expectOneLineError(await run(), 2, `${path}: MAIL_SMTP_HOST is not set`)
 })
 
-test('a lock held by a live process exits 1 and runs no step', async () => {
-  writeLock(process.pid)
+test('a lock held by a live run exits 1 and runs no step', async () => {
+  const holder = startFakeRunHolder()
+  try {
+    writeLock(holder.pid)
 
-  expectOneLineError(await run(), 1, `another run is in progress (pid ${process.pid})`)
-  expect(jobApp.requests).toEqual([])
+    expectOneLineError(await run(), 1, `another run is in progress (pid ${holder.pid})`)
+    expect(jobApp.requests).toEqual([])
+  } finally {
+    holder.stop()
+  }
 })
 
 test('a stale lock is taken over, every step reports, and the lock is released', async () => {
