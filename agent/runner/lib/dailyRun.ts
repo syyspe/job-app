@@ -11,7 +11,7 @@ import type { JobAppClient } from './jobApp.ts'
 import type { Mailbox } from './mailbox.ts'
 import type { MailMessage } from './smtp.ts'
 import type { RunnerState } from './state.ts'
-import { composeSummary } from './summary.ts'
+import { composeSummary, isEmpty } from './summary.ts'
 import type { Problem } from './summary.ts'
 import { syncProfile } from './sync.ts'
 import type { SyncOptions, SyncResult } from './sync.ts'
@@ -29,7 +29,7 @@ export interface DailyRunOptions {
   sync: Omit<SyncOptions, 'jobApp'> | null
   evaluation: Omit<EvaluationRunOptions, 'jobApp' | 'checkHealth'>
   drafting: Omit<DraftRunOptions, 'jobApp' | 'checkHealth'>
-  summary: { recipient: string; appUrl: string }
+  summary: { recipient: string; alwaysSend: boolean; appUrl: string }
   send: (message: MailMessage) => Promise<void>
   now: () => Date
 }
@@ -113,8 +113,8 @@ async function sendSummary({ options, report }: Run): Promise<void> {
   const ads = listed.flat().filter((ad) => ad.reportedAt === null)
   const sourceFailures = state.readFailures()
   const problems = [...(report.skipped ? [report.skipped] : []), ...report.failures]
+  if (isEmpty({ ads, sourceFailures, problems }) && !options.summary.alwaysSend) return
   const summary = composeSummary({ ads, sourceFailures, problems, appUrl: options.summary.appUrl })
-  if (!summary) return
   await options.send({ to: options.summary.recipient, ...summary, date: options.now() })
   report.sent = true
   await jobApp.markReported(ads.map((ad) => ad.id))

@@ -39,7 +39,7 @@ export function loadDraftConfig(path: string): DraftConfig {
 
 const dailyRunConfigSchema = z.object({
   handoverWaitDays: z.int().min(1).default(7),
-  summary: z.object({ recipient: z.email() }),
+  summary: z.object({ recipient: z.email(), alwaysSend: z.boolean().default(false) }),
 })
 
 export type DailyRunConfig = z.infer<typeof dailyRunConfigSchema>

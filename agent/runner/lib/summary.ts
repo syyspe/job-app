@@ -64,8 +64,10 @@ function bodyOf({ ads, sourceFailures, problems, appUrl }: SummaryInput): string
   ].join('\n')
 }
 
-// Null when there is nothing to report, so no mail is sent.
-export function composeSummary(input: SummaryInput): Summary | null {
-  if (input.ads.length + input.sourceFailures.length + input.problems.length === 0) return null
+export function isEmpty({ ads, sourceFailures, problems }: Pick<SummaryInput, 'ads' | 'sourceFailures' | 'problems'>): boolean {
+  return ads.length + sourceFailures.length + problems.length === 0
+}
+
+export function composeSummary(input: SummaryInput): Summary {
   return { subject: subjectOf(input), text: bodyOf(input) }
 }

@@ -468,9 +468,10 @@ before you fix the connector. The tests use synthetic fixtures only.
 
 `agent:run` does the whole pipeline once: collect, dismiss expired
 hand-overs, sync the profile, evaluate, draft, and email you one summary
-when there is something new. Windows Task Scheduler starts it every evening.
-Everything above it must already be set up: the profile corpus, ad
-evaluation, ad drafting and alert sources.
+when there is something new, or on every run if you set `alwaysSend`.
+Windows Task Scheduler starts it every evening. Everything above it must
+already be set up: the profile corpus, ad evaluation, ad drafting and alert
+sources.
 
 ### Setup
 
@@ -481,15 +482,19 @@ evaluation, ad drafting and alert sources.
    MAIL_SMTP_HOST=smtp.gmail.com
    ```
 
-2. Add the recipient, and optionally the hand-over wait, to
+2. Add the recipient, and optionally `alwaysSend` and the hand-over wait, to
    `~/.config/job-agent/config.json`:
 
    ```json
    {
-     "summary": { "recipient": "<your own address>" },
+     "summary": { "recipient": "<your own address>", "alwaysSend": true },
      "handoverWaitDays": 7
    }
    ```
+
+   `alwaysSend` defaults to false. When it is true, the summary arrives every
+   run, so it also shows that the run happened. A run with nothing new sends
+   only the job-app link.
 
    An ad waiting for hand-over is dismissed `handoverWaitDays` days after it
    was first seen, or after its deadline day if that comes sooner.

@@ -155,12 +155,22 @@ describe('daily run', () => {
   test('the wait defaults to 7 days and the recipient is read', () => {
     const path = writeConfig({ summary: { recipient: 'me@mail.example' } })
 
-    expect(loadDailyRunConfig(path)).toEqual({ handoverWaitDays: 7, summary: { recipient: 'me@mail.example' } })
+    expect(loadDailyRunConfig(path)).toEqual({
+      handoverWaitDays: 7,
+      summary: { recipient: 'me@mail.example', alwaysSend: false },
+    })
+  })
+
+  test('alwaysSend is read', () => {
+    const path = writeConfig({ summary: { recipient: 'me@mail.example', alwaysSend: true } })
+
+    expect(loadDailyRunConfig(path).summary.alwaysSend).toBe(true)
   })
 
   test.each([
     ['no summary key', {}, 'summary'],
     ['a recipient that is not an address', { summary: { recipient: 'me' } }, 'summary.recipient'],
+    ['an alwaysSend that is not a boolean', { summary: { recipient: 'me@mail.example', alwaysSend: 'yes' } }, 'summary.alwaysSend'],
     ['a zero wait', { handoverWaitDays: 0, summary: { recipient: 'me@mail.example' } }, 'handoverWaitDays'],
   ])('%s is an exit-2 error naming the field', (_name, value, field) => {
     const path = writeConfig(value)

@@ -1,6 +1,6 @@
 // npm run agent:run — the daily run: collect, expire hand-overs, sync the
-// profile, evaluate, draft, and email one summary when there is news. Task
-// Scheduler starts it through daily-run.sh.
+// profile, evaluate, draft, and email one summary when there is news, or every
+// run with summary.alwaysSend. Task Scheduler starts it through daily-run.sh.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -100,7 +100,11 @@ function dailyOptions(setup: Setup, store: IndexStore | null): DailyRunOptions {
     checkHealth: () => checkOllama(profile),
     sync: syncFolder && store ? { config: { ...profile, syncFolder }, store, ollama } : null,
     ...modelOptions(setup, today),
-    summary: { recipient: setup.daily.summary.recipient, appUrl: setup.jobAppEnv.baseUrl },
+    summary: {
+      recipient: setup.daily.summary.recipient,
+      alwaysSend: setup.daily.summary.alwaysSend,
+      appUrl: setup.jobAppEnv.baseUrl,
+    },
     send: (message) => sendMail(message, { ...setup.smtp, envPath: envFile }),
     now: () => new Date(),
   }
