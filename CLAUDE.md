@@ -44,6 +44,10 @@
   `npm run agent:draft` turns suitable ads into draft applications under the
   same gate. It needs `prompts/draft.md` and config's `drafting` key — see
   README's "Ad drafting" section.
+  `npm run agent:collect` reads the alert mailbox, ingests and screens ads
+  and fetches automatic sources' pages; no `claude -p`, so no gate. It needs
+  the `MAIL_*` keys in `~/.config/job-agent/env` and config's `sources` key —
+  see README's "Alert sources" section.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.
@@ -57,7 +61,8 @@ with no `failed` line. Playwright: `N passed`.
   tests, Playwright 1.62.1 for end-to-end.
 - Dependency policy: no new dependencies without approval. Approved so far
   beyond the framework set: `@modelcontextprotocol/sdk` 1.30.0 and `zod`
-  4.6.5, both for `mcp/` and `agent/`.
+  4.6.5, both for `mcp/` and `agent/`; `imapflow` 2.12.1 and `mailparser`
+  3.14.5 (with `@types/mailparser` 3.9.0), for `agent/runner/` only.
 - Unit tests live beside the code they test as `src/**/*.test.tsx?`,
   `server/**/*.test.ts`, `mcp/**/*.test.ts` and `agent/**/*.test.ts`; those
   globs are what Vitest picks up. E2E specs go in `e2e/*.spec.ts`.

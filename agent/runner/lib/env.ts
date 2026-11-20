@@ -8,17 +8,32 @@ export interface JobAppEnv {
   password: string
 }
 
+export interface MailEnv {
+  host: string
+  username: string
+  password: string
+}
+
 // Parsed, not loaded: the runner's credentials never enter process.env.
-export function loadJobAppEnv(path: string): JobAppEnv {
+function readEnvFile(path: string): (name: string) => string {
   const values = parseEnv(readConfigFile(path))
-  function required(name: string): string {
+  return (name) => {
     const value = values[name]
     if (!value) throw new CliError(2, `${path}: ${name} is not set`)
     return value
   }
+}
+
+export function loadJobAppEnv(path: string): JobAppEnv {
+  const required = readEnvFile(path)
   return {
     baseUrl: required('JOBAPP_API_URL'),
     username: required('JOBAPP_USERNAME'),
     password: required('JOBAPP_PASSWORD'),
   }
+}
+
+export function loadMailEnv(path: string): MailEnv {
+  const required = readEnvFile(path)
+  return { host: required('MAIL_IMAP_HOST'), username: required('MAIL_USERNAME'), password: required('MAIL_PASSWORD') }
 }

@@ -38,7 +38,7 @@ This design refines brief 033 in two places:
 | `035a-corpus-sync` | committed | done | 035 |
 | `036-ad-evaluation` | committed | done | 034, 035 |
 | `037-application-drafts` | committed | done | 036 |
-| `038-alert-sources` | committed | open | 034 |
+| `038-alert-sources` | committed | done | 034 |
 | `039-daily-run` | committed | open | 035a, 037, 038 |
 | `040-markdown-attachments` | not written | open | 035a, 037 |
 
@@ -186,7 +186,7 @@ synthetic.
 
 | Path | Holds |
 |---|---|
-| `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets: `JOBAPP_API_URL`, `JOBAPP_USERNAME`, `JOBAPP_PASSWORD` |
+| `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets: `JOBAPP_API_URL`, `JOBAPP_USERNAME`, `JOBAPP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD` |
 | `~/.config/job-agent/config.json` | Recipient, source switches, caps, `handoverWaitDays`, title rules, corpus paths, file name prefix, Ollama URL and embedding model |
 | `~/.config/job-agent/prompts/` | Headless evaluation and drafting rules adapted from the three job application skills |
 | `~/.local/state/job-agent/` | Run lock, mail watermarks, daily counters, unreported source failures, logs |
@@ -246,6 +246,35 @@ the fixed framing from `agent/runner/prompts/draft.framing.md`. The repo
 ships only a synthetic `draft.example.md`. Both CV templates go to the step
 whole. The person's work-history notes are exported into a corpus folder
 labelled `facts`, where the step finds them through `search_profile`.
+
+The `sources` key `038-alert-sources` owns, read only by `agent:collect`.
+Connector ids are `academicwork`, `valtiolle`, `nordea` (automatic) and
+`duunitori` (hand-over). A source missing from the key is disabled:
+
+```json
+{
+  "sources": {
+    "<id>": { "enabled": true, "termsCheckedOn": "YYYY-MM-DD", "dailyOpenCap": 20, "minDelayMs": 15000 }
+  }
+}
+```
+
+`dailyOpenCap` is an integer of at least 1 and `minDelayMs` at least 1000.
+The command exits 2 with one stderr line for an unknown id, for an enabled
+automatic source with no `termsCheckedOn` (`sources.<id>: termsCheckedOn is
+required to enable an automatic source`), and when no source is enabled, so
+it never reads mail it would not parse.
+
+The mail account is a dedicated mailbox read over IMAP with TLS on port 993,
+INBOX only, read-only: nothing is flagged, moved or deleted. State files in
+`~/.local/state/job-agent/`, each written through a temp file and a rename:
+
+- `mail-watermark.json`: `{ uidValidity, lastUid }`. A changed UIDVALIDITY
+  rescans from UID 0, which ingest's idempotence makes safe.
+- `source-counters.json`: `{ date, opened: { <id>: n }, blocked: [<id>] }`,
+  for the local date, reset when the date changes.
+- `source-failures.json`: `[{ source, date, kind }]`, `kind` being `blocked`
+  or `empty_alert`. `038` appends; `039-daily-run` reports and clears.
 
 `syncFolder` is optional, owned by `035a-corpus-sync`. When set, it joins the
 corpus as one more `style` entry, so every command indexes it.
@@ -310,7 +339,10 @@ What a transition must carry:
 - **`suitable` and `unsuitable`** require `evaluation`: `{verdict, fitSummary,
   reasons}`, where `verdict` equals `to`, `fitSummary` is a string and `reasons`
   a string array.
-- **`ready`** requires a non-empty `body`.
+- **`ready`** requires a non-empty `body`. It may also carry `company` and
+  `deadline`, which the fetched page names. Each fills its column only while
+  the stored value is empty, before the dedup rules run, so a company only
+  the page names still feeds rule 3.
 
 **Recording a failed attempt.** A transition with `to` equal to the current
 state and an `error` adds one to `attempts` and stores `last_error`. It works
@@ -395,6 +427,15 @@ refused request leaves no file in the uploads directory. Success answers 201
 ```ts
 type SourceMode = 'automatic' | 'handover'
 
+interface AlertMessage {
+  uid: number
+  from: string // the sender's address, lowercased
+  subject: string
+  date: string // ISO 8601
+  html: string
+  text: string
+}
+
 interface AdCandidate {
   externalId: string
   url: string
@@ -428,6 +469,21 @@ interface SourceConnector {
   untrusted, so a candidate with any other host is dropped without a request.
 - A `handover` connector has no `fetchAd` or `fetchHosts`. Duunitori is
   `handover`.
+- `PoliteHttp.get(url)` answers `{ kind: 'page', html }` for a 2xx. 401, 403,
+  429 and 503 are `blocked`, which ends the source's day: every later `get`
+  that day answers `blocked` with no request. 404 and 410 are `gone`, any
+  other status `failed: http_error`, and a network error or the 30-second
+  timeout `failed: network`. A refused URL is `failed: bad_host`, a refused
+  redirect or a fourth hop `failed: bad_redirect`. Requests carry only
+  `User-Agent: job-agent/1.0 (personal job alert reader)` and
+  `Accept: text/html`, and wait `minDelayMs` after the source's previous one,
+  redirect hops included. An open counts against `dailyOpenCap` before the
+  request is sent.
+- A connector never follows a click-tracking link. Where an alert links only
+  through one, the ad URL comes from the email itself (Valtiolle.fi's Mailjet
+  links carry the target in their path).
+- `parseAlert` answers `[]` for an alert whose structure it does not
+  recognise, and the runner records an `empty_alert` failure.
 - Each source's config is `{enabled, termsCheckedOn, dailyOpenCap, minDelayMs}`.
   The runner refuses to enable an automatic source with no `termsCheckedOn`.
 

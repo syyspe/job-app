@@ -112,3 +112,38 @@ describe('transitions', () => {
     expect((await moved(ad.id, { to: 'failed', error: 'gone' })).title).toBe(ad.title)
   })
 })
+
+describe('company and deadline on entering ready', () => {
+  test('fill the stored fields while they are empty', async () => {
+    const ad = await ingest({ company: '' })
+
+    const ready = await moved(ad.id, { to: 'ready', body: 'Text.', company: 'Page Oy', deadline: '2026-12-31' })
+
+    expect(ready.company).toBe('Page Oy')
+    expect(ready.deadline).toBe('2026-12-31')
+  })
+
+  test('leave fields the alert already set alone', async () => {
+    const ad = await ingest({ company: 'Alert Oy', deadline: '2026-12-01' })
+
+    const ready = await moved(ad.id, { to: 'ready', body: 'Text.', company: 'Page Oy', deadline: '2026-12-31' })
+
+    expect(ready.company).toBe('Alert Oy')
+    expect(ready.deadline).toBe('2026-12-01')
+  })
+
+  test('a company only the page names feeds the title rule', async () => {
+    const original = await ingest({ company: 'Page Oy', title: 'Test Lead' })
+    const repeat = await ingest({ company: '', title: 'Test Lead' })
+
+    const ad = await moved(repeat.id, { to: 'ready', body: 'Text.', company: 'Page Oy' })
+
+    expect(ad.state).toBe('duplicate')
+    expect(ad.duplicateOf).toBe(original.id)
+  })
+
+  test('a company that is not a string is 400', async () => {
+    const ad = await ingest()
+    expect((await transition(ad.id, { to: 'ready', body: 'Text.', company: 7 })).status).toBe(400)
+  })
+})

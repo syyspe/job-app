@@ -25,6 +25,9 @@ export interface AdIngest {
 export interface AdTransition {
   to: AdState
   body?: string
+  // What the fetched page names; it fills only an empty stored field.
+  company?: string
+  deadline?: string
   evaluation?: AdEvaluation
   error?: string
 }
@@ -121,6 +124,8 @@ export function parseAdTransition(body: unknown): AdTransition {
   return {
     to,
     body: optionalText(fields, 'body'),
+    company: optionalText(fields, 'company'),
+    deadline: optionalText(fields, 'deadline'),
     evaluation: evaluationOf(fields, to),
     error: errorOf(fields, to),
   }

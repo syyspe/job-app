@@ -26,12 +26,15 @@
     "agent:evaluate": "node agent/runner/commands/evaluate.ts",
     "agent:draft": "node agent/runner/commands/draft.ts",
     "preview": "vite preview",
-    "start": "npm run build && node --env-file-if-exists=.env server/index.ts"
+    "start": "npm run build && node --env-file-if-exists=.env server/index.ts",
+    "agent:collect": "node agent/runner/commands/collect.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "better-sqlite3": "^13.0.3",
     "express": "^5.2.1",
+    "imapflow": "^2.12.1",
+    "mailparser": "^3.14.5",
     "multer": "^2.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -44,6 +47,7 @@
     "@testing-library/user-event": "^14.6.7",
     "@types/better-sqlite3": "^9.6.0",
     "@types/express": "^5.0.6",
+    "@types/mailparser": "^3.9.0",
     "@types/multer": "^2.2.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",

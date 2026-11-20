@@ -14,6 +14,8 @@ export interface PendingAttachment {
 
 const adSummaryShape = {
   id: z.number(),
+  source: z.string(),
+  externalId: z.string(),
   sourceMode: z.enum(['automatic', 'handover']),
   title: z.string(),
   company: z.string(),
@@ -26,7 +28,6 @@ const adSummaryShape = {
 const adSummarySchema = z.object(adSummaryShape)
 const adSchema = z.object({
   ...adSummaryShape,
-  source: z.string(),
   evaluation: z.object({ verdict: z.string(), fitSummary: z.string(), reasons: z.array(z.string()) }).nullable(),
   body: z.string().nullable(),
 })
@@ -38,8 +39,29 @@ export type Ad = z.infer<typeof adSchema>
 
 export interface AdTransition {
   to: string
+  body?: string
+  // What a fetched page names; the server fills only an empty stored field.
+  company?: string
+  deadline?: string
   evaluation?: { verdict: string; fitSummary: string; reasons: string[] }
   error?: string
+}
+
+// POST /api/ads: the unique key is (source, externalId).
+export interface AdIngest {
+  source: string
+  sourceMode: 'automatic' | 'handover'
+  externalId: string
+  url: string
+  title: string
+  company?: string
+  location?: string
+  deadline?: string
+}
+
+export interface IngestedAd {
+  ad: AdSummary
+  created: boolean
 }
 
 export interface DraftFile {
@@ -62,6 +84,7 @@ export interface JobAppClient {
   listPendingSync: () => Promise<PendingAttachment[]>
   downloadAttachment: (id: number) => Promise<Uint8Array>
   setProfileSync: (id: number, pending: boolean) => Promise<void>
+  ingestAd: (input: AdIngest) => Promise<IngestedAd>
   listAds: (state: string) => Promise<AdSummary[]>
   getAd: (id: number) => Promise<Ad>
   transitionAd: (id: number, transition: AdTransition) => Promise<AdSummary>
@@ -158,6 +181,13 @@ export function createJobAppClient(config: JobAppConfig): JobAppClient {
     },
     setProfileSync: async (id, pending) => {
       await send({ method: 'PUT', path: `/api/attachments/${id}/profile-sync`, body: { pending } })
+    },
+    ingestAd: async (input) => {
+      const request: JobAppRequest = { method: 'POST', path: '/api/ads', body: input }
+      const response = await send(request)
+      const parsed = adSummarySchema.safeParse(await response.json().catch(() => undefined))
+      if (!parsed.success) throw new CliError(1, `job-app POST /api/ads: bad response`)
+      return { ad: parsed.data, created: response.status === 201 }
     },
     listAds: (state) => receive(send, { method: 'GET', path: `/api/ads?state=${state}` }, z.array(adSummarySchema)),
     getAd: (id) => receive(send, { method: 'GET', path: `/api/ads/${id}` }, adSchema),

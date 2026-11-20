@@ -3,19 +3,14 @@ import type { EvaluationOutcome } from './evaluate.ts'
 import type { Ad, AdSummary, JobAppClient } from './jobApp.ts'
 import { mapLimit } from './mapLimit.ts'
 import type { RunnerConfig } from './runnerConfig.ts'
-import { screenTarget } from './titleRules.ts'
+import { screenNewAds } from './screen.ts'
+import type { ScreenCounts } from './screen.ts'
 
 export interface EvaluationRunOptions {
   jobApp: JobAppClient
   config: RunnerConfig
   checkHealth: () => Promise<HealthResult>
   evaluate: (ad: Ad) => Promise<EvaluationOutcome>
-}
-
-export interface ScreenCounts {
-  titleRejected: number
-  awaitingHandover: number
-  leftNew: number
 }
 
 export interface EvaluationCounts {
@@ -31,21 +26,6 @@ export interface EvaluationReport {
   skipped: string | null
   evaluated: EvaluationCounts
   queued: number
-}
-
-async function screenNewAds(jobApp: JobAppClient, phrases: string[]): Promise<ScreenCounts> {
-  const counts: ScreenCounts = { titleRejected: 0, awaitingHandover: 0, leftNew: 0 }
-  for (const ad of await jobApp.listAds('new')) {
-    const target = screenTarget(ad, phrases)
-    if (target === null) {
-      counts.leftNew += 1
-      continue
-    }
-    await jobApp.transitionAd(ad.id, { to: target })
-    if (target === 'title_rejected') counts.titleRejected += 1
-    else counts.awaitingHandover += 1
-  }
-  return counts
 }
 
 // A failure is a same-state transition carrying its category: the server adds

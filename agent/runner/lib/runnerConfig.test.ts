@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
-import { loadDraftConfig, loadRunnerConfig } from './runnerConfig.ts'
+import { loadDraftConfig, loadRunnerConfig, loadSourcesConfig } from './runnerConfig.ts'
 
 let dir: TempDir
 
@@ -82,6 +82,70 @@ describe('drafting', () => {
     const path = writeConfig({ drafting: value })
 
     expect(() => loadDraftConfig(path)).toThrow(
+      expect.objectContaining({ exitCode: 2, message: expect.stringContaining(`${path}: ${field}: `) }),
+    )
+  })
+})
+
+describe('sources', () => {
+  const connectors = [
+    { id: 'auto', mode: 'automatic' as const },
+    { id: 'manual', mode: 'handover' as const },
+  ]
+  const load = (sources: unknown) => loadSourcesConfig(writeConfig({ sources }), connectors)
+
+  test('missing keys take their defaults and a missing source is disabled', () => {
+    expect(load({ auto: { enabled: true, termsCheckedOn: '2026-11-20' } })).toEqual({
+      auto: { enabled: true, termsCheckedOn: '2026-11-20', dailyOpenCap: 20, minDelayMs: 15000 },
+      manual: { enabled: false, dailyOpenCap: 20, minDelayMs: 15000 },
+    })
+  })
+
+  test('caps are overridable per source', () => {
+    const config = load({ auto: { enabled: true, termsCheckedOn: '2026-11-20', dailyOpenCap: 5, minDelayMs: 2000 } })
+
+    expect(config.auto).toMatchObject({ dailyOpenCap: 5, minDelayMs: 2000 })
+  })
+
+  test('a hand-over source is enabled without a terms check', () => {
+    expect(load({ manual: { enabled: true } }).manual.enabled).toBe(true)
+  })
+
+  test('an automatic source cannot be enabled before its terms are checked', () => {
+    const path = writeConfig({ sources: { auto: { enabled: true } } })
+
+    expect(() => loadSourcesConfig(path, connectors)).toThrow(
+      expect.objectContaining({
+        exitCode: 2,
+        message: `${path}: sources.auto: termsCheckedOn is required to enable an automatic source`,
+      }),
+    )
+  })
+
+  test('an unknown source id is an exit-2 error naming it', () => {
+    const path = writeConfig({ sources: { manual: { enabled: true }, other: { enabled: false } } })
+
+    expect(() => loadSourcesConfig(path, connectors)).toThrow(
+      expect.objectContaining({ exitCode: 2, message: `${path}: sources.other: unknown source` }),
+    )
+  })
+
+  test('no source enabled is an exit-2 error', () => {
+    const path = writeConfig({ sources: { manual: { enabled: false } } })
+
+    expect(() => loadSourcesConfig(path, connectors)).toThrow(
+      expect.objectContaining({ exitCode: 2, message: `${path}: sources: no source is enabled` }),
+    )
+  })
+
+  test.each([
+    ['a cap below 1', { manual: { enabled: true, dailyOpenCap: 0 } }, 'sources.manual.dailyOpenCap'],
+    ['a delay below 1000', { manual: { enabled: true, minDelayMs: 999 } }, 'sources.manual.minDelayMs'],
+    ['a malformed terms date', { manual: { enabled: true, termsCheckedOn: '20.11.2026' } }, 'sources.manual.termsCheckedOn'],
+  ])('%s is an exit-2 error naming the field', (_name, sources, field) => {
+    const path = writeConfig({ sources })
+
+    expect(() => loadSourcesConfig(path, connectors)).toThrow(
       expect.objectContaining({ exitCode: 2, message: expect.stringContaining(`${path}: ${field}: `) }),
     )
   })

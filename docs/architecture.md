@@ -119,7 +119,8 @@ Helpers with no Express dependency:
   fixes status `draft` and an empty `dateApplied` itself.
 - `ads.ts` — the ad database operations: ingest, transition, hand-over,
   `draftAd` (application, attachments and the move to `drafted`, run by the
-  route in one transaction), reporting.
+  route in one transaction), reporting. A transition to `ready` fills an empty
+  `company` or `deadline` from the request before the dedup rules run.
 - `files.ts` — attachment storage.
 - `passwords.ts` — hashing and session tokens.
 - `cookies.ts` — reads the session cookie. Express 5 doesn't parse cookies,
@@ -256,7 +257,10 @@ when all pass. `commands/evaluate.ts` is `npm run agent:evaluate`: config,
 runner config, private prompt and env, then the version gate, then
 `runEvaluation`. `commands/draft.ts` is `npm run agent:draft`: config, the
 `drafting` key, the private prompt and both CV templates, env, the version
-gate, then `runDrafting`.
+gate, then `runDrafting`. `commands/collect.ts` is `npm run agent:collect`:
+the `sources` key, runner config and the mail and job-app env, then
+`openMailbox` and `runCollect`, closing the mailbox whatever happens. It runs
+no `claude -p`, so it has no version gate.
 
 `prompts/evaluate.framing.md` is the fixed head of the evaluation system
 prompt; `prompts/evaluate.example.md` a synthetic example of the private
@@ -265,19 +269,22 @@ criteria that follow it. `prompts/draft.framing.md` and
 
 `lib/`:
 
-- `env.ts` — `loadJobAppEnv(path)`: `util.parseEnv` of the env file, which
-  gives `{ baseUrl, username, password }`. A missing file or variable is exit
-  2.
+- `env.ts` — `loadJobAppEnv(path)` and `loadMailEnv(path)`: `util.parseEnv`
+  of the env file, which gives `{ baseUrl, username, password }` and
+  `{ host, username, password }`. A missing file or variable is exit 2.
 - `jobApp.ts` — `createJobAppClient(config)`: `listPendingSync`,
   `downloadAttachment`, `setProfileSync`, `listAds(state)`, `getAd(id)`,
-  `transitionAd(id, body)`, `draftAd(id, upload)` (multipart: the five fields
+  `transitionAd(id, body)`, `ingestAd(input)` (201 new, 200 existing),
+  `draftAd(id, upload)` (multipart: the five fields
   and three `text/plain` files). There is no other way to create or change an
   application. It logs in lazily, re-logs in once on a 401, and
   turns every failure into a `CliError(1, …)`. Ad responses are checked
   against only the fields the runner reads.
 - `runnerConfig.ts` — `loadRunnerConfig(path)`: `titleRules.reject` and
   `evaluation.{concurrency, perRunCap, timeoutMs}`, with defaults;
-  `loadDraftConfig(path)`: the `drafting` key, read only by `agent:draft`.
+  `loadDraftConfig(path)`: the `drafting` key, read only by `agent:draft`;
+  `loadSourcesConfig(path, connectors)`: the `sources` key, with every
+  connector present (missing means disabled) and the exit-2 refusals.
 - `mapLimit.ts` — `mapLimit(items, limit, fn)`, order-keeping bounded
   concurrency for both runs.
 - `prompts.ts` — `buildSystemPrompt(framing, rules)`: the fixed framing
@@ -285,6 +292,29 @@ criteria that follow it. `prompts/draft.framing.md` and
 - `titleRules.ts` — `matchesReject(title, phrases)` (whole-word,
   case-insensitive, Unicode letters as word characters) and
   `screenTarget(ad, phrases)`.
+- `screen.ts` — `screenNewAds(jobApp, phrases)`, which both runs call.
+- `mailbox.ts` — `openMailbox(config)`: INBOX over IMAP (TLS, port 993),
+  read-only, with ImapFlow's logger off. `messagesAfter(uid)` yields
+  `AlertMessage`s in UID order through `toAlertMessage`, and `connectError`
+  maps a rejected login and an unreachable host to `CliError(1, …)`.
+- `state.ts` — `createRunnerState(stateDir)`: the mail watermark, the daily
+  source counters and the source failure list, each a JSON file written
+  through a temp file and a rename; `localDate(now)`.
+- `politeHttp.ts` — `createPoliteHttp(options)`: the only network path a
+  connector has. It checks scheme and host on the URL and every redirect,
+  sends fixed headers, spaces requests by `minDelayMs`, counts each open
+  before the request and ends the source's day at its cap or first block.
+- `sources/` — the connectors. `types.ts` holds the section 6 interface,
+  `html.ts` the dependency-free `htmlToText`, `linksOf` and `jobPostingOf`,
+  `common.ts` the host check and the fetch-then-extract step, and
+  `index.ts` the `CONNECTORS` registry. `academicWork.ts`, `valtiolle.ts` and
+  `nordea.ts` are automatic, `duunitori.ts` is hand-over. Each file opens with
+  what identifies its alerts and where the ad id, title and text sit.
+  `fixtures/` holds synthetic alert bodies and ad pages only.
+- `collectRun.ts` — `runCollect`: alerts after the watermark into ingests,
+  then `screenNewAds`, then each enabled automatic source's oldest `new` ads
+  through its connector, the sources in parallel. It returns per-source
+  counts.
 - `sandbox.ts` — the one way the runner starts `claude -p`: `sandboxArgs`
   (the fixed flag list), `sandboxEnv` (the allowlist), `profileMcpConfig`,
   `stepSchema` (zod → JSON Schema without `$schema`), `spawnSandboxed` (fresh
@@ -323,9 +353,13 @@ criteria that follow it. `prompts/draft.framing.md` and
   every request line, a login
   counter, session expiry and a switchable failure. `fakeHttp.ts` holds its
   JSON helpers.
-- `fakeJobAppAds.ts` — `fakeAd(fields)` and the ad list, get, transition and
-  multipart draft handlers, which record attempts, fail an ad on the third and
-  draft only a suitable ad, as the server does.
+- `fakeJobAppAds.ts` — `fakeAd(fields)` and the ad ingest, list, get,
+  transition and multipart draft handlers. They are idempotent on
+  `(source, externalId)`, record attempts, fail an ad on the third and draft
+  only a suitable ad, as the server does.
+- `fakeMailbox.ts` — an in-memory `Mailbox` that records the UIDs read after.
+- `fakeSources.ts` — `fixture(name)`, `alert(fields)` and `fakePoliteHttp`,
+  which answers every get with one result.
 - `fakeClaude.ts` — an executable stand-in for the `claude` CLI: records
   argv, env, cwd and stdin to `FAKE_CLAUDE_LOG` and acts as
   `FAKE_CLAUDE_MODE` says; `--version` prints `9.9.9`.
