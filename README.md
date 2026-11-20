@@ -340,7 +340,7 @@ up as above, the job-app env file, and a logged-in `claude` CLI on `PATH`.
 `agent:draft` turns each `suitable` ad into a job-app application with status
 `draft`. A sandboxed `claude -p` step writes a cover letter, a tailored CV, a
 fit summary and the open questions as JSON. The runner checks them, builds
-three `.txt` attachments (the saved ad, the cover letter and the CV) and
+three `.md` attachments (the saved ad, the cover letter and the CV) and
 creates the application in one call to `POST /api/ads/:id/draft`. Nothing in
 the agent can submit an application. The setup from "Ad evaluation" applies,
 including the sandbox check.

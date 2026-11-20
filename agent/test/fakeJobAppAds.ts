@@ -41,7 +41,7 @@ export interface FakeTransition {
 export interface FakeDraft {
   id: number
   fields: Record<string, string>
-  files: Record<string, { name: string; text: string }>
+  files: Record<string, { name: string; type: string; text: string }>
 }
 
 export function fakeAd(fields: Partial<FakeAd> & { id: number }): FakeAd {
@@ -119,7 +119,7 @@ async function toDraft(id: number, form: FormData): Promise<FakeDraft> {
   const draft: FakeDraft = { id, fields: {}, files: {} }
   for (const [name, value] of form) {
     if (typeof value === 'string') draft.fields[name] = value.replaceAll('\r\n', '\n')
-    else draft.files[name] = { name: value.name, text: await value.text() }
+    else draft.files[name] = { name: value.name, type: value.type, text: await value.text() }
   }
   return draft
 }

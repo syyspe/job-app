@@ -22,6 +22,8 @@ The CV:
 
 - Write in `language`: the ad's language, unless the rules below say
   otherwise. Start from the template for that language.
+- The CV and the cover letter are Markdown. The CV keeps the template's
+  Markdown structure: its headings, lists and emphasis.
 - Tailor it by ordering, shortening and leaving out items. Never add an
   employer, a role, a date, a skill or a result that is not in the template or
   a `facts` result.
@@ -43,7 +45,8 @@ Other fields:
 
 - `applicationType`: `email` when the ad asks for applications by email,
   otherwise `portal`. For `email`, `coverLetter` holds the recipient, the
-  subject, the attachment's name and then the body.
+  subject, the attachment's name and then the body. Name the CV attachment
+  as the `.pdf` the person renders from the CV.
 - `company`, `role` and `applyTo` (the URL or email address to apply to):
   only what the ad states. Leave a field empty when the ad does not say.
 - `fitSummary`: a few sentences on how the person fits the ad, for the person

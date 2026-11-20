@@ -31,10 +31,10 @@ function output(fields: Partial<DraftOutput> = {}): DraftOutput {
 
 describe('file names', () => {
   test.each([
-    ['fi', 'portal', ['Tester_Hakemus_Example_Oy_FI.txt', 'Tester_CV_Example_Oy_FI.txt', 'Example_Oy_Test_Lead_ilmoitus.txt']],
-    ['en', 'portal', ['Tester_CoverLetter_Example_Oy_EN.txt', 'Tester_CV_Example_Oy_EN.txt', 'Example_Oy_Test_Lead_ad.txt']],
-    ['fi', 'email', ['Tester_Hakemus_Example_Oy_FI.txt', 'Tester_CV_Example_Oy_FI.txt', 'Example_Oy_Test_Lead_ilmoitus.txt']],
-    ['en', 'email', ['Tester_CoverLetter_Example_Oy_EN.txt', 'Tester_CV_Example_Oy_EN.txt', 'Example_Oy_Test_Lead_ad.txt']],
+    ['fi', 'portal', ['Tester_Hakemus_Example_Oy_FI.md', 'Tester_CV_Example_Oy_FI.md', 'Example_Oy_Test_Lead_ilmoitus.md']],
+    ['en', 'portal', ['Tester_CoverLetter_Example_Oy_EN.md', 'Tester_CV_Example_Oy_EN.md', 'Example_Oy_Test_Lead_ad.md']],
+    ['fi', 'email', ['Tester_Hakemus_Example_Oy_FI.md', 'Tester_CV_Example_Oy_FI.md', 'Example_Oy_Test_Lead_ilmoitus.md']],
+    ['en', 'email', ['Tester_CoverLetter_Example_Oy_EN.md', 'Tester_CV_Example_Oy_EN.md', 'Example_Oy_Test_Lead_ad.md']],
   ] as const)('%s %s', (language, applicationType, names) => {
     const { files } = buildDraft(ad(), output({ language, applicationType }), naming)
 
@@ -72,7 +72,7 @@ describe('company and role', () => {
     const draft = buildDraft(ad({ company: '' }), output(), naming)
 
     expect(draft.company).toBe('Unknown company')
-    expect(draft.files.cv.name).toBe('Tester_CV_Unknown_company_EN.txt')
+    expect(draft.files.cv.name).toBe('Tester_CV_Unknown_company_EN.md')
     expect(draft.notes).toContain('company: Which company is this ad for? The ad does not say.')
   })
 })
@@ -100,14 +100,14 @@ describe('notes and the saved ad', () => {
     const { files } = buildDraft(ad(), output(), naming)
 
     expect(files.ad.text).toBe(
-      'Source: https://jobs.example/1\nApply to: https://jobs.example/1\nSaved: 2026-11-19\n\nTest Lead\n\nFull ad text.\n',
+      '- Source: https://jobs.example/1\n- Apply to: https://jobs.example/1\n- Saved: 2026-11-19\n\nTest Lead\n\nFull ad text.\n',
     )
   })
 
   test('the saved ad header names applyTo when the ad gives one, in Finnish', () => {
     const { files } = buildDraft(ad(), output({ language: 'fi', applyTo: 'jobs@example.com' }), naming)
 
-    expect(files.ad.text).toMatch(/^Lähde: https:\/\/jobs.example\/1\nHakuosoite: jobs@example.com\nTallennettu: 2026-11-19\n/)
+    expect(files.ad.text).toMatch(/^- Lähde: https:\/\/jobs.example\/1\n- Hakuosoite: jobs@example.com\n- Tallennettu: 2026-11-19\n/)
   })
 
   test('the cover letter and CV are the model text as is', () => {

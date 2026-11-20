@@ -70,9 +70,9 @@ function notesOf(ad: Ad, output: DraftOutput, missing: string[]): string {
 function savedAdText(ad: Ad, output: DraftOutput, savedOn: string): string {
   const labels = LABELS[output.language]
   const header = [
-    `${labels.source}: ${ad.url}`,
-    `${labels.applyTo}: ${output.applyTo.trim() || ad.url}`,
-    `${labels.saved}: ${savedOn}`,
+    `- ${labels.source}: ${ad.url}`,
+    `- ${labels.applyTo}: ${output.applyTo.trim() || ad.url}`,
+    `- ${labels.saved}: ${savedOn}`,
   ]
   return `${header.join('\n')}\n\n${ad.title}\n\n${ad.body ?? ''}\n`
 }
@@ -88,9 +88,9 @@ function fileNames(language: Language, names: Resolved, prefix: string): FileNam
   const suffix = language.toUpperCase()
   const letter = language === 'fi' ? 'Hakemus' : 'CoverLetter'
   return {
-    coverLetter: `${prefix}_${letter}_${company}_${suffix}.txt`,
-    cv: `${prefix}_CV_${company}_${suffix}.txt`,
-    ad: `${company}_${fileComponent(names.role)}_${LABELS[language].adFile}.txt`,
+    coverLetter: `${prefix}_${letter}_${company}_${suffix}.md`,
+    cv: `${prefix}_CV_${company}_${suffix}.md`,
+    ad: `${company}_${fileComponent(names.role)}_${LABELS[language].adFile}.md`,
   }
 }
 

@@ -40,7 +40,7 @@ This design refines brief 033 in two places:
 | `037-application-drafts` | committed | done | 036 |
 | `038-alert-sources` | committed | done | 034 |
 | `039-daily-run` | committed | done | 035a, 037, 038 |
-| `040-markdown-attachments` | not written | open | 035a, 037 |
+| `040-markdown-attachments` | committed | done | 035a, 037 |
 
 `035a-corpus-sync` adds an "Add to profile" action in the UI, where the user
 picks which of an application's attachments to mark; job-app stores a flag on
@@ -52,8 +52,7 @@ runs the sync each day. The letter suffix keeps it in build order next to 035
 without taking a new number.
 
 `040-markdown-attachments` switches the agent's text attachments from `.txt` to
-`.md` (section 7), after which the corpus walk (section 3) reads `.md` files
-only.
+`.md` (section 7). The corpus walk (section 3) keeps reading both.
 
 ### Picking the next stream
 
@@ -555,23 +554,25 @@ Model output, validated by the runner:
   ```
 
   The questions block is left out when there are none.
-- **Attachments.** All `.txt`, all stored in job-app only. The agent never
-  writes to the applications folder.
+- **Attachments.** All `.md` (`text/markdown`), all stored in job-app only.
+  The agent never writes to the applications folder.
 
 | File | Name |
 |---|---|
-| Cover letter (FI) | `<prefix>_Hakemus_<Company>_FI.txt` |
-| Cover letter (EN) | `<prefix>_CoverLetter_<Company>_EN.txt` |
-| CV | `<prefix>_CV_<Company>_<FI\|EN>.txt` |
-| Saved ad | `<Company>_<Role>_ilmoitus.txt` or `_ad.txt`, with a header of source URL, apply URL or email, and saved date |
+| Cover letter (FI) | `<prefix>_Hakemus_<Company>_FI.md` |
+| Cover letter (EN) | `<prefix>_CoverLetter_<Company>_EN.md` |
+| CV | `<prefix>_CV_<Company>_<FI\|EN>.md` |
+| Saved ad | `<Company>_<Role>_ilmoitus.md` or `_ad.md`, with a header of source URL, apply URL or email, and saved date |
 
 `<Company>` and `<Role>` keep Unicode letters, digits and `-`. Every other run
 of characters becomes one `_`, ends are trimmed, the result is capped at 40
-characters, and it falls back to `Unknown`. The saved ad's header is labelled
-in the draft's language, and `applyTo` falls back to the ad URL.
+characters, and it falls back to `Unknown`. The saved ad's header is a
+Markdown list (`- Source: …`, `- Apply to: …`, `- Saved: …`) labelled in the
+draft's language, and `applyTo` falls back to the ad URL.
 
 An email application's cover letter file holds the recipient, subject,
-attachment name and body. PDFs are never rendered by the agent.
+attachment name and body. The attachment it names is the CV as the `.pdf` the
+user renders from the `.md`. PDFs are never rendered by the agent.
 
 ## 8. Profile corpus and embeddings
 
