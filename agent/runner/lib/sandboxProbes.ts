@@ -16,9 +16,9 @@ export interface Probe {
 
 // StructuredOutput is how the CLI delivers --json-schema output.
 const EXPECTED_TOOLS = ['StructuredOutput', 'mcp__profile__search_profile']
-// The agent types CLI 2.1.328 reports with every customisation off. None can
-// run: the step has no Agent tool.
-const BUILTIN_AGENTS = ['claude', 'Explore', 'general-purpose', 'Plan', 'statusline-setup']
+// The agent types the CLI reports with every customisation off (2.1.329 added
+// web-fetch). None can run: the step has no Agent tool.
+const BUILTIN_AGENTS = ['claude', 'Explore', 'general-purpose', 'Plan', 'statusline-setup', 'web-fetch']
 
 const probeOutputSchema = z.object({ summary: z.string() })
 const PROBE_SCHEMA = stepSchema(probeOutputSchema)
