@@ -9,6 +9,7 @@ export interface JobAppConfig extends JobAppEnv {
 
 export interface PendingAttachment {
   id: number
+  storedName: string
   originalName: string
 }
 
@@ -24,6 +25,10 @@ const adSummaryShape = {
   url: z.string(),
   state: z.string(),
   attempts: z.number(),
+  lastError: z.string().nullable(),
+  applicationId: z.number().nullable(),
+  firstSeenAt: z.string(),
+  reportedAt: z.string().nullable(),
 }
 const adSummarySchema = z.object(adSummaryShape)
 const adSchema = z.object({
@@ -83,21 +88,25 @@ export interface DraftUpload {
 export interface JobAppClient {
   listPendingSync: () => Promise<PendingAttachment[]>
   downloadAttachment: (id: number) => Promise<Uint8Array>
-  setProfileSync: (id: number, pending: boolean) => Promise<void>
+  // False when the attachment was replaced since it was listed; the mark stays.
+  clearProfileSync: (id: number, storedName: string) => Promise<boolean>
   ingestAd: (input: AdIngest) => Promise<IngestedAd>
   listAds: (state: string) => Promise<AdSummary[]>
   getAd: (id: number) => Promise<Ad>
   transitionAd: (id: number, transition: AdTransition) => Promise<AdSummary>
   draftAd: (id: number, upload: DraftUpload) => Promise<{ applicationId: number }>
+  markReported: (ids: number[]) => Promise<void>
 }
 
 interface JobAppRequest {
   method: 'GET' | 'POST' | 'PUT'
   path: string
   body?: unknown
+  // Statuses returned to the caller instead of thrown.
+  allow?: number[]
 }
 
-const pendingSchema = z.array(z.object({ id: z.number(), originalName: z.string() }))
+const pendingSchema = z.array(z.object({ id: z.number(), storedName: z.string(), originalName: z.string() }))
 const errorSchema = z.object({ error: z.string() })
 
 // fetch sets a FormData body's multipart Content-Type, boundary included.
@@ -151,7 +160,7 @@ function createSender(config: JobAppConfig): Sender {
       cookie = undefined
       response = await attempt(request)
     }
-    if (!response.ok) throw await failure(request, response)
+    if (!response.ok && !request.allow?.includes(response.status)) throw await failure(request, response)
     return response
   }
 }
@@ -179,8 +188,10 @@ export function createJobAppClient(config: JobAppConfig): JobAppClient {
       const response = await send({ method: 'GET', path: `/api/attachments/${id}` })
       return new Uint8Array(await response.arrayBuffer())
     },
-    setProfileSync: async (id, pending) => {
-      await send({ method: 'PUT', path: `/api/attachments/${id}/profile-sync`, body: { pending } })
+    clearProfileSync: async (id, storedName) => {
+      const path = `/api/attachments/${id}/profile-sync`
+      const response = await send({ method: 'PUT', path, body: { pending: false, storedName }, allow: [409] })
+      return response.ok
     },
     ingestAd: async (input) => {
       const request: JobAppRequest = { method: 'POST', path: '/api/ads', body: input }
@@ -197,6 +208,9 @@ export function createJobAppClient(config: JobAppConfig): JobAppClient {
       const request: JobAppRequest = { method: 'POST', path: `/api/ads/${id}/draft`, body: draftForm(upload) }
       const { application } = await receive(send, request, draftResponseSchema)
       return { applicationId: application.id }
+    },
+    markReported: async (ids) => {
+      await send({ method: 'POST', path: '/api/ads/reported', body: { ids } })
     },
   }
 }

@@ -23,7 +23,9 @@ export interface FakeAd {
   lastError: string | null
   evaluation: FakeEvaluation | null
   body: string | null
+  applicationId: number | null
   firstSeenAt: string
+  reportedAt: string | null
 }
 
 export interface FakeTransition {
@@ -57,6 +59,8 @@ export function fakeAd(fields: Partial<FakeAd> & { id: number }): FakeAd {
     lastError: null,
     evaluation: null,
     body: null,
+    applicationId: null,
+    reportedAt: null,
     firstSeenAt: `2026-11-${String(fields.id).padStart(2, '0')} 08:00:00`,
     ...fields,
   }
@@ -80,8 +84,10 @@ function applyTransition(ad: FakeAd, transition: FakeTransition): void {
   moveAd(ad, transition)
 }
 
+// A move clears reportedAt, as on the server.
 function moveAd(ad: FakeAd, { to, error, evaluation, body, company, deadline }: FakeTransition): void {
   ad.state = to
+  ad.reportedAt = null
   if (to === 'failed') ad.lastError = error ?? null
   ad.evaluation = evaluation ?? ad.evaluation
   ad.body = body ?? ad.body
@@ -124,7 +130,8 @@ async function answerDraft({ fake, ad }: TransitionTarget, req: IncomingMessage,
   if (ad.state !== 'suitable') return sendJson(res, 409, { error: `an ad cannot be drafted from ${ad.state}` })
   fake.drafts.push(draft)
   ad.state = 'drafted'
-  sendJson(res, 201, { ad, application: { id: 100 + fake.drafts.length } })
+  ad.applicationId = 100 + fake.drafts.length
+  sendJson(res, 201, { ad, application: { id: ad.applicationId } })
 }
 
 // Idempotent on (source, externalId), as on the server: 201 new, 200 known.
@@ -141,15 +148,26 @@ async function answerIngest(fake: FakeJobApp, req: IncomingMessage, res: ServerR
   sendJson(res, 201, summary(ad))
 }
 
+async function answerReported(fake: FakeJobApp, req: IncomingMessage, res: ServerResponse) {
+  const { ids } = (await readJson(req)) as { ids: number[] }
+  if (fake.failure === 'reported') return sendJson(res, 500, { error: 'internal server error' })
+  for (const ad of fake.ads) if (ids.includes(ad.id)) ad.reportedAt = '2026-12-01 20:00:00'
+  res.writeHead(204).end()
+}
+
 // Lists newest first, like the real API.
+function answerAdCollection(fake: FakeJobApp, req: IncomingMessage, res: ServerResponse): void {
+  if (req.method === 'POST') return void answerIngest(fake, req, res)
+  if (fake.failure === 'malformed') return sendJson(res, 200, { ads: 'nope' })
+  const state = new URL(req.url ?? '', 'http://fake').searchParams.get('state')
+  const listed = fake.ads.filter((ad) => ad.state === state)
+  sendJson(res, 200, listed.toSorted((a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt)).map(summary))
+}
+
 export function answerAds(fake: FakeJobApp, req: IncomingMessage, res: ServerResponse): void {
   const url = new URL(req.url ?? '', 'http://fake')
-  if (url.pathname === '/api/ads' && req.method === 'POST') return void answerIngest(fake, req, res)
-  if (url.pathname === '/api/ads') {
-    if (fake.failure === 'malformed') return sendJson(res, 200, { ads: 'nope' })
-    const listed = fake.ads.filter((ad) => ad.state === url.searchParams.get('state'))
-    return sendJson(res, 200, listed.toSorted((a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt)).map(summary))
-  }
+  if (url.pathname === '/api/ads/reported') return void answerReported(fake, req, res)
+  if (url.pathname === '/api/ads') return answerAdCollection(fake, req, res)
   const [, id, action] = /^\/api\/ads\/(\d+)(\/transition|\/draft)?$/.exec(url.pathname) ?? []
   const ad = fake.ads.find((candidate) => candidate.id === Number(id))
   if (!ad) return sendJson(res, 404, { error: 'ad not found' })

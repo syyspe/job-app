@@ -464,6 +464,68 @@ before you fix the connector. The tests use synthetic fixtures only.
   `~/.local/state/job-agent/mail-watermark.json` and advances one message at
   a time, so a failed run reads the unfinished message again next time.
 
+## Daily run
+
+`agent:run` does the whole pipeline once: collect, dismiss expired
+hand-overs, sync the profile, evaluate, draft, and email you one summary
+when there is something new. Windows Task Scheduler starts it every evening.
+Everything above it must already be set up: the profile corpus, ad
+evaluation, ad drafting and alert sources.
+
+### Setup
+
+1. Add the SMTP host to `~/.config/job-agent/env`. The summary is sent from
+   the alert mailbox, so it reuses its login:
+
+   ```sh
+   MAIL_SMTP_HOST=smtp.gmail.com
+   ```
+
+2. Add the recipient, and optionally the hand-over wait, to
+   `~/.config/job-agent/config.json`:
+
+   ```json
+   {
+     "summary": { "recipient": "<your own address>" },
+     "handoverWaitDays": 7
+   }
+   ```
+
+   An ad waiting for hand-over is dismissed `handoverWaitDays` days after it
+   was first seen, or after its deadline day if that comes sooner.
+3. In Windows, open Task Scheduler and create a task:
+   - Trigger: daily at 20:00.
+   - Settings: tick "Run task as soon as possible after a scheduled start is
+     missed", and set "If the task is already running" to "Do not start a
+     new instance".
+   - Action: start `wsl.exe` with the arguments
+     `-d <distro> --exec bash -lic <repo>/agent/runner/daily-run.sh`, where
+     `<distro>` is your distribution's name in `wsl -l` and `<repo>` this
+     repository's absolute path. `-i` makes bash read `~/.bashrc`, which is
+     where node and `NODE_EXTRA_CA_CERTS` come from.
+
+The first run after a `claude` update re-runs the sandbox check by itself.
+If the check fails, evaluation and drafting are skipped until it passes, and
+the summary says why.
+
+### Command
+
+- `npm run agent:run` takes `~/.local/state/job-agent/run.lock` and refuses
+  with exit 1 while another run holds it. A lock left by a run that no
+  longer exists is taken over. It prints one line per step and a `summary:`
+  line. A step that fails (the mailbox or job-app unreachable, say) is
+  printed to stderr and listed in the summary, and the later steps still
+  run. If Ollama is unreachable or the sandbox check fails, evaluation and
+  drafting are skipped and no ad is touched. Configuration errors exit 2
+  before the lock is taken. A failed step or send exits 1; a skip alone
+  exits 0. Nothing is marked reported until the mail server has accepted
+  the summary, so a failed send is retried next run.
+- `agent/runner/daily-run.sh` is what the task runs. It starts job-app with
+  `npm start` if nothing answers at `JOBAPP_API_URL`, then runs `agent:run`.
+  Its output is appended to
+  `~/.local/state/job-agent/logs/run-YYYY-MM-DD.log`, and the output of a
+  job-app it started to `logs/server.log` in the same folder.
+
 ## The default branch is PR-only
 
 Nothing lands on the default branch except by merged pull request. On a solo

@@ -464,3 +464,41 @@ test('marking an attachment does not move the parent application\'s updatedAt', 
   const [listed] = (await listRes.json()) as Application[]
   expect(listed.updatedAt).toBe('2020-01-01 00:00:00')
 })
+
+test('clearing with the listed storedName clears the mark', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+  await setProfileSync(attachment.id, { pending: true })
+
+  const res = await setProfileSync(attachment.id, {
+    pending: false,
+    storedName: attachment.storedName,
+  })
+
+  expect(res.status).toBe(200)
+  expect(((await res.json()) as Attachment).profileSyncPending).toBe(false)
+  expect(await listPendingSync()).toEqual([])
+})
+
+test('clearing with a storedName replaced since listing is a 409 and keeps the mark', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+  await setProfileSync(attachment.id, { pending: true })
+  await replaceAttachment(attachment.id, newCvFile())
+
+  const res = await setProfileSync(attachment.id, {
+    pending: false,
+    storedName: attachment.storedName,
+  })
+
+  expect(res.status).toBe(409)
+  expect(await res.json()).toMatchObject({ error: 'attachment changed since it was listed' })
+  expect(await listPendingSync()).toHaveLength(1)
+})
+
+test('a storedName that is not a string is rejected', async () => {
+  const attachment = await uploadResume((await createApplication()).id)
+
+  const res = await setProfileSync(attachment.id, { pending: false, storedName: 7 })
+
+  expect(res.status).toBe(400)
+  expect(await res.json()).toMatchObject({ error: 'storedName must be a string' })
+})

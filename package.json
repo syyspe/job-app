@@ -27,7 +27,8 @@
     "agent:draft": "node agent/runner/commands/draft.ts",
     "preview": "vite preview",
     "start": "npm run build && node --env-file-if-exists=.env server/index.ts",
-    "agent:collect": "node agent/runner/commands/collect.ts"
+    "agent:collect": "node agent/runner/commands/collect.ts",
+    "agent:run": "node agent/runner/commands/run.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

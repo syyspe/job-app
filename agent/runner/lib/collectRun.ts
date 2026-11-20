@@ -126,3 +126,20 @@ export async function runCollect(options: CollectRunOptions): Promise<CollectRep
   const leftNew = (await options.jobApp.listAds('new')).length
   return { sources: run.reports, screened, leftNew }
 }
+
+function sourceLine(id: string, report: SourceReport, connectors: SourceConnector[]): string {
+  const { messages, newAds, existingAds, emptyAlerts, fetched } = report
+  const collected = `${id}: ${messages} messages, ${newAds} new ads, ${existingAds} existing, ${emptyAlerts} empty alerts`
+  if (connectors.find((connector) => connector.id === id)?.mode === 'handover') return collected
+  const { ready, duplicate, gone, retrying, failed, blocked } = fetched
+  return `${collected}; fetched ${ready} ready, ${duplicate} duplicate, ${gone} gone, ${retrying} retrying, ${failed} failed, ${blocked} blocked`
+}
+
+export function formatCollectReport({ sources, screened, leftNew }: CollectReport, connectors: SourceConnector[]): string[] {
+  const { titleRejected, awaitingHandover } = screened
+  return [
+    ...Object.entries(sources).map(([id, report]) => sourceLine(id, report, connectors)),
+    `screened: ${titleRejected} title_rejected, ${awaitingHandover} awaiting_handover`,
+    `left new: ${leftNew} ads`,
+  ]
+}

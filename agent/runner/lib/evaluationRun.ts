@@ -56,3 +56,15 @@ export async function runEvaluation(options: EvaluationRunOptions): Promise<Eval
   const moved = await mapLimit(batch, config.evaluation.concurrency, (ad) => evaluateOne(options, ad))
   return { screened, skipped: null, evaluated: countStates(moved), queued: ready.length - batch.length }
 }
+
+export function formatEvaluationReport({ screened, skipped, evaluated, queued }: EvaluationReport): string[] {
+  const { titleRejected, awaitingHandover, leftNew } = screened
+  const screenedLine = `screened: ${titleRejected} title_rejected, ${awaitingHandover} awaiting_handover, ${leftNew} left new`
+  if (skipped) return [screenedLine, `evaluation skipped: ${skipped}`]
+  const { suitable, unsuitable, retrying, failed } = evaluated
+  return [
+    screenedLine,
+    `evaluated: ${suitable} suitable, ${unsuitable} unsuitable, ${retrying} retrying, ${failed} failed`,
+    `queued: ${queued} ready ads over the per-run cap`,
+  ]
+}

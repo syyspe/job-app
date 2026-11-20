@@ -32,6 +32,8 @@ export interface RunnerState {
   counters: (today: string) => DailyCounters
   readFailures: () => SourceFailure[]
   addFailure: (failure: SourceFailure) => void
+  // Drops the failures a sent summary covered; any added since stay.
+  removeFailures: (reported: SourceFailure[]) => void
 }
 
 // The local calendar date, YYYY-MM-DD: daily caps follow the user's day.
@@ -88,6 +90,10 @@ function dailyCounters(path: string, today: string): DailyCounters {
   }
 }
 
+function sameFailure(a: SourceFailure, b: SourceFailure): boolean {
+  return a.source === b.source && a.date === b.date && a.kind === b.kind
+}
+
 export function createRunnerState(dir: string): RunnerState {
   const watermarkPath = join(dir, 'mail-watermark.json')
   const failuresPath = join(dir, 'source-failures.json')
@@ -97,5 +103,11 @@ export function createRunnerState(dir: string): RunnerState {
     counters: (today) => dailyCounters(join(dir, 'source-counters.json'), today),
     readFailures: () => readState(failuresPath, failuresSchema, []),
     addFailure: (failure) => writeState(failuresPath, [...readState(failuresPath, failuresSchema, []), failure]),
+    removeFailures: (reported) => {
+      const kept = readState(failuresPath, failuresSchema, []).filter(
+        (failure) => !reported.some((covered) => sameFailure(failure, covered)),
+      )
+      writeState(failuresPath, kept)
+    },
   }
 }

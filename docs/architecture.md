@@ -94,7 +94,8 @@ including the multipart `POST /ads/:id/draft`, which removes every uploaded
 file again when the draft is refused),
 `applications.ts`, `attachments.ts` (upload, download, replace, delete, and
 the profile-sync mark: `GET /attachments/pending-sync`,
-`PUT /attachments/:id/profile-sync`), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
+`PUT /attachments/:id/profile-sync`, where a clear naming a `storedName` the
+row no longer has is a 409 that keeps the mark), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
 (`/config`, the page size the client pages the list by) and `users.ts`
 (admin-only account management).
 
@@ -260,7 +261,16 @@ runner config, private prompt and env, then the version gate, then
 gate, then `runDrafting`. `commands/collect.ts` is `npm run agent:collect`:
 the `sources` key, runner config and the mail and job-app env, then
 `openMailbox` and `runCollect`, closing the mailbox whatever happens. It runs
-no `claude -p`, so it has no version gate.
+no `claude -p`, so it has no version gate. `commands/run.ts` is
+`npm run agent:run`: every config key, prompt and env value (exit 2 before
+anything else), then `acquireRunLock`, the profile index only when
+`syncFolder` is set, and `runDaily` with the real dependencies; it prints
+each step's lines through the same formatters the single-step commands use.
+`daily-run.sh` is what the scheduled task runs: it logs to
+`~/.local/state/job-agent/logs/`, starts job-app if it isn't answering, and
+runs `agent:run`. Each step's line formatter (`formatCollectReport`,
+`formatEvaluationReport`, `formatDraftReport`, `formatSyncResult`) lives
+beside its run in `lib/`, since a command file runs on import.
 
 `prompts/evaluate.framing.md` is the fixed head of the evaluation system
 prompt; `prompts/evaluate.example.md` a synthetic example of the private
@@ -269,14 +279,17 @@ criteria that follow it. `prompts/draft.framing.md` and
 
 `lib/`:
 
-- `env.ts` — `loadJobAppEnv(path)` and `loadMailEnv(path)`: `util.parseEnv`
-  of the env file, which gives `{ baseUrl, username, password }` and
-  `{ host, username, password }`. A missing file or variable is exit 2.
+- `env.ts` — `loadJobAppEnv(path)`, `loadMailEnv(path)` and
+  `loadSmtpEnv(path)`: `util.parseEnv` of the env file, which gives
+  `{ baseUrl, username, password }` and `{ host, username, password }` (the
+  IMAP or the SMTP host, with the shared mail login). A missing file or
+  variable is exit 2.
 - `jobApp.ts` — `createJobAppClient(config)`: `listPendingSync`,
-  `downloadAttachment`, `setProfileSync`, `listAds(state)`, `getAd(id)`,
+  `downloadAttachment`, `clearProfileSync(id, storedName)` (false on 409,
+  through the request's `allow` list), `listAds(state)`, `getAd(id)`,
   `transitionAd(id, body)`, `ingestAd(input)` (201 new, 200 existing),
   `draftAd(id, upload)` (multipart: the five fields
-  and three `text/plain` files). There is no other way to create or change an
+  and three `text/plain` files) and `markReported(ids)`. There is no other way to create or change an
   application. It logs in lazily, re-logs in once on a 401, and
   turns every failure into a `CliError(1, …)`. Ad responses are checked
   against only the fields the runner reads.
@@ -284,7 +297,9 @@ criteria that follow it. `prompts/draft.framing.md` and
   `evaluation.{concurrency, perRunCap, timeoutMs}`, with defaults;
   `loadDraftConfig(path)`: the `drafting` key, read only by `agent:draft`;
   `loadSourcesConfig(path, connectors)`: the `sources` key, with every
-  connector present (missing means disabled) and the exit-2 refusals.
+  connector present (missing means disabled) and the exit-2 refusals;
+  `loadDailyRunConfig(path)`: `handoverWaitDays` and `summary.recipient`,
+  read only by `agent:run`.
 - `mapLimit.ts` — `mapLimit(items, limit, fn)`, order-keeping bounded
   concurrency for both runs.
 - `prompts.ts` — `buildSystemPrompt(framing, rules)`: the fixed framing
@@ -298,8 +313,29 @@ criteria that follow it. `prompts/draft.framing.md` and
   `AlertMessage`s in UID order through `toAlertMessage`, and `connectError`
   maps a rejected login and an unreachable host to `CliError(1, …)`.
 - `state.ts` — `createRunnerState(stateDir)`: the mail watermark, the daily
-  source counters and the source failure list, each a JSON file written
-  through a temp file and a rename; `localDate(now)`.
+  source counters and the source failure list (`removeFailures` drops the
+  ones a sent summary covered), each a JSON file written through a temp file
+  and a rename; `localDate(now)`.
+- `lock.ts` — `acquireRunLock(stateDir)` → `release`: `run.lock` created
+  exclusively with the pid; a holder whose `/proc/<pid>/cmdline` still names
+  `agent/runner/commands/run.ts` is `CliError(1, …)`; any other holder (gone,
+  reused by an unrelated process, or unreadable) is removed and the lock
+  taken once more.
+- `handoverExpiry.ts` — `handoverExpired(ad, { waitDays, now })` (UTC
+  first-seen plus the wait, or past an ISO deadline's local day) and
+  `dismissExpiredHandovers(jobApp, options)`.
+- `smtp.ts` — `sendMail(message, config, transport)`: the hand-written SMTP
+  exchange over implicit TLS on 465 (`EHLO`, `AUTH PLAIN`, `MAIL FROM`,
+  `RCPT TO`, `DATA`, `QUIT`), every reply code checked, a base64 body, a 30 s
+  timeout. Failures are `CliError(1, …)`: unreachable, login refused, or the
+  command refused with its code.
+- `summary.ts` — `composeSummary(input)`: subject and plain-text body from
+  the unreported ads, source failures and problems, or null when all are
+  empty. Ad text has control characters and line breaks replaced.
+- `dailyRun.ts` — `runDaily(options)`, every dependency injected: collect,
+  expire, one health check and `ensureSandboxVerified`, then sync,
+  evaluation and drafting, then the summary. A `CliError` in a step is
+  recorded as a failure and the run goes on; anything else propagates.
 - `politeHttp.ts` — `createPoliteHttp(options)`: the only network path a
   connector has. It checks scheme and host on the URL and every redirect,
   sends fixed headers, spaces requests by `minDelayMs`, counts each open
@@ -323,8 +359,11 @@ criteria that follow it. `prompts/draft.framing.md` and
 - `sandboxProbes.ts` / `sandboxCanary.ts` — the gate's two real runs (benign
   with canary project files in the parent directory, hostile) and the judging
   of their `stream-json` events.
-- `sandboxCheck.ts` — the `sandbox-check.json` record and
-  `requirePassedCheck(claudeBin, stateDir)`.
+- `sandboxCheck.ts` — the `sandbox-check.json` record,
+  `requirePassedCheck(claudeBin, stateDir)` for `agent:evaluate` and
+  `agent:draft`, `verifySandbox` (probes, then the record only if all pass)
+  and `ensureSandboxVerified`, `agent:run`'s gate, which probes only when the
+  record doesn't match the installed version.
 - `evaluate.ts` — `evaluateAd(ad, runStep)`: the ad as JSON on stdin, the
   output checked again with zod, `unsure` mapped to `suitable` with the fixed
   first reason.
@@ -343,21 +382,26 @@ criteria that follow it. `prompts/draft.framing.md` and
   transition with its category.
 - `sync.ts` — `syncProfile({ jobApp, config, store, ollama })`: copies the
   marked attachments into `syncFolder` as `<id>-<safe name>`, rebuilds the
-  index, then clears the marks. It does no health check.
+  index, then clears each mark with the `storedName` it listed, so a file
+  replaced mid-run keeps its mark and is returned under `changed`. It does
+  no health check.
 
 ### `agent/test/`
 
 - `fakeJobApp.ts` — an HTTP stand-in for the job-app endpoints the runner
-  uses (login, pending list, download, flag, and the ad routes from
+  uses (login, pending list, download, flag with the conditional 409, and the ad routes from
   `fakeJobAppAds.ts`), with recorded flag calls, transitions, drafts and
   every request line, a login
   counter, session expiry and a switchable failure. `fakeHttp.ts` holds its
   JSON helpers.
 - `fakeJobAppAds.ts` — `fakeAd(fields)` and the ad ingest, list, get,
-  transition and multipart draft handlers. They are idempotent on
+  transition, multipart draft and `reported` handlers. They are idempotent on
   `(source, externalId)`, record attempts, fail an ad on the third and draft
   only a suitable ad, as the server does.
 - `fakeMailbox.ts` — an in-memory `Mailbox` that records the UIDs read after.
+- `fakeSmtp.ts` — a plain-TCP SMTP stand-in: records every command and the
+  decoded message, and can refuse a chosen verb with a code, drop the
+  connection or never greet.
 - `fakeSources.ts` — `fixture(name)`, `alert(fields)` and `fakePoliteHttp`,
   which answers every get with one result.
 - `fakeClaude.ts` — an executable stand-in for the `claude` CLI: records

@@ -33,11 +33,12 @@ function client(overrides: { baseUrl?: string; password?: string } = {}) {
 test('lists the pending attachments, downloads one and clears its flag', async () => {
   const jobApp = client()
 
-  expect(await jobApp.listPendingSync()).toEqual([{ id: 3, originalName: 'letter.md' }])
+  expect(await jobApp.listPendingSync()).toEqual([{ id: 3, storedName: '3.bin', originalName: 'letter.md' }])
   expect(new TextDecoder().decode(await jobApp.downloadAttachment(3))).toBe('Dear team')
-  await jobApp.setProfileSync(3, false)
+  expect(await jobApp.clearProfileSync(3, '3.bin')).toBe(true)
 
-  expect(fake.flagCalls).toEqual([{ id: 3, pending: false }])
+  expect(fake.flagCalls).toEqual([{ id: 3, pending: false, storedName: '3.bin' }])
+  expect(fake.attachments[0].pending).toBe(false)
   expect(fake.logins).toBe(1)
 })
 
@@ -75,8 +76,15 @@ test('a failing response passes the API error through', async () => {
   })
 })
 
+test('clearing an attachment replaced since listing answers false and keeps the mark', async () => {
+  fake.attachments[0].storedName = 'replaced.bin'
+
+  expect(await client().clearProfileSync(3, '3.bin')).toBe(false)
+  expect(fake.attachments[0].pending).toBe(true)
+})
+
 test('an unknown attachment is a 404 naming the request', async () => {
-  await expect(client().setProfileSync(99, false)).rejects.toMatchObject({
+  await expect(client().clearProfileSync(99, '99.bin')).rejects.toMatchObject({
     exitCode: 1,
     message: 'job-app PUT /api/attachments/99/profile-sync: 404 not found',
   })
@@ -168,4 +176,21 @@ test('a ready transition carries the body, company and deadline', async () => {
 
   expect(fake.transitions).toEqual([{ id: 1, to: 'ready', body: 'Text', company: 'Page Oy', deadline: '2026-12-31' }])
   expect(fake.ads[0]).toMatchObject({ state: 'ready', body: 'Text', company: 'Page Oy', deadline: '2026-12-31' })
+})
+
+test('marks ads reported', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'drafted' }), fakeAd({ id: 2, state: 'failed' }))
+
+  await client().markReported([1])
+
+  expect(fake.ads.map((ad) => ad.reportedAt)).toEqual(['2026-12-01 20:00:00', null])
+})
+
+test('a failing reported call passes the API error through', async () => {
+  fake.failure = 'reported'
+
+  await expect(client().markReported([1])).rejects.toMatchObject({
+    exitCode: 1,
+    message: 'job-app POST /api/ads/reported: 500 internal server error',
+  })
 })

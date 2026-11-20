@@ -37,6 +37,18 @@ export function loadDraftConfig(path: string): DraftConfig {
   return parseConfigFile(path, draftConfigSchema).drafting
 }
 
+const dailyRunConfigSchema = z.object({
+  handoverWaitDays: z.int().min(1).default(7),
+  summary: z.object({ recipient: z.email() }),
+})
+
+export type DailyRunConfig = z.infer<typeof dailyRunConfigSchema>
+
+// Only agent:run reads these keys.
+export function loadDailyRunConfig(path: string): DailyRunConfig {
+  return parseConfigFile(path, dailyRunConfigSchema)
+}
+
 const sourceSchema = z.object({
   enabled: z.boolean(),
   termsCheckedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD').optional(),

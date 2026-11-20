@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { CliError } from '../../lib/cliError.ts'
+import type { Probe } from './sandboxProbes.ts'
 
 export interface CheckRecord {
   cliVersion: string
@@ -44,4 +45,44 @@ export function requirePassedCheck(claudeBin: string, stateDir: string): void {
   const version = installedVersion(claudeBin)
   if (readCheckRecord(stateDir)?.cliVersion === version) return
   throw new CliError(2, `sandbox not verified for claude ${version}: run npm run agent:sandbox-check`)
+}
+
+export interface VerifyOptions {
+  version: string
+  stateDir: string
+  runProbes: () => Promise<Probe[]>
+  now: () => Date
+}
+
+export interface Verification {
+  probes: Probe[]
+  passed: boolean
+}
+
+// Records the version only when every probe passes.
+export async function verifySandbox({ version, stateDir, runProbes, now }: VerifyOptions): Promise<Verification> {
+  const probes = await runProbes()
+  const passed = probes.every((probe) => probe.ok)
+  if (passed) writeCheckRecord(stateDir, { cliVersion: version, checkedAt: now().toISOString() })
+  return { probes, passed }
+}
+
+export interface EnsureOptions {
+  claudeBin: string
+  stateDir: string
+  runProbes: () => Promise<Probe[]>
+  now: () => Date
+}
+
+// agent:run's gate: after a CLI update it runs the probes itself instead of
+// refusing. A failure records nothing, so the next run probes again.
+export async function ensureSandboxVerified(options: EnsureOptions): Promise<{ version: string; reverified: boolean }> {
+  const version = installedVersion(options.claudeBin)
+  if (readCheckRecord(options.stateDir)?.cliVersion === version) return { version, reverified: false }
+  const { probes, passed } = await verifySandbox({ ...options, version })
+  if (!passed) {
+    const failed = probes.filter((probe) => !probe.ok).map((probe) => probe.property)
+    throw new CliError(1, `sandbox check failed for claude ${version}: ${failed.join(', ')}`)
+  }
+  return { version, reverified: true }
 }

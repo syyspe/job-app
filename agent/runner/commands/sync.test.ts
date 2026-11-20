@@ -52,7 +52,7 @@ test('a marked attachment is synced, indexed and reported', async () => {
   expect(result.stdout).toBe(
     'synced 1 attachments\n  5-letter_2026.md\nadded 3, updated 0, removed 0, unchanged 0; 3 chunks embedded\n',
   )
-  expect(jobApp.flagCalls).toEqual([{ id: 5, pending: false }])
+  expect(jobApp.flagCalls).toEqual([{ id: 5, pending: false, storedName: '5.bin' }])
 })
 
 test('nothing marked still creates the folder and builds', async () => {
