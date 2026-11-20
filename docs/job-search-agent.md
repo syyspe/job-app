@@ -40,7 +40,7 @@ This design refines brief 033 in two places:
 | `037-application-drafts` | committed | done | 036 |
 | `038-alert-sources` | committed | done | 034 |
 | `039-daily-run` | committed | done | 035a, 037, 038 |
-| `040-markdown-attachments` | not written | open | 035a, 037 |
+| `040-markdown-attachments` | committed | in progress | 035a, 037 |
 
 `035a-corpus-sync` adds an "Add to profile" action in the UI, where the user
 picks which of an application's attachments to mark; job-app stores a flag on
@@ -52,8 +52,7 @@ runs the sync each day. The letter suffix keeps it in build order next to 035
 without taking a new number.
 
 `040-markdown-attachments` switches the agent's text attachments from `.txt` to
-`.md` (section 7), after which the corpus walk (section 3) reads `.md` files
-only.
+`.md` (section 7). The corpus walk (section 3) keeps reading both.
 
 ### Picking the next stream
 
