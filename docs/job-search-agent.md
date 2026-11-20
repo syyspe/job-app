@@ -138,8 +138,9 @@ claude -p "<step prompt>"
   so the step always uses the subscription login (`apiKeySource: "none"` in
   the `init` event). `--bare` stays unused.
 - With everything disabled, the `init` event still lists four built-in
-  plugins (`path: "builtin"`) and five built-in agent types (`claude`,
-  `Explore`, `general-purpose`, `Plan`, `statusline-setup`). None of the
+  plugins (`path: "builtin"`) and six built-in agent types (`claude`,
+  `Explore`, `general-purpose`, `Plan`, `statusline-setup`, and since CLI
+  2.1.329 `web-fetch`). None of the
   agent types can run, because the step has no Agent tool. `skills` and
   `slash_commands` are empty and `output_style` is `default`.
 - A usage limit is not marked distinctly in the JSON result: only an
