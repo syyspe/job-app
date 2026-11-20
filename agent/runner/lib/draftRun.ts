@@ -59,3 +59,12 @@ export async function runDrafting(options: DraftRunOptions): Promise<DraftReport
   const results = await mapLimit(batch, config.concurrency, (ad) => draftOne(options, ad))
   return { skipped: null, counts: countResults(results), queued: suitable.length - batch.length }
 }
+
+export function formatDraftReport({ skipped, counts, queued }: DraftReport): string[] {
+  if (skipped) return [`drafting skipped: ${skipped}`]
+  const { drafted, retrying, failed } = counts
+  return [
+    `drafted: ${drafted} drafted, ${retrying} retrying, ${failed} failed`,
+    `queued: ${queued} suitable ads over the per-run cap`,
+  ]
+}

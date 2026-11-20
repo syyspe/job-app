@@ -12,7 +12,8 @@ import { createOllama } from '../../profile/lib/ollama.ts'
 import { openIndex } from '../../profile/lib/store.ts'
 import type { IndexStore } from '../../profile/lib/store.ts'
 import { createJobAppClient } from './jobApp.ts'
-import { syncProfile } from './sync.ts'
+import type { JobAppClient } from './jobApp.ts'
+import { formatSyncResult, syncProfile } from './sync.ts'
 
 let dir: TempDir
 let ollamaFake: FakeOllama
@@ -40,13 +41,13 @@ function mark(attachment: Omit<FakeAttachment, 'pending'>): void {
   jobAppFake.attachments.push({ ...attachment, pending: true })
 }
 
-function sync() {
-  const jobApp = createJobAppClient({
+function sync(wrap: (client: JobAppClient) => JobAppClient = (client) => client) {
+  const jobApp = wrap(createJobAppClient({
     baseUrl: jobAppFake.url,
     username: jobAppFake.username,
     password: jobAppFake.password,
     envPath: 'env',
-  })
+  }))
   const config = {
     ollamaUrl: ollamaFake.url,
     embeddingModel: 'test-embed',
@@ -66,7 +67,8 @@ test('a marked attachment is copied as <id>-<name>, indexed, and its mark cleare
   expect(readFileSync(join(syncFolder, '7-letter.md'), 'utf8')).toBe('I would love to join.')
   expect(result.build).toMatchObject({ added: 1, chunks: 1 })
   expect(result.skipped).toEqual([])
-  expect(jobAppFake.flagCalls).toEqual([{ id: 7, pending: false }])
+  expect(result.changed).toEqual([])
+  expect(jobAppFake.flagCalls).toEqual([{ id: 7, pending: false, storedName: '7.bin' }])
 })
 
 test('a name with a path and unsafe characters stays inside the sync folder', async () => {
@@ -97,7 +99,7 @@ test('a .pdf is copied but reported as skipped', async () => {
 
   expect(readdirSync(syncFolder)).toEqual(['10-cv.pdf'])
   expect(result.skipped).toEqual([join(syncFolder, '10-cv.pdf')])
-  expect(jobAppFake.flagCalls).toEqual([{ id: 10, pending: false }])
+  expect(jobAppFake.flagCalls).toEqual([{ id: 10, pending: false, storedName: '10.bin' }])
 })
 
 test('an embed failure keeps the copy and leaves the mark set', async () => {
@@ -118,4 +120,35 @@ test('nothing marked still builds the index', async () => {
 
   expect(result.synced).toEqual([])
   expect(result.build).toMatchObject({ added: 1 })
+})
+
+test('an attachment replaced during the sync keeps its mark and is listed as changed', async () => {
+  mark({ id: 12, originalName: 'letter.md', content: 'Old text.' })
+  const replaceAfterDownload = (client: JobAppClient): JobAppClient => ({
+    ...client,
+    downloadAttachment: async (id) => {
+      const bytes = await client.downloadAttachment(id)
+      jobAppFake.attachments[0].storedName = 'replaced.bin'
+      return bytes
+    },
+  })
+
+  const result = await sync(replaceAfterDownload)
+
+  expect(result.synced).toEqual(['12-letter.md'])
+  expect(result.changed).toEqual(['12-letter.md'])
+  expect(jobAppFake.attachments[0].pending).toBe(true)
+})
+
+test('the result lines list kept-marked copies after the build summary', () => {
+  const build = { added: 1, updated: 0, removed: 0, unchanged: 0, chunks: 1 }
+
+  const lines = formatSyncResult({ synced: ['12-letter.md'], build, skipped: [], changed: ['12-letter.md'] })
+
+  expect(lines).toEqual([
+    'synced 1 attachments',
+    '  12-letter.md',
+    'added 1, updated 0, removed 0, unchanged 0; 1 chunks embedded',
+    'kept marked (changed during sync): 12-letter.md',
+  ])
 })

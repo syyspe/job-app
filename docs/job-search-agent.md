@@ -170,7 +170,10 @@ claude -p "<step prompt>"
 It then records `{cliVersion, checkedAt}` in
 `~/.local/state/job-agent/sandbox-check.json`. `agent:evaluate` exits 2 unless
 `claude --version` matches that record, so a CLI update stops evaluation until
-the gate passes again.
+the gate passes again. `agent:draft` refuses the same way. `agent:run` instead
+re-runs the probes itself on the first run after a CLI update and records the
+new version if they pass. If they fail, nothing is recorded, the model steps
+are skipped, and the summary names the failed properties.
 
 The summary recipient is fixed in private config. No value from an ad or a
 model response can select a recipient, file path or status, and a URL is
@@ -186,7 +189,7 @@ synthetic.
 
 | Path | Holds |
 |---|---|
-| `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets: `JOBAPP_API_URL`, `JOBAPP_USERNAME`, `JOBAPP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD` |
+| `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets: `JOBAPP_API_URL`, `JOBAPP_USERNAME`, `JOBAPP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_SMTP_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD` |
 | `~/.config/job-agent/config.json` | Recipient, source switches, caps, `handoverWaitDays`, title rules, corpus paths, file name prefix, Ollama URL and embedding model |
 | `~/.config/job-agent/prompts/` | Headless evaluation and drafting rules adapted from the three job application skills |
 | `~/.local/state/job-agent/` | Run lock, mail watermarks, daily counters, unreported source failures, logs |
@@ -260,6 +263,21 @@ Connector ids are `academicwork`, `valtiolle`, `nordea` (automatic) and
 ```
 
 `dailyOpenCap` is an integer of at least 1 and `minDelayMs` at least 1000.
+
+The keys `039-daily-run` owns, read only by `agent:run`. `summary.recipient`
+is required and must be an email address; `handoverWaitDays` is an integer of
+at least 1:
+
+```json
+{
+  "handoverWaitDays": 7,
+  "summary": { "recipient": "<address>" }
+}
+```
+
+The summary goes out over SMTP with implicit TLS on port 465 to
+`MAIL_SMTP_HOST`, logged in as `MAIL_USERNAME`, which is also the From
+address.
 The command exits 2 with one stderr line for an unknown id, for an enabled
 automatic source with no `termsCheckedOn` (`sources.<id>: termsCheckedOn is
 required to enable an automatic source`), and when no source is enabled, so
@@ -275,6 +293,10 @@ INBOX only, read-only: nothing is flagged, moved or deleted. State files in
   for the local date, reset when the date changes.
 - `source-failures.json`: `[{ source, date, kind }]`, `kind` being `blocked`
   or `empty_alert`. `038` appends; `039-daily-run` reports and clears.
+- `run.lock`: the pid of the `agent:run` holding it, created exclusively. A
+  lock whose pid is no longer running is stale and taken over.
+- `logs/`: `run-YYYY-MM-DD.log`, everything a day's `daily-run.sh` printed,
+  and `server.log`, from a job-app it started.
 
 `syncFolder` is optional, owned by `035a-corpus-sync`. When set, it joins the
 corpus as one more `style` entry, so every command indexes it.
@@ -593,7 +615,11 @@ attachment name and body. PDFs are never rendered by the agent.
   `_`. Any earlier `<id>-*` copy is removed first, so a renamed re-upload
   replaces it. The index is rebuilt incrementally. Only after the build
   completes are the marks cleared (`PUT /api/attachments/:id/profile-sync`),
-  so a failed run keeps them and the next run rewrites the copies.
+  so a failed run keeps them and the next run rewrites the copies. Each clear
+  sends the `storedName` the listing returned. If the file was replaced since,
+  the server answers 409 and keeps the mark, the command prints `kept marked
+  (changed during sync): <name>`, and the next run syncs the new bytes. A
+  clear without `storedName`, as the UI sends, is unconditional.
   `syncProfile` in `agent/runner/lib/sync.ts` does no health check of its own
   and is what `039-daily-run` calls. Copies and their index entries are the
   user's to delete by hand.
@@ -601,7 +627,7 @@ attachment name and body. PDFs are never rendered by the agent.
   runner checks the endpoint before the evaluation and draft steps. If it is
   unreachable, collection and title screening still run, evaluation and
   drafting are skipped, ads keep their state, no attempt is counted, and the
-  summary reports it as a source failure. The next run catches up.
+  summary lists it under Problems. The next run catches up.
 
 ## 9. Daily run
 
@@ -616,3 +642,36 @@ attachment name and body. PDFs are never rendered by the agent.
 - One summary is sent when there are unreported drafts, title rejections,
   failures or source failures. Nothing is marked reported until the mail server
   accepts the message.
+
+**The entry point.** `npm run agent:run` (`agent/runner/commands/run.ts`)
+loads every config key, prompt and env value first, and exits 2 with one
+stderr line on any error, before taking the lock. With the lock held it runs,
+in order:
+
+1. collect: mail, ingest, title screening and page fetches (`agent:collect`);
+2. dismiss the expired hand-overs;
+3. one Ollama health check, then the sandbox gate (section 2). If either
+   fails, steps 4–6 are skipped and no ad is touched;
+4. `syncProfile`, only when `syncFolder` is set;
+5. evaluation and 6. drafting, both reusing the health result;
+7. the summary: the unreported `drafted`, `title_rejected` and `failed` ads,
+   the source failures and the run's problems. When there is anything, it is
+   sent, then the ads are marked reported and those source failures cleared.
+   A failed send marks and clears nothing, so the next run sends them again.
+   A crash between an accepted send and the marking repeats them too.
+
+A step that fails with an error the user can act on (job-app or the mailbox
+unreachable, a rejected login) becomes a problem and the later steps still
+run. Any other error ends the run with its stack. The command prints one line
+per step, as the single-step commands do, and `summary: sent`, `summary:
+nothing to report` or `summary: not sent`. Failed steps go to stderr. It exits
+1 if any step or the send failed; a skip alone exits 0, since the summary
+carries it. A sandbox re-verification is printed (`sandbox re-verified for
+claude X`) but sends no mail on its own.
+
+**The wrapper.** The scheduled task runs `agent/runner/daily-run.sh`, which
+appends all output to `logs/run-YYYY-MM-DD.log`. If job-app doesn't answer at
+`JOBAPP_API_URL`, the script starts `npm start` detached, logging to
+`logs/server.log`, and waits up to 120 s for it. It then runs `agent:run` and
+exits with its status. WSL may stop the distro, and the server with it, once
+the task's `wsl.exe` exits; the next run starts it again.

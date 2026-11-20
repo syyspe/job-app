@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
-import { loadJobAppEnv, loadMailEnv } from './env.ts'
+import { loadJobAppEnv, loadMailEnv, loadSmtpEnv } from './env.ts'
 
 let dir: TempDir
 
@@ -57,5 +57,19 @@ test('a missing mail variable is an exit-2 error naming it', () => {
 
   expect(() => loadMailEnv(path)).toThrow(
     expect.objectContaining({ exitCode: 2, message: `${path}: MAIL_IMAP_HOST is not set` }),
+  )
+})
+
+test('reads the SMTP host with the shared mail login', () => {
+  const path = dir.write('env', `${mail}MAIL_SMTP_HOST=smtp.mail.example\n`)
+
+  expect(loadSmtpEnv(path)).toEqual({ host: 'smtp.mail.example', username: 'alerts@mail.example', password: 'app pass' })
+})
+
+test('a missing SMTP host is an exit-2 error naming it', () => {
+  const path = dir.write('env', mail)
+
+  expect(() => loadSmtpEnv(path)).toThrow(
+    expect.objectContaining({ exitCode: 2, message: `${path}: MAIL_SMTP_HOST is not set` }),
   )
 })

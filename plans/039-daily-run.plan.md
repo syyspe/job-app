@@ -140,6 +140,26 @@ the API isn't answering; the documented run time is 20:00.
 - `CLAUDE.md` — the `agent:run` line under Commands.
 - `docs/architecture.md` — the new runner files.
 
+### Departures made during the build
+
+- The step line formatters moved out of the command files, which run on
+  import, into their libraries: `formatCollectReport` (`collectRun.ts`),
+  `formatEvaluationReport` (`evaluationRun.ts`), `formatDraftReport`
+  (`draftRun.ts`) and `formatSyncResult` (`sync.ts`). The single-step
+  commands print through them, so their output is unchanged.
+- `verifySandbox` takes the `version` rather than `claudeBin`, so
+  `agent:sandbox-check` can still print `checking the sandbox against claude
+  X` before the probes run.
+- `sendMail`'s third parameter is a `transport` (`{connect, timeoutMs}`), so
+  tests can use a plain-TCP fake and a short timeout. SNI is sent only for a
+  hostname, not for an IP address.
+- The summary subject also counts source failures (`job agent: 2 drafts, 1
+  title rejected, 0 failed, 1 source failure, 1 problem`). An Ollama or gate
+  skip is listed under Problems as `model steps: <message>`.
+- `DailyReport` keeps the skip (`skipped`) apart from step `failures`, so a
+  skip alone exits 0. A failed send or `markReported` is a `summary` failure,
+  and the command prints `summary: not sent` for the first.
+
 ## Work order
 
 1. Server: the conditional profile-sync clear and its tests.

@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
-import { loadDraftConfig, loadRunnerConfig, loadSourcesConfig } from './runnerConfig.ts'
+import { loadDailyRunConfig, loadDraftConfig, loadRunnerConfig, loadSourcesConfig } from './runnerConfig.ts'
 
 let dir: TempDir
 
@@ -146,6 +146,26 @@ describe('sources', () => {
     const path = writeConfig({ sources })
 
     expect(() => loadSourcesConfig(path, connectors)).toThrow(
+      expect.objectContaining({ exitCode: 2, message: expect.stringContaining(`${path}: ${field}: `) }),
+    )
+  })
+})
+
+describe('daily run', () => {
+  test('the wait defaults to 7 days and the recipient is read', () => {
+    const path = writeConfig({ summary: { recipient: 'me@mail.example' } })
+
+    expect(loadDailyRunConfig(path)).toEqual({ handoverWaitDays: 7, summary: { recipient: 'me@mail.example' } })
+  })
+
+  test.each([
+    ['no summary key', {}, 'summary'],
+    ['a recipient that is not an address', { summary: { recipient: 'me' } }, 'summary.recipient'],
+    ['a zero wait', { handoverWaitDays: 0, summary: { recipient: 'me@mail.example' } }, 'handoverWaitDays'],
+  ])('%s is an exit-2 error naming the field', (_name, value, field) => {
+    const path = writeConfig(value)
+
+    expect(() => loadDailyRunConfig(path)).toThrow(
       expect.objectContaining({ exitCode: 2, message: expect.stringContaining(`${path}: ${field}: `) }),
     )
   })

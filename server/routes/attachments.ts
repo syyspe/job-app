@@ -113,12 +113,25 @@ function pendingSyncHandler(db: Database.Database) {
   }
 }
 
+function readProfileSyncBody(body: unknown): { pending: boolean; storedName?: string } {
+  const { pending, storedName } = (body ?? {}) as Record<string, unknown>
+  if (typeof pending !== 'boolean') throw new HttpError(400, 'pending must be true or false')
+  if (storedName !== undefined && typeof storedName !== 'string') {
+    throw new HttpError(400, 'storedName must be a string')
+  }
+  return { pending, storedName }
+}
+
 function profileSyncHandler(db: Database.Database) {
   return (req: Request, res: Response) => {
     const id = Number(req.params.id)
-    if (!findOwnedAttachment(db, id, req.userId)) throw new HttpError(404, 'not found')
-    const pending: unknown = req.body?.pending
-    if (typeof pending !== 'boolean') throw new HttpError(400, 'pending must be true or false')
+    const current = findOwnedAttachment(db, id, req.userId)
+    if (!current) throw new HttpError(404, 'not found')
+    const { pending, storedName } = readProfileSyncBody(req.body)
+    // The runner clears a mark only for the bytes it copied; a replace since then keeps it.
+    if (!pending && storedName !== undefined && storedName !== current.stored_name) {
+      throw new HttpError(409, 'attachment changed since it was listed')
+    }
 
     db.prepare('UPDATE attachments SET profile_sync = ? WHERE id = ?').run(pending ? 1 : 0, id)
     const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as AttachmentRow

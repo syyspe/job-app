@@ -68,3 +68,14 @@ test.each([
 test('localDate is the local calendar date', () => {
   expect(localDate(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05')
 })
+
+test('removing reported failures keeps the ones the summary did not cover', () => {
+  const state = createRunnerState(dir.root)
+  const reported = { source: 'a', date: '2026-11-20', kind: 'blocked' as const }
+  state.addFailure(reported)
+  state.addFailure({ source: 'a', date: '2026-11-21', kind: 'blocked' })
+
+  state.removeFailures([reported])
+
+  expect(state.readFailures()).toEqual([{ source: 'a', date: '2026-11-21', kind: 'blocked' }])
+})

@@ -37,3 +37,9 @@ export function loadMailEnv(path: string): MailEnv {
   const required = readEnvFile(path)
   return { host: required('MAIL_IMAP_HOST'), username: required('MAIL_USERNAME'), password: required('MAIL_PASSWORD') }
 }
+
+// MAIL_USERNAME and MAIL_PASSWORD are shared with the IMAP reader.
+export function loadSmtpEnv(path: string): MailEnv {
+  const required = readEnvFile(path)
+  return { host: required('MAIL_SMTP_HOST'), username: required('MAIL_USERNAME'), password: required('MAIL_PASSWORD') }
+}

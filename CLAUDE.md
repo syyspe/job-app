@@ -48,6 +48,12 @@
   and fetches automatic sources' pages; no `claude -p`, so no gate. It needs
   the `MAIL_*` keys in `~/.config/job-agent/env` and config's `sources` key —
   see README's "Alert sources" section.
+  `npm run agent:run` is the daily run: every step above in order under
+  `run.lock`, then one summary email over SMTP. It needs everything the
+  steps need plus `MAIL_SMTP_HOST` and config's `summary.recipient`, and
+  re-runs the sandbox check itself after a `claude` update. Task Scheduler
+  starts it through `agent/runner/daily-run.sh` — see README's "Daily run"
+  section.
 
 Expected healthy output for tests: `Test Files N passed / Tests N passed`,
 with no `failed` line. Playwright: `N passed`.

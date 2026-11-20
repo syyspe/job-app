@@ -10,6 +10,8 @@ export interface FakeAttachment {
   originalName: string
   content: string
   pending: boolean
+  // Defaults to `<id>.bin`; a test changes it to stand for a replaced file.
+  storedName?: string
 }
 
 export interface FakeJobApp {
@@ -22,11 +24,12 @@ export interface FakeJobApp {
   drafts: FakeDraft[]
   // Every request as `<method> <url>`, logins included.
   requests: string[]
-  flagCalls: { id: number; pending: boolean }[]
+  flagCalls: { id: number; pending: boolean; storedName?: string }[]
   logins: number
   // 'status' answers the pending list with a 500; 'malformed' answers the ad
-  // list with something that is not a list.
-  failure: 'none' | 'status' | 'malformed'
+  // list with something that is not a list; 'reported' answers
+  // POST /api/ads/reported with a 500.
+  failure: 'none' | 'status' | 'malformed' | 'reported'
   // Ingesting the ad with this external id is answered with a 500.
   ingestFailsFor: string | null
   // Drops the current session, so the next request is answered 401.
@@ -34,8 +37,14 @@ export interface FakeJobApp {
   close: () => Promise<void>
 }
 
-function toAttachment({ id, originalName, pending }: FakeAttachment) {
-  return { id, applicationId: 1, storedName: `${id}.bin`, originalName, mimeType: 'text/plain', uploadedAt: '', profileSyncPending: pending }
+function storedNameOf(attachment: FakeAttachment): string {
+  return attachment.storedName ?? `${attachment.id}.bin`
+}
+
+function toAttachment(attachment: FakeAttachment) {
+  const { id, originalName, pending } = attachment
+  const storedName = storedNameOf(attachment)
+  return { id, applicationId: 1, storedName, originalName, mimeType: 'text/plain', uploadedAt: '', profileSyncPending: pending }
 }
 
 interface State {
@@ -59,10 +68,14 @@ interface FlagTarget {
   attachment: FakeAttachment
 }
 
+// A clear naming a storedName the attachment no longer has is a 409, as on the server.
 async function answerFlag({ fake, attachment }: FlagTarget, req: IncomingMessage, res: ServerResponse) {
-  const { pending } = await readJson(req)
-  fake.flagCalls.push({ id: attachment.id, pending: pending as boolean })
-  attachment.pending = pending as boolean
+  const { pending, storedName } = (await readJson(req)) as { pending: boolean; storedName?: string }
+  fake.flagCalls.push({ id: attachment.id, pending, storedName })
+  if (!pending && storedName !== undefined && storedName !== storedNameOf(attachment)) {
+    return sendJson(res, 409, { error: 'attachment changed since it was listed' })
+  }
+  attachment.pending = pending
   sendJson(res, 200, toAttachment(attachment))
 }
 

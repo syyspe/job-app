@@ -3,20 +3,12 @@
 import { mkdirSync } from 'node:fs'
 import { CliError, runCommand } from '../../lib/cliError.ts'
 import { configPath, envPath, indexPath } from '../../lib/paths.ts'
-import { formatBuildSummary } from '../../profile/lib/build.ts'
 import { loadProfileConfig } from '../../profile/lib/config.ts'
 import { checkOllama, createOllama } from '../../profile/lib/ollama.ts'
 import { openIndex } from '../../profile/lib/store.ts'
 import { loadJobAppEnv } from '../lib/env.ts'
 import { createJobAppClient } from '../lib/jobApp.ts'
-import { syncProfile } from '../lib/sync.ts'
-import type { SyncResult } from '../lib/sync.ts'
-
-function printResult({ synced, build, skipped }: SyncResult): void {
-  console.log(`synced ${synced.length} attachments`)
-  for (const name of synced) console.log(`  ${name}`)
-  for (const line of formatBuildSummary(build, skipped)) console.log(line)
-}
+import { formatSyncResult, syncProfile } from '../lib/sync.ts'
 
 await runCommand(async () => {
   const path = configPath(process.env)
@@ -31,7 +23,8 @@ await runCommand(async () => {
   const store = openIndex(indexPath(process.env))
   try {
     const ollama = createOllama({ url: config.ollamaUrl, model: config.embeddingModel })
-    printResult(await syncProfile({ jobApp, config: { ...config, syncFolder }, store, ollama }))
+    const result = await syncProfile({ jobApp, config: { ...config, syncFolder }, store, ollama })
+    for (const line of formatSyncResult(result)) console.log(line)
   } finally {
     store.close()
   }
