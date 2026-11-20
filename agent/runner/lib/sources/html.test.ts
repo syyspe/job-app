@@ -14,6 +14,10 @@ test('htmlToText decodes named and numeric entities and keeps unknown ones', () 
   expect(htmlToText('<p>Ty&ouml;paikka &amp; &#228;&#x00E4; &nbsp;x &bogus;</p>')).toBe('Työpaikka & ää x &bogus;')
 })
 
+test('htmlToText keeps a numeric entity past the Unicode range as written', () => {
+  expect(htmlToText('<p>a &#99999999; b &#x110000; c</p>')).toBe('a &#99999999; b &#x110000; c')
+})
+
 test('htmlToText collapses runs of blank lines and trims', () => {
   expect(htmlToText('<div></div><div></div><p>a</p><div></div><div></div><div></div><p>b</p><div></div>')).toBe('a\n\nb')
 })

@@ -22,10 +22,18 @@ export interface JobPosting {
   deadline?: string
 }
 
+const MAX_CODE_POINT = 0x10ffff
+
+// A numeric entity past Unicode's range stays as written: fromCodePoint would
+// throw, and one malformed email would then stop every run at the same message.
+function codePoint(entity: string, value: number): string {
+  return value <= MAX_CODE_POINT ? String.fromCodePoint(value) : entity
+}
+
 export function decodeEntities(text: string): string {
   return text.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, name: string) => {
-    if (name.startsWith('#x') || name.startsWith('#X')) return String.fromCodePoint(parseInt(name.slice(2), 16))
-    if (name.startsWith('#')) return String.fromCodePoint(Number(name.slice(1)))
+    if (name.startsWith('#x') || name.startsWith('#X')) return codePoint(entity, parseInt(name.slice(2), 16))
+    if (name.startsWith('#')) return codePoint(entity, Number(name.slice(1)))
     return NAMED_ENTITIES[name] ?? entity
   })
 }
