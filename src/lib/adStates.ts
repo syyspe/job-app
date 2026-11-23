@@ -13,7 +13,11 @@ export const AD_STATE_LABELS: Record<AdState, string> = {
   failed: 'Failed',
 }
 
-/** Most urgent first: what waits for the user leads. */
+/**
+ * Most urgent first: what waits for the user leads. Duplicate and dismissed
+ * are left out on purpose: the inbox lists only the selected state, so those
+ * closed ads are never shown there.
+ */
 export const AD_STATE_ORDER: readonly AdState[] = [
   'awaiting_handover',
   'failed',
@@ -23,8 +27,6 @@ export const AD_STATE_ORDER: readonly AdState[] = [
   'drafted',
   'title_rejected',
   'unsuitable',
-  'duplicate',
-  'dismissed',
 ]
 
 const HAND_OVER_STATES: readonly AdState[] = ['awaiting_handover', 'title_rejected']

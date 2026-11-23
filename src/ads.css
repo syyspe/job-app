@@ -81,23 +81,17 @@
 /* Closed ads recede with a thinner neutral spine and muted text, never
    opacity, which would drop the row below AA. */
 .ad-item[data-state='title_rejected'],
-.ad-item[data-state='unsuitable'],
-.ad-item[data-state='duplicate'],
-.ad-item[data-state='dismissed'] {
+.ad-item[data-state='unsuitable'] {
   --spine: var(--st-rejected);
 }
 
 .ad-item[data-state='title_rejected']::before,
-.ad-item[data-state='unsuitable']::before,
-.ad-item[data-state='duplicate']::before,
-.ad-item[data-state='dismissed']::before {
+.ad-item[data-state='unsuitable']::before {
   width: 2px;
 }
 
 .ad-item[data-state='title_rejected'] .ad-title,
-.ad-item[data-state='unsuitable'] .ad-title,
-.ad-item[data-state='duplicate'] .ad-title,
-.ad-item[data-state='dismissed'] .ad-title {
+.ad-item[data-state='unsuitable'] .ad-title {
   color: var(--ink-muted);
 }
 

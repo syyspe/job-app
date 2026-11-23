@@ -57,7 +57,7 @@ test('an ad waiting for its text is handed over and becomes ready', async ({ pag
   await expect(adRow(page, title)).toBeVisible()
 })
 
-test('dismissing an ad takes a confirmation and moves it to dismissed', async ({ page }) => {
+test('dismissing an ad takes a confirmation and hides it from the inbox', async ({ page }) => {
   await logIn(page)
   const { id, title } = await ingestAd(page, 'automatic')
   await moveAd(page, id, { to: 'awaiting_handover' })
@@ -68,8 +68,14 @@ test('dismissing an ad takes a confirmation and moves it to dismissed', async ({
   await row.getByRole('button', { name: 'Confirm dismiss' }).click()
 
   await expect(row).toHaveCount(0)
-  await showState(page, 'Dismissed')
-  await expect(adRow(page, title)).toBeVisible()
+  await expect(
+    page
+      .getByRole('group', { name: 'Filter ads by state' })
+      .getByRole('button', { name: /^Dismissed \d+$/ }),
+  ).toHaveCount(0)
+  const response = await page.request.get('/api/ads')
+  const ads = (await response.json()) as { id: number; state: string }[]
+  expect(ads.find((ad) => ad.id === id)?.state).toBe('dismissed')
 })
 
 test('retrying a failed ad sends it back to new', async ({ page }) => {

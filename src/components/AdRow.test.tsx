@@ -71,10 +71,11 @@ test('the link stays available while handing over, where the text is copied from
   expect(screen.getByRole('link', { name: 'Open ad' })).toBeVisible()
 })
 
-test('a blanked ad reads Untitled ad', () => {
+test('a blanked ad reads its source and first-seen date', () => {
   renderRow(sampleAd({ title: '', company: '' }))
 
-  expect(screen.getByText('Untitled ad')).toBeVisible()
+  expect(screen.getByText('Duunitori ad · 1 Nov 2026')).toBeVisible()
+  expect(screen.queryByText('Untitled ad')).not.toBeInTheDocument()
 })
 
 test('shows the fit summary when there is one', () => {
