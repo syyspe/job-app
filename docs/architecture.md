@@ -43,7 +43,8 @@ Presentational components, each with a test beside it. By surface:
 - **Admin** — `AdminView` (with its local `useUsers` hook) plus `UserForm`,
   `UserList` and `UserRow`.
 - **Ad inbox** — `AdsView` (with its local `useAds` hook and the state filter)
-  over `AdList`, `AdRow` and `AdHandoverForm`.
+  over `AdList`, `AdRow` and `AdHandoverForm`. `AdRow` offers Fetch on a
+  waiting hand-over ad and shows its pre-screen verdict.
 - **Frame** — `NavBar`, which switches between the views and shows the Admin
   control to admins only; `ToastProvider` and `ToastHost`.
 
@@ -119,15 +120,18 @@ Helpers with no Express dependency:
 - `adValidation.ts` — request parsing for each ad route; `parseAdDraft`
   fixes status `draft` and an empty `dateApplied` itself.
 - `ads.ts` — the ad database operations: ingest, transition, hand-over,
+  `requestFetch` and `setPrescreen` (both on `awaiting_handover` only),
   `draftAd` (application, attachments and the move to `drafted`, run by the
-  route in one transaction), reporting. A transition to `ready` fills an empty
+  route in one transaction), reporting. Blanking a hand-over ad empties its
+  title, company and pre-screen reason, keeping the verdict. A transition to `ready` fills an empty
   `company` or `deadline` from the request before the dedup rules run.
 - `files.ts` — attachment storage.
 - `passwords.ts` — hashing and session tokens.
 - `cookies.ts` — reads the session cookie. Express 5 doesn't parse cookies,
   which is the only reason this file exists.
 - `migrations.ts` — the startup column migrations (`migrateApplicationDates`,
-  `migrateApplicationArchived`, `migrateUserRole`) behind one `migrate`.
+  `migrateApplicationArchived`, `migrateUserRole`, `migrateAttachmentUploadedAt`,
+  `migrateAttachmentProfileSync`, `migrateAdFetch`) behind one `migrate`.
 - `seed.ts` — `createUser`; `seedUser`, which every run grants admin, so the
   seeded user is how an admin comes into being; and
   `migrateApplicationsToUser`, the table rebuild that gives a pre-auth
@@ -322,19 +326,22 @@ criteria that follow it. `prompts/draft.framing.md` and
   reused by an unrelated process, or unreadable) is removed and the lock
   taken once more.
 - `handoverExpiry.ts` — `handoverExpired(ad, { waitDays, now })` (UTC
-  first-seen plus the wait, or past an ISO deadline's local day) and
-  `dismissExpiredHandovers(jobApp, options)`.
+  first-seen plus the wait, or past an ISO deadline's local day; an ad with a
+  Fetch request and a deadline waits for the deadline) and
+  `dismissExpiredHandovers(jobApp, options)`, which also dismisses hand-over
+  ads in `ready` or `suitable` past their deadline.
 - `smtp.ts` — `sendMail(message, config, transport)`: the hand-written SMTP
   exchange over implicit TLS on 465 (`EHLO`, `AUTH PLAIN`, `MAIL FROM`,
   `RCPT TO`, `DATA`, `QUIT`), every reply code checked, a base64 body, a 30 s
   timeout. Failures are `CliError(1, …)`: unreachable, login refused, or the
   command refused with its code.
 - `summary.ts` — `composeSummary(input)`: subject and plain-text body from
-  the unreported ads, source failures and problems, or null when all are
-  empty. Ad text has control characters and line breaks replaced.
+  the unreported ads, the run's pre-screens with `prescreenTally`'s 14-day
+  verdict-vs-click count, source failures and problems; `isEmpty` says when
+  there is nothing to send. Ad text has control characters and line breaks replaced.
 - `dailyRun.ts` — `runDaily(options)`, every dependency injected: collect,
   expire, one health check and `ensureSandboxVerified`, then sync,
-  evaluation and drafting, then the summary. A `CliError` in a step is
+  pre-screen, hand-over fetch, evaluation and drafting, then the summary. A `CliError` in a step is
   recorded as a failure and the run goes on; anything else propagates.
 - `politeHttp.ts` — `createPoliteHttp(options)`: the only network path a
   connector has. It checks scheme and host on the URL and every redirect,
@@ -344,13 +351,24 @@ criteria that follow it. `prompts/draft.framing.md` and
   `html.ts` the dependency-free `htmlToText`, `linksOf` and `jobPostingOf`,
   `common.ts` the host check and the fetch-then-extract step, and
   `index.ts` the `CONNECTORS` registry. `academicWork.ts`, `valtiolle.ts` and
-  `nordea.ts` are automatic, `duunitori.ts` is hand-over. Each file opens with
+  `nordea.ts` are automatic, `duunitori.ts` is hand-over with a `fetchAd`
+  over the page's JSON-LD, used only by `handoverFetchRun.ts`. Each file opens with
   what identifies its alerts and where the ad id, title and text sit.
   `fixtures/` holds synthetic alert bodies and ad pages only.
 - `collectRun.ts` — `runCollect`: alerts after the watermark into ingests,
   then `screenNewAds`, then each enabled automatic source's oldest `new` ads
   through its connector, the sources in parallel. It returns per-source
   counts.
+- `fetchOutcome.ts` — `applyFetch` (a fetch result into a transition: a
+  failure is a same-state attempt from `new` or `awaiting_handover`) and
+  `recordBlocked`, shared by collect and the hand-over fetch.
+- `handoverFetchRun.ts` — `runHandoverFetch`: each enabled hand-over source
+  with a `fetchAd`, its waiting ads with a Fetch request (plus the promising
+  ones under `fetch: "automatic"`), oldest first, until the day ends.
+- `prescreen.ts` / `prescreenRun.ts` — `prescreenAd(ad, runStep)`: title,
+  company, location and deadline as JSON on stdin, `unsure` mapped to
+  `promising`; `runPrescreen`: the unscreened waiting hand-over ads, oldest
+  first, up to `perRunCap` through `mapLimit`. A failure stores nothing.
 - `sandbox.ts` — the one way the runner starts `claude -p`: `sandboxArgs`
   (the fixed flag list), `sandboxEnv` (the allowlist), `profileMcpConfig`,
   `stepSchema` (zod → JSON Schema without `$schema`), `spawnSandboxed` (fresh

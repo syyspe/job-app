@@ -308,14 +308,16 @@ up as above, the job-app env file, and a logged-in `claude` CLI on `PATH`.
    ```json
    {
      "titleRules": { "reject": [] },
-     "evaluation": { "concurrency": 2, "perRunCap": 10, "timeoutMs": 300000 }
+     "evaluation": { "concurrency": 2, "perRunCap": 10, "timeoutMs": 300000 },
+     "prescreen": { "concurrency": 4, "perRunCap": 40, "timeoutMs": 120000 }
    }
    ```
 
    `titleRules.reject` holds phrases matched as whole words, ignoring case
    (`intern` does not match `international`). A title that matches goes to
    `title_rejected`; leave unclear words off the list so those ads get a full
-   evaluation. `concurrency` is 1–8.
+   evaluation. `concurrency` is 1–8. `prescreen` is read only by `agent:run`
+   (see "Daily run").
 3. Run `npm run agent:sandbox-check` once, and again **after every `claude`
    CLI update**. It runs two real `claude -p` probes and the CLI version that passed in
    `~/.local/state/job-agent/sandbox-check.json`. `agent:evaluate` refuses to
@@ -403,7 +405,7 @@ it needs no sandbox check. The sources are:
 | `academicwork` | Academic Work | automatic: the ad page is fetched |
 | `valtiolle` | Valtiolle.fi | automatic |
 | `nordea` | Nordea careers | automatic |
-| `duunitori` | Duunitori | hand-over: never fetched; the ad waits in `awaiting_handover` |
+| `duunitori` | Duunitori | hand-over: the ad waits in `awaiting_handover`; `agent:run` fetches it only after you click Fetch, or with `fetch: "automatic"` also when the pre-screen calls it promising |
 
 ### Setup
 
@@ -419,15 +421,16 @@ it needs no sandbox check. The sources are:
    ```
 
    The mailbox is opened read-only: nothing is marked read, moved or deleted.
-3. Check each automatic site's terms of use. Once a site's terms allow
-   fetching its public ad pages, record the date you checked them. A source
-   left out of `sources` is disabled, and an automatic source can't be
-   enabled without `termsCheckedOn`:
+3. Check the terms of use of each site the runner fetches from: every
+   automatic site, and Duunitori. Once a site's terms allow fetching its
+   public ad pages, record the date you checked them. A source left out of
+   `sources` is disabled, and a source that fetches can't be enabled without
+   `termsCheckedOn`:
 
    ```json
    {
      "sources": {
-       "duunitori": { "enabled": true },
+       "duunitori": { "enabled": true, "termsCheckedOn": "2026-11-23", "fetch": "requested" },
        "valtiolle": { "enabled": true, "termsCheckedOn": "2026-11-20" },
        "nordea": { "enabled": false },
        "academicwork": { "enabled": false }
@@ -438,7 +441,11 @@ it needs no sandbox check. The sources are:
    Each source also takes `dailyOpenCap` (pages opened per day, default 20)
    and `minDelayMs` (the pause between its requests, default 15000, at least
    1000). If a site's terms rule fetching out, switching its connector's
-   `mode` to `handover` is a one-line change.
+   `mode` to `handover` is a one-line change. `fetch` is read only for
+   Duunitori: `"requested"` (the default) fetches an ad only after you click
+   Fetch on it, `"automatic"` also fetches every ad the pre-screen calls
+   promising. Why Duunitori is fetched at all, and the limits on it, are in
+   `docs/job-search-agent.md` §10.
 
 The parsers were written from real alerts and pages kept in
 `~/.config/job-agent/samples/<source>/`, outside the repository. When a
@@ -467,7 +474,8 @@ before you fix the connector. The tests use synthetic fixtures only.
 ## Daily run
 
 `agent:run` does the whole pipeline once: collect, dismiss expired
-hand-overs, sync the profile, evaluate, draft, and email you one summary
+hand-overs, sync the profile, pre-screen and fetch hand-over ads, evaluate,
+draft, and email you one summary
 when there is something new, or on every run if you set `alwaysSend`.
 Windows Task Scheduler starts it every evening. Everything above it must
 already be set up: the profile corpus, ad evaluation, ad drafting and alert
@@ -482,7 +490,12 @@ sources.
    MAIL_SMTP_HOST=smtp.gmail.com
    ```
 
-2. Add the recipient, and optionally `alwaysSend`, `lanUrl` and the hand-over
+2. Write your pre-screen criteria to `~/.config/job-agent/prompts/prescreen.md`.
+   Start from `agent/runner/prompts/prescreen.example.md`. The pre-screen
+   sees only an alert's title, company, location and deadline, and answers
+   promising or not promising with a short reason. The runner puts its own
+   framing first (`agent/runner/prompts/prescreen.framing.md`).
+3. Add the recipient, and optionally `alwaysSend`, `lanUrl` and the hand-over
    wait, to `~/.config/job-agent/config.json`:
 
    ```json
@@ -504,8 +517,11 @@ sources.
    for reading it on the phone. It must be an http or https URL.
 
    An ad waiting for hand-over is dismissed `handoverWaitDays` days after it
-   was first seen, or after its deadline day if that comes sooner.
-3. In Windows, open Task Scheduler and create a task:
+   was first seen, or after its deadline day if that comes sooner. An ad you
+   clicked Fetch on waits until its deadline instead. A hand-over ad still
+   in `ready` or `suitable` after its deadline is dismissed, which clears its
+   text.
+4. In Windows, open Task Scheduler and create a task:
    - Trigger: daily at 20:00.
    - Settings: tick "Run task as soon as possible after a scheduled start is
      missed", and set "If the task is already running" to "Do not start a
@@ -517,7 +533,7 @@ sources.
      where node and `NODE_EXTRA_CA_CERTS` come from.
 
 The first run after a `claude` update re-runs the sandbox check by itself.
-If the check fails, evaluation and drafting are skipped until it passes, and
+If the check fails, the model steps are skipped until it passes, and
 the summary says why.
 
 ### Command
@@ -527,8 +543,14 @@ the summary says why.
   longer exists is taken over. It prints one line per step and a `summary:`
   line. A step that fails (the mailbox or job-app unreachable, say) is
   printed to stderr and listed in the summary, and the later steps still
-  run. If Ollama is unreachable or the sandbox check fails, evaluation and
-  drafting are skipped and no ad is touched. Configuration errors exit 2
+  run. After the profile sync it pre-screens the waiting hand-over ads, then
+  fetches the ones you clicked Fetch on (and, with `fetch: "automatic"`, the
+  promising ones) through the same caps, delays and block handling as
+  collect, so they are evaluated in the same run. The summary lists the
+  run's pre-screens and a 14-day count of verdicts against your Fetch
+  clicks. If Ollama is unreachable or the sandbox check fails, the
+  pre-screen, fetch, evaluation and drafting are skipped and no ad is
+  touched. Configuration errors exit 2
   before the lock is taken. A failed step or send exits 1; a skip alone
   exits 0. Nothing is marked reported until the mail server has accepted
   the summary, so a failed send is retried next run.
