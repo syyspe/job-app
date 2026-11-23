@@ -6,6 +6,7 @@ import type {
   Application,
   ApplicationInput,
   Attachment,
+  OpenQuestion,
   Role,
   User,
   UserInput,
@@ -176,6 +177,42 @@ export async function setAttachmentProfileSync(
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pending }),
+  })
+  return parseJson(response)
+}
+
+export async function getAttachmentText(id: number): Promise<string> {
+  const response = await fetch(attachmentUrl(id), { credentials: 'same-origin' })
+  return (await checkOk(response)).text()
+}
+
+/** Answers with the row written: on an original, that is its new "(edited)" copy. */
+export async function saveAttachmentText(id: number, text: string): Promise<Attachment> {
+  const response = await fetch(`/api/attachments/${id}/text`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  })
+  return parseJson(response)
+}
+
+export async function getOpenQuestions(applicationId: number): Promise<OpenQuestion[]> {
+  const response = await fetch(`/api/applications/${applicationId}/questions`, {
+    credentials: 'same-origin',
+  })
+  return parseJson(response)
+}
+
+export async function answerQuestions(
+  applicationId: number,
+  answers: Record<string, string>,
+): Promise<OpenQuestion[]> {
+  const response = await fetch(`/api/applications/${applicationId}/answers`, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers }),
   })
   return parseJson(response)
 }

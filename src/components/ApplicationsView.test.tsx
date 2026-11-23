@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 import { ApplicationsView } from './ApplicationsView'
 import { ToastProvider } from './ToastProvider'
-import type { Application } from '../types'
+import type { Application, Attachment } from '../types'
 
 const sampleApplications: Application[] = [
   {
@@ -35,6 +35,7 @@ function stubFetch(applications: Application[], { pageSize = 10, post }: StubOpt
     if (String(input) === '/api/config') {
       return new Response(JSON.stringify({ pageSize }), { status: 200 })
     }
+    if (String(input).endsWith('/questions')) return new Response('[]', { status: 200 })
     return new Response(JSON.stringify(applications), { status: 200 })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -318,4 +319,84 @@ test('adding an application returns to page 1', async () => {
   await addApplication(user)
 
   expect(await screen.findByText('Page 1 of 3')).toBeVisible()
+})
+
+const letter: Attachment = {
+  id: 5,
+  applicationId: 1,
+  storedName: 'a5.md',
+  originalName: 'Letter.md',
+  mimeType: 'text/markdown',
+  uploadedAt: '2026-01-15 09:00:00',
+  profileSyncPending: false,
+  editedFromId: null,
+}
+
+// Routes the draft-editing endpoints; questions stay open until answers are posted.
+function stubDraftApi({ letterResponse = () => new Response('Hei [[ASK:q1]]') } = {}) {
+  let answered = false
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+    const url = String(input)
+    if (url === '/api/config') return Response.json({ pageSize: 10 })
+    if (url === '/api/applications/1/questions') {
+      return Response.json(answered ? [] : [{ id: 'q1', text: 'Why Acme?' }])
+    }
+    if (url === '/api/applications/1/answers') {
+      answered = true
+      return Response.json([])
+    }
+    if (url === '/api/attachments/5') return letterResponse()
+    if (url === '/api/attachments/5/text') return Response.json({ ...letter, id: 6, editedFromId: 5 })
+    return Response.json([{ ...sampleApplications[0], attachments: [letter] }])
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
+test('expanding a row loads its open questions, and answering them saves and clears the block', async () => {
+  const user = userEvent.setup()
+  const fetchMock = stubDraftApi()
+  renderView()
+
+  await user.click(await screen.findByRole('button', { name: /Acme/ }))
+  await user.type(await screen.findByRole('textbox', { name: 'q1 Why Acme?' }), 'Great product')
+  await user.click(screen.getByRole('button', { name: 'Save answers' }))
+
+  expect(await screen.findByText('Answers saved')).toBeVisible()
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/applications/1/answers',
+    expect.objectContaining({ method: 'POST', body: JSON.stringify({ answers: { q1: 'Great product' } }) }),
+  )
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Open questions' })).toBeNull())
+})
+
+test('editing a .md attachment loads its text and saves it', async () => {
+  const user = userEvent.setup()
+  const fetchMock = stubDraftApi()
+  renderView()
+
+  await user.click(await screen.findByRole('button', { name: /Acme/ }))
+  await user.click(await screen.findByRole('button', { name: 'Edit Letter.md' }))
+  const field = await screen.findByRole('textbox', { name: 'Edit Letter.md' })
+  await user.clear(field)
+  await user.type(field, 'Hei')
+  await user.click(screen.getByRole('button', { name: 'Save Letter.md' }))
+
+  expect(await screen.findByText('Attachment saved')).toBeVisible()
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/attachments/5/text',
+    expect.objectContaining({ method: 'PUT', body: JSON.stringify({ text: 'Hei' }) }),
+  )
+})
+
+test('a failed text load shows the server error and opens no editor', async () => {
+  const user = userEvent.setup()
+  stubDraftApi({ letterResponse: () => Response.json({ error: 'not found' }, { status: 404 }) })
+  renderView()
+
+  await user.click(await screen.findByRole('button', { name: /Acme/ }))
+  await user.click(await screen.findByRole('button', { name: 'Edit Letter.md' }))
+
+  expect(await screen.findByText('not found')).toBeVisible()
+  expect(screen.queryByRole('textbox', { name: 'Edit Letter.md' })).toBeNull()
 })

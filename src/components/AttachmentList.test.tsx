@@ -13,6 +13,7 @@ const attachments: Attachment[] = [
     mimeType: 'text/plain',
     uploadedAt: '2026-01-15 09:00:00',
     profileSyncPending: false,
+    editedFromId: null,
   },
   {
     id: 2,
@@ -22,6 +23,7 @@ const attachments: Attachment[] = [
     mimeType: 'text/plain',
     uploadedAt: '2026-01-15 09:00:00',
     profileSyncPending: true,
+    editedFromId: null,
   },
 ]
 
@@ -32,6 +34,7 @@ test('renders a link for each attachment', () => {
       onUpload={vi.fn()}
       onSetProfileSync={vi.fn()}
       onRemove={vi.fn()}
+      editing={{ onLoadText: vi.fn(), onSaveText: vi.fn() }}
     />,
   )
 
@@ -48,6 +51,7 @@ test('removing an attachment reports its id', async () => {
       onUpload={vi.fn()}
       onSetProfileSync={vi.fn()}
       onRemove={onRemove}
+      editing={{ onLoadText: vi.fn(), onSaveText: vi.fn() }}
     />,
   )
 
@@ -66,6 +70,7 @@ test('choosing a file reports the file', async () => {
       onUpload={onUpload}
       onSetProfileSync={vi.fn()}
       onRemove={vi.fn()}
+      editing={{ onLoadText: vi.fn(), onSaveText: vi.fn() }}
     />,
   )
 
@@ -84,6 +89,7 @@ test('the input is cleared after an upload', async () => {
       onUpload={vi.fn()}
       onSetProfileSync={vi.fn()}
       onRemove={vi.fn()}
+      editing={{ onLoadText: vi.fn(), onSaveText: vi.fn() }}
     />,
   )
 
@@ -102,6 +108,7 @@ test('a change with no file reports nothing', () => {
       onUpload={onUpload}
       onSetProfileSync={vi.fn()}
       onRemove={vi.fn()}
+      editing={{ onLoadText: vi.fn(), onSaveText: vi.fn() }}
     />,
   )
 
@@ -121,6 +128,7 @@ test('an unmarked attachment offers to add it to the profile', async () => {
       onUpload={vi.fn()}
       onSetProfileSync={onSetProfileSync}
       onRemove={vi.fn()}
+      editing={{ onLoadText: vi.fn(), onSaveText: vi.fn() }}
     />,
   )
 
@@ -138,6 +146,7 @@ test('a marked attachment shows it is pending and offers to take the mark back',
       onUpload={vi.fn()}
       onSetProfileSync={onSetProfileSync}
       onRemove={vi.fn()}
+      editing={{ onLoadText: vi.fn(), onSaveText: vi.fn() }}
     />,
   )
 
@@ -148,4 +157,82 @@ test('a marked attachment shows it is pending and offers to take the mark back',
   )
 
   expect(onSetProfileSync).toHaveBeenCalledWith(2, false)
+})
+
+const letter: Attachment = { ...attachments[0], id: 3, storedName: 'a3.md', originalName: 'Letter.md' }
+const letterCopy: Attachment = {
+  ...letter,
+  id: 4,
+  storedName: 'a4.md',
+  originalName: 'Letter (edited).md',
+  editedFromId: 3,
+}
+const cv: Attachment = { ...attachments[0], id: 5, storedName: 'a5.MD', originalName: 'CV.MD' }
+
+function renderEditable(handlers: { onLoadText?: () => Promise<string | null>; onSaveText?: () => Promise<boolean> } = {}) {
+  render(
+    <AttachmentList
+      attachments={[attachments[0], letter, letterCopy, cv]}
+      onUpload={vi.fn()}
+      onSetProfileSync={vi.fn()}
+      onRemove={vi.fn()}
+      editing={{
+        onLoadText: handlers.onLoadText ?? vi.fn(async () => 'text'),
+        onSaveText: handlers.onSaveText ?? vi.fn(async () => true),
+      }}
+    />,
+  )
+}
+
+test('Edit is offered on current .md attachments only', () => {
+  renderEditable()
+
+  expect(screen.getByRole('button', { name: 'Edit Letter (edited).md' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Edit CV.MD' })).toBeVisible()
+  expect(screen.queryByRole('button', { name: 'Edit Letter.md' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Edit resume.txt' })).toBeNull()
+})
+
+test('a superseded original says it is kept and still offers profile and remove', () => {
+  renderEditable()
+
+  expect(screen.getByText('Original, kept unchanged')).toBeVisible()
+  expect(screen.getByRole('link', { name: 'Letter.md' })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Add Letter.md to profile' })).toBeVisible()
+})
+
+test('Edit loads the text into the editor, and a successful save closes it', async () => {
+  const user = userEvent.setup()
+  const onLoadText = vi.fn(async () => 'Hei')
+  const onSaveText = vi.fn(async () => true)
+  renderEditable({ onLoadText, onSaveText })
+
+  await user.click(screen.getByRole('button', { name: 'Edit CV.MD' }))
+  const field = screen.getByRole('textbox', { name: 'Edit CV.MD' })
+  expect(field).toHaveValue('Hei')
+  await user.type(field, '!')
+  await user.click(screen.getByRole('button', { name: 'Save CV.MD' }))
+
+  expect(onLoadText).toHaveBeenCalledWith(5)
+  expect(onSaveText).toHaveBeenCalledWith(5, 'Hei!')
+  expect(screen.queryByRole('textbox', { name: 'Edit CV.MD' })).toBeNull()
+})
+
+test('a failed save keeps the editor open with the text', async () => {
+  const user = userEvent.setup()
+  renderEditable({ onSaveText: vi.fn(async () => false) })
+
+  await user.click(screen.getByRole('button', { name: 'Edit CV.MD' }))
+  await user.click(screen.getByRole('button', { name: 'Save CV.MD' }))
+
+  expect(screen.getByRole('textbox', { name: 'Edit CV.MD' })).toHaveValue('text')
+})
+
+test('a failed load opens no editor', async () => {
+  const user = userEvent.setup()
+  renderEditable({ onLoadText: vi.fn(async () => null) })
+
+  await user.click(screen.getByRole('button', { name: 'Edit CV.MD' }))
+
+  expect(screen.queryByRole('textbox')).toBeNull()
 })

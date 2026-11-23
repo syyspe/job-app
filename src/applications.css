@@ -178,6 +178,8 @@
 
 .attachment-item {
   display: flex;
+  /* wrap: an open editor takes its own line under the file name. */
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--s-3);
@@ -191,6 +193,81 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s-2);
+}
+
+.attachment-editor {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+/* Prose, not code: Plex Sans stays, and the line stops where a letter would. */
+.attachment-editor textarea {
+  max-width: 72ch;
+  line-height: var(--lh-body);
+}
+
+.attachment-editor-hint,
+.superseded-note,
+.open-questions-hint {
+  color: var(--ink-muted);
+  font-size: var(--fs-xs);
+}
+
+/* A superseded original recedes: muted name, no opacity. */
+.attachment-item[data-superseded='true'] > a {
+  color: var(--ink-muted);
+}
+
+/* The one part of the detail that needs the user, so the one that spends colour;
+   the spine is the list rows' own technique. */
+.open-questions {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-4) var(--s-4) var(--s-5);
+  background: var(--accent-tint);
+  border-radius: var(--r-md);
+}
+
+.open-questions::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--accent);
+}
+
+.open-questions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s-3);
+}
+
+.open-questions h3 {
+  margin: 0;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.open-questions-count {
+  color: var(--ink-muted);
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.question-id {
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.question-text {
+  color: var(--ink);
 }
 
 .sync-pending {

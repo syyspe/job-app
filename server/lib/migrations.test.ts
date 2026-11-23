@@ -8,6 +8,7 @@ import {
   migrateAdFetch,
   migrateApplicationArchived,
   migrateApplicationDates,
+  migrateAttachmentEditedFrom,
   migrateAttachmentProfileSync,
   migrateAttachmentUploadedAt,
   migrateUserRole,
@@ -207,4 +208,44 @@ test('migrating the ad fetch columns twice is a no-op the second time', () => {
     fetch_requested_at: string
   }
   expect(ad.fetch_requested_at).toBe('2026-01-01 00:00:00')
+})
+
+test('migrating a legacy database leaves existing attachments as originals', () => {
+  migrateAttachmentEditedFrom(db)
+
+  const attachment = db.prepare('SELECT * FROM attachments WHERE id = 1').get() as {
+    original_name: string
+    edited_from: number | null
+  }
+  expect(attachment.original_name).toBe('cv.pdf')
+  expect(attachment.edited_from).toBeNull()
+})
+
+test('migrating edited_from twice is a no-op the second time', () => {
+  migrateAttachmentEditedFrom(db)
+  db.prepare(
+    `INSERT INTO attachments (id, application_id, stored_name, original_name, mime_type, edited_from)
+     VALUES (2, 1, 'b.md', 'cv (edited).md', 'text/markdown', 1)`,
+  ).run()
+
+  expect(() => migrateAttachmentEditedFrom(db)).not.toThrow()
+  const copy = db.prepare('SELECT edited_from FROM attachments WHERE id = 2').get() as {
+    edited_from: number
+  }
+  expect(copy.edited_from).toBe(1)
+})
+
+test('deleting an original after the migration turns its copy into an original', () => {
+  migrateAttachmentEditedFrom(db)
+  db.prepare(
+    `INSERT INTO attachments (id, application_id, stored_name, original_name, mime_type, edited_from)
+     VALUES (2, 1, 'b.md', 'cv (edited).md', 'text/markdown', 1)`,
+  ).run()
+
+  db.prepare('DELETE FROM attachments WHERE id = 1').run()
+
+  const copy = db.prepare('SELECT edited_from FROM attachments WHERE id = 2').get() as {
+    edited_from: number | null
+  }
+  expect(copy.edited_from).toBeNull()
 })

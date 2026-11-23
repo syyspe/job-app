@@ -1,4 +1,5 @@
 import { ApplicationDetail } from './ApplicationDetail.tsx'
+import type { DraftEditing } from './ApplicationDetail.tsx'
 import { formatDate } from '../lib/dates.ts'
 import { STATUS_LABELS } from '../lib/status.ts'
 import type { Application, ApplicationInput } from '../types.ts'
@@ -61,6 +62,7 @@ interface ApplicationRowProps {
   onSetProfileSync: (attachmentId: number, pending: boolean) => void
   onRemoveAttachment: (attachmentId: number) => void
   onSetArchived: (archived: boolean) => void
+  drafting: DraftEditing
 }
 
 function ApplicationRow({
@@ -73,6 +75,7 @@ function ApplicationRow({
   onSetProfileSync,
   onRemoveAttachment,
   onSetArchived,
+  drafting,
 }: ApplicationRowProps) {
   return (
     <li
@@ -90,10 +93,25 @@ function ApplicationRow({
           onSetProfileSync={onSetProfileSync}
           onRemoveAttachment={onRemoveAttachment}
           onSetArchived={onSetArchived}
+          drafting={drafting}
         />
       )}
     </li>
   )
+}
+
+/** DraftEditing with onAnswer naming the application, since the list has many. */
+export interface ListDrafting extends Omit<DraftEditing, 'onAnswer'> {
+  onAnswer: (applicationId: number, answers: Record<string, string>) => void
+}
+
+// The loaded questions are the expanded application's, so only its row gets them.
+function rowDrafting(drafting: ListDrafting, applicationId: number, expanded: boolean): DraftEditing {
+  return {
+    ...drafting,
+    questions: expanded ? drafting.questions : [],
+    onAnswer: (answers) => drafting.onAnswer(applicationId, answers),
+  }
 }
 
 interface ApplicationListProps {
@@ -107,6 +125,7 @@ interface ApplicationListProps {
   onRemoveAttachment: (attachmentId: number) => void
   onSetArchived: (id: number, archived: boolean) => void
   hiddenArchivedCount: number
+  drafting: ListDrafting
 }
 
 export function ApplicationList({
@@ -120,6 +139,7 @@ export function ApplicationList({
   onRemoveAttachment,
   onSetArchived,
   hiddenArchivedCount,
+  drafting,
 }: ApplicationListProps) {
   if (applications.length === 0) {
     return <EmptyState hiddenArchivedCount={hiddenArchivedCount} />
@@ -141,6 +161,7 @@ export function ApplicationList({
           onSetProfileSync={onSetProfileSync}
           onRemoveAttachment={onRemoveAttachment}
           onSetArchived={(archived) => onSetArchived(application.id, archived)}
+          drafting={rowDrafting(drafting, application.id, expandedId === application.id)}
         />
       ))}
     </ul>

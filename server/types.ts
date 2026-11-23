@@ -31,6 +31,12 @@ export interface Attachment {
   mimeType: string
   uploadedAt: string
   profileSyncPending: boolean
+  editedFromId: number | null
+}
+
+export interface OpenQuestion {
+  id: string
+  text: string | null
 }
 
 export interface Application {

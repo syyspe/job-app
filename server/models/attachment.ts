@@ -8,6 +8,7 @@ export interface AttachmentRow {
   mime_type: string
   uploaded_at: string
   profile_sync: number
+  edited_from: number | null
 }
 
 export function toAttachment(row: AttachmentRow): Attachment {
@@ -19,5 +20,6 @@ export function toAttachment(row: AttachmentRow): Attachment {
     mimeType: row.mime_type,
     uploadedAt: row.uploaded_at,
     profileSyncPending: row.profile_sync === 1,
+    editedFromId: row.edited_from,
   }
 }

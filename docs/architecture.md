@@ -38,8 +38,12 @@ Presentational components, each with a test beside it. By surface:
 - **Applications** — `ApplicationsView` (with its local `useApplications`
   hook for the data and `useListView` for sort, archived filter and page)
   over `ApplicationList`, `ApplicationDetail`, `ApplicationForm` and
-  `ApplicationSort`, with `AttachmentList` in the detail and
-  `ArchivedToggle`/`Pagination` at the foot of the list.
+  `ApplicationSort`, with `OpenQuestions` (one answer field per open
+  `[[ASK:qN]]` question, shown only while any is open) and `AttachmentList`
+  in the detail, and `ArchivedToggle`/`Pagination` at the foot of the list.
+  `AttachmentList` offers Edit on a current `.md` attachment and opens
+  `AttachmentEditor` in place of the row's actions; an original with an
+  edited copy says "Original, kept unchanged" instead.
 - **Admin** — `AdminView` (with its local `useUsers` hook) plus `UserForm`,
   `UserList` and `UserRow`.
 - **Ad inbox** — `AdsView` (with its local `useAds` hook and the state filter)
@@ -96,7 +100,10 @@ file again when the draft is refused),
 `applications.ts`, `attachments.ts` (upload, download, replace, delete, and
 the profile-sync mark: `GET /attachments/pending-sync`,
 `PUT /attachments/:id/profile-sync`, where a clear naming a `storedName` the
-row no longer has is a 409 that keeps the mark), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
+row no longer has is a 409 that keeps the mark; and
+`PUT /attachments/:id/text`, the raw-text save of a `.md` attachment),
+`questions.ts` (`GET /applications/:id/questions` and
+`POST /applications/:id/answers`, the draft's open questions), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
 (`/config`, the page size the client pages the list by) and `users.ts`
 (admin-only account management).
 
@@ -126,12 +133,23 @@ Helpers with no Express dependency:
   title, company and pre-screen reason, keeping the verdict. A transition to `ready` fills an empty
   `company` or `deadline` from the request before the dedup rules run.
 - `files.ts` — attachment storage.
+- `askMarkers.ts` — pure text rules for `[[ASK:qN]]` markers: the open ids,
+  filling answers into a document, the `qN:` question lines in the notes and
+  the `→ <answer>` line written under them, and `.md`/"(edited)" naming.
+- `markdownEdits.ts` — `currentDocuments` (the `.md` attachments no copy
+  supersedes), `readTextIfExists` and `saveMarkdownText`. That last one never
+  overwrites an original. The first save inserts an "(edited)" copy with
+  `edited_from` set, and the profile mark moves to it. A later save
+  overwrites the copy. It returns the replaced file for the caller to unlink
+  after its transaction commits. Shared by the attachments and questions
+  routers.
 - `passwords.ts` — hashing and session tokens.
 - `cookies.ts` — reads the session cookie. Express 5 doesn't parse cookies,
   which is the only reason this file exists.
 - `migrations.ts` — the startup column migrations (`migrateApplicationDates`,
   `migrateApplicationArchived`, `migrateUserRole`, `migrateAttachmentUploadedAt`,
-  `migrateAttachmentProfileSync`, `migrateAdFetch`) behind one `migrate`.
+  `migrateAttachmentProfileSync`, `migrateAttachmentEditedFrom`,
+  `migrateAdFetch`) behind one `migrate`.
 - `seed.ts` — `createUser`; `seedUser`, which every run grants admin, so the
   seeded user is how an admin comes into being; and
   `migrateApplicationsToUser`, the table rebuild that gives a pre-auth
@@ -187,7 +205,8 @@ No MCP dependency:
 
 ### `mcp/tools/`
 
-One file per tool group (`ads.ts`, `applications.ts`, `attachments.ts`), each exporting
+One file per tool group (`ads.ts`, `applications.ts`, `attachments.ts`,
+`questions.ts`), each exporting
 a `register*Tools(server, client)`. Tool schemas are zod. A handler signals
 failure by **throwing**; the SDK turns that into the tool error the user
 reads.

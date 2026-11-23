@@ -152,10 +152,11 @@ servers — useful for confirming the built app actually works end to end.
 
 ## Claude Desktop (MCP)
 
-`mcp/` is a stdio MCP server that gives Claude Desktop thirteen tools over this
+`mcp/` is a stdio MCP server that gives Claude Desktop fifteen tools over this
 app: `list_applications`, `get_application`, `create_application`,
 `attach_file`, `update_application`, `archive_application`,
-`read_attachment`, `delete_attachment`, `replace_attachment`, `list_ads`,
+`read_attachment`, `delete_attachment`, `replace_attachment`,
+`list_open_questions`, `answer_questions`, `list_ads`,
 `get_ad`, `handover_ad` and `dismiss_ad`. It speaks
 to the API over HTTP exactly as the browser does, so **the API has to be
 running already** (`npm run dev:server`, or `npm start`) and the seed user
@@ -392,6 +393,16 @@ including the sandbox check.
   third failed attempt moves the ad to `failed`. A draft the API refuses
   (for example a 409 because the ad was drafted in the meantime) stops the
   run with exit 1.
+- To finish a draft, open it in the app. **Open questions** lists every
+  `[[ASK:qN]]` marker still left in its `.md` attachments, with one answer
+  field each. Saving an answer replaces the marker in every document that
+  carries it and writes `→ <answer>` under the question in the notes. A
+  blank answer leaves the question open. Any `.md` attachment can also be
+  edited as raw text with **Edit**. Either way the original file is never
+  overwritten. The first save writes `<name> (edited).md` beside it and
+  moves the "Add to profile" mark to that copy, and later saves overwrite
+  the copy. Claude Desktop does the same through `list_open_questions` and
+  `answer_questions`.
 
 ## Alert sources
 
