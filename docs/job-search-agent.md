@@ -13,7 +13,8 @@ to change anything here changes this file in the same PR. The feature's goals ar
         ├─ 1. Collect      alert mailbox → connectors → POST /api/ads
         ├─ 2. Screen       title rules → title_rejected | awaiting_handover | new
         ├─ 3. Fetch        public ad page via PoliteHttp → ready
-        │                  (hand-over sources: the user supplies the text)
+        │                  (hand-over sources: the user pastes the text, or a
+        │                  pre-screen and a Fetch click or the switch fetch it, §10)
         ├─ 4. Evaluate     one sandboxed `claude -p` per ad → suitable | unsuitable
         ├─ 5. Draft        one sandboxed `claude -p` per ad → validated JSON
         ├─ 6. Save         POST /api/ads/:id/draft → application with status `draft`
@@ -263,6 +264,22 @@ Connector ids are `academicwork`, `valtiolle`, `nordea` (automatic) and
 ```
 
 `dailyOpenCap` is an integer of at least 1 and `minDelayMs` at least 1000.
+`fetch` is `"requested"` (the default) or `"automatic"`, and is read only for a
+hand-over connector with a `fetchAd`, which today means Duunitori (section 10):
+
+```json
+{ "sources": { "duunitori": { "enabled": true, "termsCheckedOn": "YYYY-MM-DD", "fetch": "requested" } } }
+```
+
+The key `046-duunitori-terms-decision` owns, read only by `agent:run`, with its
+defaults. `concurrency` is 1–8. The pre-screen criteria live in
+`prompts/prescreen.md`, after the fixed framing from
+`agent/runner/prompts/prescreen.framing.md`; the repo ships only a synthetic
+`prescreen.example.md`:
+
+```json
+{ "prescreen": { "concurrency": 4, "perRunCap": 40, "timeoutMs": 120000 } }
+```
 
 The keys `039-daily-run` owns, read only by `agent:run`. `summary.recipient`
 is required and must be an email address; `handoverWaitDays` is an integer of
@@ -279,9 +296,10 @@ The summary goes out over SMTP with implicit TLS on port 465 to
 `MAIL_SMTP_HOST`, logged in as `MAIL_USERNAME`, which is also the From
 address.
 The command exits 2 with one stderr line for an unknown id, for an enabled
-automatic source with no `termsCheckedOn` (`sources.<id>: termsCheckedOn is
-required to enable an automatic source`), and when no source is enabled, so
-it never reads mail it would not parse.
+source whose connector has a `fetchAd` but no `termsCheckedOn` (`sources.<id>:
+termsCheckedOn is required to enable a source that fetches`), which covers
+every automatic source and Duunitori, and when no source is enabled, so it
+never reads mail it would not parse.
 
 The mail account is a dedicated mailbox read over IMAP with TLS on port 993,
 INBOX only, read-only: nothing is flagged, moved or deleted. State files in
@@ -321,6 +339,8 @@ New table `ads`, scoped by `user_id` like `applications`:
 | `state` | See below |
 | `body` | Nullable ad text |
 | `evaluation` | Nullable JSON: `verdict`, `fitSummary`, `reasons` |
+| `prescreen` | Nullable JSON: `verdict` (`promising` or `not_promising`), `reason` (1–300 characters) |
+| `fetch_requested_at` | Nullable UTC time of the user's first Fetch click; never cleared |
 | `application_id` | Nullable, `ON DELETE SET NULL`, so deleting a draft does not recreate it |
 | `duplicate_of` | Nullable ad id |
 | `attempts`, `last_error` | Retry bookkeeping; `last_error` is a fixed category, never ad text |
@@ -344,7 +364,7 @@ States, lowercase like every other value in the app:
 Allowed transitions; the server answers anything else with 409:
 
 - `new` → `title_rejected`, `awaiting_handover`, `ready`, `duplicate`, `failed`, `dismissed`
-- `awaiting_handover` → `ready`, `dismissed`
+- `awaiting_handover` → `ready`, `dismissed`, `failed`
 - `title_rejected` → `ready` (the user hands the ad over anyway), `dismissed`
 - `ready` → `suitable`, `unsuitable`, `duplicate`, `failed`, `dismissed`
 - `suitable` → `drafted`, `failed`, `dismissed`
@@ -369,7 +389,7 @@ What a transition must carry:
 
 **Recording a failed attempt.** A transition with `to` equal to the current
 state and an `error` adds one to `attempts` and stores `last_error`. It works
-from `new`, `ready` and `suitable`. The third attempt moves the ad to `failed`
+from `new`, `awaiting_handover`, `ready` and `suitable`. The third attempt moves the ad to `failed`
 on the server. Any other same-state request is 409.
 
 The evaluation step's categories are `timeout`, `cli_failed` (a non-zero exit
@@ -389,13 +409,20 @@ stays `new` for the next run. A `gone` fetch result moves the ad straight to
 
 An ad waits in `awaiting_handover` for `handoverWaitDays` days after
 `first_seen_at`, 7 by default. If the ad has a deadline that falls sooner, it
-waits only until the end of that day. The runner then moves it to `dismissed`.
+waits only until the end of that day. An ad with `fetch_requested_at` ignores
+`handoverWaitDays` and waits until the end of its deadline day, so a click on
+the last day isn't dismissed before the run that fetches it; one without a
+deadline keeps the normal wait. The runner then
+moves it to `dismissed`. The same step dismisses hand-over ads in `ready` or
+`suitable` whose deadline has passed, which clears their text.
 
 For a hand-over source, `title` and `company` are blanked as soon as the ad
 enters `unsuitable`, `duplicate` or `dismissed`, which no summary covers, and
 once reported for `drafted`, `title_rejected` and `failed`. Only the keys needed
 for deduplication remain, and handing such an ad over again supplies the title
 and company anew. This keeps stored Duunitori content to what the review needs.
+The same blanking empties `prescreen.reason`, which talks about the ad, and
+keeps `prescreen.verdict`, which the verdict-vs-click comparison needs.
 
 **Deduplication**, applied by the server, in order:
 
@@ -428,6 +455,8 @@ All routes sit behind `requireSession` and follow the existing error contract.
 | `POST /api/ads` | Idempotent ingest: 201 new, 200 existing |
 | `POST /api/ads/:id/transition` | `{to, body?, evaluation?, error?}`; 409 if not allowed |
 | `POST /api/ads/:id/handover` | `{text, url?, title?, company?}`; moves the ad to `ready` |
+| `POST /api/ads/:id/fetch-request` | No body; sets `fetch_requested_at` once (a repeat keeps the first time). 409 unless the ad is a hand-over ad in `awaiting_handover` |
+| `POST /api/ads/:id/prescreen` | `{verdict, reason}`; 400 for a bad verdict or a reason outside 1–300 characters, 409 unless the ad is `awaiting_handover` |
 | `POST /api/ads/:id/draft` | Atomic draft creation, see below |
 | `POST /api/ads/reported` | `{ids}`; sets `reported_at` after the email is accepted |
 
@@ -490,8 +519,10 @@ interface SourceConnector {
 - `PoliteHttp` fetches only `https` URLs whose host is in the connector's
   `fetchHosts`, and applies the same check to every redirect. Alert emails are
   untrusted, so a candidate with any other host is dropped without a request.
-- A `handover` connector has no `fetchAd` or `fetchHosts`. Duunitori is
-  `handover`.
+- A `handover` connector may have a `fetchAd` and `fetchHosts`. Its ads are
+  fetched only on the user's Fetch click, or, with `fetch: "automatic"`, also
+  when the pre-screen calls them promising (section 10). Duunitori is
+  `handover` and the only such connector.
 - `PoliteHttp.get(url)` answers `{ kind: 'page', html }` for a 2xx. 401, 403,
   429 and 503 are `blocked`, which ends the source's day: every later `get`
   that day answers `blocked` with no request. 404 and 410 are `gone`, any
@@ -507,8 +538,9 @@ interface SourceConnector {
   links carry the target in their path).
 - `parseAlert` answers `[]` for an alert whose structure it does not
   recognise, and the runner records an `empty_alert` failure.
-- Each source's config is `{enabled, termsCheckedOn, dailyOpenCap, minDelayMs}`.
-  The runner refuses to enable an automatic source with no `termsCheckedOn`.
+- Each source's config is `{enabled, termsCheckedOn, dailyOpenCap, minDelayMs,
+  fetch}`. The runner refuses to enable a source that fetches with no
+  `termsCheckedOn`.
 
 ## 7. Draft format
 
@@ -643,7 +675,7 @@ user renders from the `.md`. PDFs are never rendered by the agent.
 - Each run dismisses the `awaiting_handover` ads whose wait has ended (section
   4), so a day missed because the PC was off is caught up on the next run.
 - One summary is sent when there are unreported drafts, title rejections,
-  failures or source failures. Nothing is marked reported until the mail server
+  failures, newly pre-screened ads or source failures. Nothing is marked reported until the mail server
   accepts the message.
 
 **The entry point.** `npm run agent:run` (`agent/runner/commands/run.ts`)
@@ -652,12 +684,17 @@ stderr line on any error, before taking the lock. With the lock held it runs,
 in order:
 
 1. collect: mail, ingest, title screening and page fetches (`agent:collect`);
-2. dismiss the expired hand-overs;
+2. dismiss the expired hand-overs, ads waiting in `awaiting_handover`
+   and the hand-over ads in `ready` or `suitable` past their deadline;
 3. one Ollama health check, then the sandbox gate (section 2). If either
    fails, steps 4–6 are skipped and no ad is touched;
 4. `syncProfile`, only when `syncFolder` is set;
-5. evaluation and 6. drafting, both reusing the health result;
+5. the pre-screen, then the hand-over fetch (section 10), then evaluation and
+   6. drafting, all reusing the health result. The fetch sits inside the model
+   steps so that text is fetched only in a run that can evaluate it the same
+   day;
 7. the summary: the unreported `drafted`, `title_rejected` and `failed` ads,
+   the run's newly pre-screened ads with the 14-day verdict-vs-click tally,
    the source failures and the run's problems. When there is anything, it is
    sent, then the ads are marked reported and those source failures cleared.
    A failed send marks and clears nothing, so the next run sends them again.
@@ -678,3 +715,75 @@ appends all output to `logs/run-YYYY-MM-DD.log`. If job-app doesn't answer at
 `logs/server.log`, and waits up to 120 s for it. It then runs `agent:run` and
 exits with its status. WSL may stop the distro, and the server with it, once
 the task's `wsl.exe` exits; the next run starts it again.
+
+## 10. Duunitori decision (046)
+
+This replaces the 033 ruling "Duunitori is never fetched by the agent". The
+user chose option (a) of [`ad-inbox-review.md`](ad-inbox-review.md) §3, a
+Fetch click per ad, with a config switch to (b), automatic fetching, to flip
+once the pre-screen below proves good enough. The reasoning is the user's,
+from [brief 046](../brief/046-duunitori-terms-decision.md).
+
+**The terms, read 2026-11-23** at
+<https://duunitori.fi/compliance/kayttoehdot>, still "Päivitetty 13.
+marraskuuta 2026". They forbid users to "tallentaa, arkistoida, skrapata tai
+muutoin järjestelmällisesti kopioida Palvelun sisältöä tai olennaista osaa
+siitä, paitsi siltä osin kuin se on teknisesti välttämätöntä Palvelun
+valtuutettua käyttöä varten". They also forbid systematically linking to or
+embedding the content in another service, and making it available to the
+public. They expressly allow "tavallisia linkkejä Palvelun julkisesti
+saatavilla oleville sivuille", with individual ads as the example. Bots, AI
+and agents are not mentioned, and nothing bans a user-triggered fetch.
+
+**robots.txt, read 2026-11-23.** `User-agent: *` has `Disallow: /`. Named
+groups, the search bots and the user-triggered fetchers Claude-User,
+ChatGPT-User, Perplexity-User and MistralAI-User, may read
+`/tyopaikat/tyo/<ad>`, except the `lisaa_suosikkeihin`, `poista_suosikeista`,
+`samanlaiset` and `somegroups*` paths. The runner's User-Agent,
+`job-agent/1.0 (personal job alert reader)`, falls under `*`. The user's
+reading: `*` is a crawler rule, and the allowed `*-User` agents show that
+Duunitori tolerates user-triggered fetches. The User-Agent stays honest; the
+runner never claims to be one of the named agents.
+
+**Why this is not systematic copying.** Reading the alert emails touches only
+the user's own mailbox. Opening one ad the user picked, from an alert the user
+set up, is the request the browser sends on a click. Writing an application is
+the user's own work, with the ad as one input. With the switch on, two screens
+still come before any fetch: the job watcher the user defined on Duunitori,
+and the agent's pre-screen of each ad.
+
+**Where it would start to look like scraping**, and so stays out:
+
+- crawling search or category pages, or following any link beyond the ad URL
+  the alert carried;
+- fetching every ad of every email in bulk rather than the ones the user
+  considers;
+- a stored archive of ad texts ("tallentaa" is in the clause);
+- republishing or sharing the content;
+- high request rates, or getting around rate limits and bot protection.
+
+**What the runner does.**
+
+- The pre-screen is a sandboxed `claude -p` step under the section 2 gate. The
+  alerts carry no description, so it judges only title, company, location and
+  deadline. Its verdict is `promising` or `not_promising` with a reason; an
+  `unsure` answer is stored as `promising`. It runs for hand-over sources
+  only. A failed step stores nothing and the ad is tried again next run.
+- A Fetch click (`POST /api/ads/:id/fetch-request`) only marks the ad. The
+  next daily run fetches the alert's own ad URL through `PoliteHttp`, with the
+  source's `dailyOpenCap`, `minDelayMs` and stop on the first block, and
+  evaluates it in the same run. The paste stays available.
+- With `sources.duunitori.fetch: "automatic"`, the run also fetches the ads
+  the pre-screen calls promising. `"requested"` is the default.
+- The inbox and the summary show each verdict next to whether the user
+  clicked Fetch, so the user can judge when to flip the switch.
+
+**Retention.** Entering `dismissed`, `unsuitable`, `duplicate`, `failed` or
+`title_rejected` clears `body`. Title, company and the pre-screen reason are
+blanked as section 4 says. An `awaiting_handover` ad is dismissed when its
+wait ends, and a hand-over ad in `ready` or `suitable` is dismissed once its
+deadline has passed. So no Duunitori text outlives its deadline unless it
+became an application, whose saved ad is the user's own record.
+
+**Rollback.** `fetch: "requested"` stops automatic fetching. Disabling the
+source stops all of it.

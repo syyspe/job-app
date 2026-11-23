@@ -18,6 +18,8 @@ function sampleAd(overrides: Partial<AdSummary>): AdSummary {
     deadline: '',
     state: 'awaiting_handover',
     evaluation: null,
+    prescreen: null,
+    fetchRequestedAt: null,
     applicationId: null,
     duplicateOf: null,
     attempts: 0,
@@ -161,6 +163,20 @@ test('dismissing posts the transition', async () => {
       expect.objectContaining({ body: JSON.stringify({ to: 'dismissed' }) }),
     ),
   )
+})
+
+test('Fetch posts the request and confirms it', async () => {
+  const user = userEvent.setup()
+  const fetchMock = stubAds([waiting])
+  renderView()
+  await screen.findByText('Waiting ad')
+
+  await user.click(screen.getByRole('button', { name: 'Fetch' }))
+
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith('/api/ads/1/fetch-request', expect.objectContaining({ method: 'POST' })),
+  )
+  expect(await screen.findByText('Fetch requested')).toBeVisible()
 })
 
 test('handing over posts the text', async () => {

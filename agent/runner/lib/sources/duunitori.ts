@@ -1,4 +1,7 @@
-// Duunitori (duunitori.fi), hand-over: its ads are never fetched.
+// Duunitori (duunitori.fi), hand-over: an ad is fetched only when the user
+// clicks Fetch, or, with `fetch: "automatic"`, when the pre-screen calls it
+// promising (docs/job-search-agent.md §10). Only the alert's own ad URL is
+// fetched, never a search, category or related-ad page.
 //
 // Alerts ("Duunivahti") come from duunivahti@duunitori.fi with subjects like
 // "Duunitori löysi sinulle 13 työpaikkaa - …". The matched ads come first,
@@ -9,8 +12,12 @@
 // "Company, City - Hakuaika D.M - D.M." or "Company - Toistaiseksi voimassa".
 // The trailing number of the slug is the external id. The closing date has
 // no year: it is the next such date on or after the alert's own date.
-import { isoDate, linkOn, pageUrl } from './common.ts'
-import { decodeEntities, htmlToText } from './html.ts'
+//
+// The ad page carries one JSON-LD JobPosting with the description,
+// validThrough and the employer as a lowercase slug ("esimerkki-oy"). The
+// slug fills the company only while the email gave none.
+import { fetchAdPage, isoDate, linkOn, pageUrl } from './common.ts'
+import { decodeEntities, htmlToText, jobPostingOf } from './html.ts'
 import type { AdCandidate, AlertMessage, SourceConnector } from './types.ts'
 
 const HOSTS = ['duunitori.fi']
@@ -71,6 +78,8 @@ function parseAlert(message: AlertMessage): AdCandidate[] {
 export const duunitori: SourceConnector = {
   id: 'duunitori',
   mode: 'handover',
+  fetchHosts: HOSTS,
   matches: (message) => message.from === 'duunivahti@duunitori.fi' && message.subject.startsWith('Duunitori löysi'),
   parseAlert,
+  fetchAd: (candidate, http) => fetchAdPage(candidate.url, http, jobPostingOf),
 }

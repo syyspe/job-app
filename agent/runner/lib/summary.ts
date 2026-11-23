@@ -6,9 +6,19 @@ export interface Problem {
   message: string
 }
 
+// Hand-over ads pre-screened in the last 14 days, by verdict, and how many of
+// each the user clicked Fetch on.
+export interface PrescreenTally {
+  promising: { total: number; fetched: number }
+  notPromising: { total: number; fetched: number }
+}
+
 export interface SummaryInput {
   // The unreported drafted, title_rejected and failed ads.
   ads: AdSummary[]
+  // The ads this run pre-screened.
+  prescreened: AdSummary[]
+  tally: PrescreenTally
   sourceFailures: SourceFailure[]
   problems: Problem[]
   appUrl: string
@@ -39,6 +49,36 @@ function inState(ads: AdSummary[], state: string): AdSummary[] {
   return ads.filter((ad) => ad.state === state)
 }
 
+const TALLY_DAYS = 14
+const DAY_MS = 24 * 60 * 60 * 1000
+const VERDICT_LABELS = { promising: 'promising', not_promising: 'not promising' }
+
+// firstSeenAt is SQLite's UTC 'YYYY-MM-DD HH:MM:SS', so it compares as text.
+function sqliteTime(time: number): string {
+  return new Date(time).toISOString().slice(0, 19).replace('T', ' ')
+}
+
+export function prescreenTally(ads: AdSummary[], now: Date): PrescreenTally {
+  const since = sqliteTime(now.getTime() - TALLY_DAYS * DAY_MS)
+  const recent = ads.filter((ad) => ad.sourceMode === 'handover' && ad.prescreen && ad.firstSeenAt >= since)
+  const count = (verdict: string) => {
+    const matching = recent.filter((ad) => ad.prescreen?.verdict === verdict)
+    return { total: matching.length, fetched: matching.filter((ad) => ad.fetchRequestedAt !== null).length }
+  }
+  return { promising: count('promising'), notPromising: count('not_promising') }
+}
+
+function prescreenLine({ title, company, prescreen }: AdSummary): string {
+  const verdict = prescreen ? VERDICT_LABELS[prescreen.verdict] : ''
+  return `${title}, ${company}: ${verdict} — ${prescreen?.reason ?? ''}`
+}
+
+function tallyLines({ promising, notPromising }: PrescreenTally): string[] {
+  if (promising.total + notPromising.total === 0) return []
+  const counts = `promising ${promising.total} (fetched ${promising.fetched}), not promising ${notPromising.total} (fetched ${notPromising.fetched})`
+  return [`Pre-screen vs. Fetch, last ${TALLY_DAYS} days: ${counts}`, '']
+}
+
 function subjectOf(input: SummaryInput): string {
   const { ads, sourceFailures, problems } = input
   return [
@@ -50,9 +90,11 @@ function subjectOf(input: SummaryInput): string {
   ].join(', ')
 }
 
-function bodyOf({ ads, sourceFailures, problems, appUrl, lanUrl }: SummaryInput): string {
+function bodyOf({ ads, prescreened, tally, sourceFailures, problems, appUrl, lanUrl }: SummaryInput): string {
   return [
     ...section('Drafts', inState(ads, 'drafted').map((ad) => `${ad.title}, ${ad.company} (application ${ad.applicationId})`)),
+    ...section('Pre-screened', prescreened.map(prescreenLine)),
+    ...tallyLines(tally),
     ...section(
       'Title rejected',
       inState(ads, 'title_rejected').map((ad) => `${ad.title}, ${ad.company}, ${ad.source}: ${ad.url}`),
@@ -66,8 +108,10 @@ function bodyOf({ ads, sourceFailures, problems, appUrl, lanUrl }: SummaryInput)
   ].join('\n')
 }
 
-export function isEmpty({ ads, sourceFailures, problems }: Pick<SummaryInput, 'ads' | 'sourceFailures' | 'problems'>): boolean {
-  return ads.length + sourceFailures.length + problems.length === 0
+type Reported = Pick<SummaryInput, 'ads' | 'prescreened' | 'sourceFailures' | 'problems'>
+
+export function isEmpty({ ads, prescreened, sourceFailures, problems }: Reported): boolean {
+  return ads.length + prescreened.length + sourceFailures.length + problems.length === 0
 }
 
 export function composeSummary(input: SummaryInput): Summary {

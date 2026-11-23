@@ -4,7 +4,7 @@ import type { AdState, SourceMode } from '../types.ts'
 // no ad is marked drafted without an application.
 const TRANSITIONS: Record<AdState, readonly AdState[]> = {
   new: ['title_rejected', 'awaiting_handover', 'ready', 'duplicate', 'failed', 'dismissed'],
-  awaiting_handover: ['ready', 'dismissed'],
+  awaiting_handover: ['ready', 'dismissed', 'failed'],
   ready: ['suitable', 'unsuitable', 'duplicate', 'failed', 'dismissed'],
   suitable: ['failed', 'dismissed'],
   drafted: [],
@@ -28,7 +28,7 @@ const BLANK_ON_ENTRY: readonly AdState[] = ['unsuitable', 'duplicate', 'dismisse
 
 const BLANK_ONCE_REPORTED: readonly AdState[] = ['drafted', 'title_rejected', 'failed']
 
-const ATTEMPT_STATES: readonly AdState[] = ['new', 'ready', 'suitable']
+const ATTEMPT_STATES: readonly AdState[] = ['new', 'awaiting_handover', 'ready', 'suitable']
 
 export function canTransition(from: AdState, to: AdState): boolean {
   return TRANSITIONS[from].includes(to)

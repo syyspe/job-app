@@ -112,6 +112,12 @@
   font-size: var(--fs-sm);
 }
 
+.ad-prescreen,
+.ad-fetch-requested {
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+}
+
 .ad-error {
   font-size: var(--fs-sm);
   color: var(--danger);

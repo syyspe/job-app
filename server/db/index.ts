@@ -48,6 +48,8 @@ const SCHEMA = `
     state          TEXT NOT NULL,
     body           TEXT,
     evaluation     TEXT,
+    prescreen      TEXT,
+    fetch_requested_at TEXT,
     application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
     duplicate_of   INTEGER REFERENCES ads(id) ON DELETE SET NULL,
     attempts       INTEGER NOT NULL DEFAULT 0,

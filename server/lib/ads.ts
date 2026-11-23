@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3'
 import type { AdRow } from '../models/ad.ts'
 import type { ApplicationRow } from '../models/application.ts'
 import type { AttachmentRow } from '../models/attachment.ts'
-import type { AdEvaluation, AdState } from '../types.ts'
+import type { AdEvaluation, AdPrescreen, AdState } from '../types.ts'
 import { findTitleDuplicate, findUrlDuplicate } from './adDedup.ts'
 import {
   blanksOnceReported,
@@ -62,18 +62,29 @@ export function listAds(db: Database.Database, userId: number, state?: AdState):
     .all(userId, filter, filter) as AdRow[]
 }
 
+// The reason talks about the ad; the verdict stays for the verdict-vs-click
+// comparison.
+function blankedPrescreen(prescreen: string | null): string | null {
+  if (prescreen === null) return null
+  const { verdict } = JSON.parse(prescreen) as AdPrescreen
+  return JSON.stringify({ verdict, reason: '' })
+}
+
+// What a hand-over ad keeps once blanked: only the keys deduplication needs.
+function blanked(ad: AdRow): AdRow {
+  return { ...ad, title: '', company: '', prescreen: blankedPrescreen(ad.prescreen) }
+}
+
 function movedRow(ad: AdRow, move: AdMove): AdRow {
   const blank = ad.source_mode === 'handover' && blanksOnEntry(move.to)
   return {
-    ...ad,
+    ...(blank ? blanked(ad) : ad),
     state: move.to,
     body: clearsBody(move.to) ? null : (move.body ?? ad.body),
     evaluation: move.evaluation ? JSON.stringify(move.evaluation) : ad.evaluation,
     last_error: move.lastError ?? ad.last_error,
     duplicate_of: move.duplicateOf ?? ad.duplicate_of,
     application_id: move.applicationId ?? ad.application_id,
-    title: blank ? '' : ad.title,
-    company: blank ? '' : ad.company,
   }
 }
 
@@ -81,8 +92,8 @@ function saveMove(db: Database.Database, row: AdRow): AdRow {
   db.prepare(
     `UPDATE ads
         SET url = ?, canonical_url = ?, title = ?, company = ?, deadline = ?, state = ?, body = ?,
-            evaluation = ?, application_id = ?, duplicate_of = ?, attempts = ?, last_error = ?,
-            updated_at = datetime('now'), reported_at = NULL
+            evaluation = ?, prescreen = ?, application_id = ?, duplicate_of = ?, attempts = ?,
+            last_error = ?, updated_at = datetime('now'), reported_at = NULL
       WHERE id = ?`,
   ).run(
     row.url,
@@ -93,6 +104,7 @@ function saveMove(db: Database.Database, row: AdRow): AdRow {
     row.state,
     row.body,
     row.evaluation,
+    row.prescreen,
     row.application_id,
     row.duplicate_of,
     row.attempts,
@@ -216,6 +228,34 @@ export function handOverAd(db: Database.Database, ad: AdRow, handover: AdHandove
   return enterReady(db, updated, handover.text)
 }
 
+function requireWaiting(ad: AdRow, action: string): void {
+  if (ad.state !== 'awaiting_handover') {
+    throw new HttpError(409, `an ad cannot be ${action} from ${ad.state}`)
+  }
+}
+
+// A repeat keeps the first click's time: it is the record the pre-screen
+// verdict is compared against.
+export function requestFetch(db: Database.Database, ad: AdRow): AdRow {
+  requireWaiting(ad, 'fetched')
+  if (ad.source_mode !== 'handover') throw new HttpError(409, 'only a hand-over ad can be fetched')
+  db.prepare(
+    `UPDATE ads SET fetch_requested_at = COALESCE(fetch_requested_at, datetime('now')),
+            updated_at = datetime('now')
+      WHERE id = ?`,
+  ).run(ad.id)
+  return readAd(db, ad.id)
+}
+
+export function setPrescreen(db: Database.Database, ad: AdRow, prescreen: AdPrescreen): AdRow {
+  requireWaiting(ad, 'pre-screened')
+  db.prepare(`UPDATE ads SET prescreen = ?, updated_at = datetime('now') WHERE id = ?`).run(
+    JSON.stringify(prescreen),
+    ad.id,
+  )
+  return readAd(db, ad.id)
+}
+
 // The caller runs this in a transaction, so a failure leaves no application behind.
 export function draftAd(db: Database.Database, ad: AdRow, draft: AdDraft): DraftedAd {
   if (ad.state !== 'suitable') throw new HttpError(409, `an ad cannot be drafted from ${ad.state}`)
@@ -226,12 +266,10 @@ export function draftAd(db: Database.Database, ad: AdRow, draft: AdDraft): Draft
 }
 
 function markOneReported(db: Database.Database, ad: AdRow): void {
-  const blank = ad.source_mode === 'handover' && blanksOnceReported(ad.state)
-  db.prepare(`UPDATE ads SET reported_at = datetime('now'), title = ?, company = ? WHERE id = ?`).run(
-    blank ? '' : ad.title,
-    blank ? '' : ad.company,
-    ad.id,
-  )
+  const kept = ad.source_mode === 'handover' && blanksOnceReported(ad.state) ? blanked(ad) : ad
+  db.prepare(
+    `UPDATE ads SET reported_at = datetime('now'), title = ?, company = ?, prescreen = ? WHERE id = ?`,
+  ).run(kept.title, kept.company, kept.prescreen, ad.id)
 }
 
 /** Ids the user does not own are skipped. */

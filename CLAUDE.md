@@ -50,8 +50,9 @@
   see README's "Alert sources" section.
   `npm run agent:run` is the daily run: every step above in order under
   `run.lock`, then one summary email over SMTP. It needs everything the
-  steps need plus `MAIL_SMTP_HOST` and config's `summary.recipient`, and
-  re-runs the sandbox check itself after a `claude` update. Task Scheduler
+  steps need plus `MAIL_SMTP_HOST`, config's `summary.recipient` and the
+  private prompt `prompts/prescreen.md` (the pre-screen of hand-over ads),
+  and re-runs the sandbox check itself after a `claude` update. Task Scheduler
   starts it through `agent/runner/daily-run.sh` — see README's "Daily run"
   section.
 

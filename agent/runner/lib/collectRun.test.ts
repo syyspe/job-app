@@ -71,8 +71,8 @@ function fakeFetch(url: string | URL | Request): Promise<Response> {
   return Promise.resolve(new Response(`<main>${page}</main>`, { status: 200 }))
 }
 
-const ON = { enabled: true, termsCheckedOn: '2026-11-01', dailyOpenCap: 20, minDelayMs: 1000 }
-const OFF = { enabled: false, dailyOpenCap: 20, minDelayMs: 1000 }
+const ON = { enabled: true, termsCheckedOn: '2026-11-01', dailyOpenCap: 20, minDelayMs: 1000, fetch: 'requested' as const }
+const OFF = { enabled: false, dailyOpenCap: 20, minDelayMs: 1000, fetch: 'requested' as const }
 
 interface RunSetup {
   messages: AlertMessage[]

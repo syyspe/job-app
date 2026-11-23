@@ -18,6 +18,8 @@ function sampleAd(overrides: Partial<AdSummary> = {}): AdSummary {
     deadline: 'end of May',
     state: 'awaiting_handover',
     evaluation: null,
+    prescreen: null,
+    fetchRequestedAt: null,
     applicationId: null,
     duplicateOf: null,
     attempts: 0,
@@ -34,6 +36,7 @@ function renderRow(ad: AdSummary, handedOver = true) {
     onHandOver: vi.fn().mockResolvedValue(handedOver),
     onRetry: vi.fn(),
     onDismiss: vi.fn(),
+    onFetch: vi.fn(),
   }
   render(
     <ul>
@@ -181,4 +184,50 @@ test('cancelling the confirmation keeps the ad', async () => {
 
   expect(actions.onDismiss).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: 'Dismiss' })).toBeVisible()
+})
+
+test('a waiting hand-over ad offers Fetch beside Hand over, and clicking it calls onFetch', async () => {
+  const user = userEvent.setup()
+  const actions = renderRow(sampleAd())
+
+  expect(screen.getByRole('button', { name: 'Hand over' })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Fetch' }))
+
+  expect(actions.onFetch).toHaveBeenCalledWith(7)
+})
+
+test.each<[string, Partial<AdSummary>]>([
+  ['an automatic ad', { sourceMode: 'automatic' }],
+  ['a title-rejected ad', { state: 'title_rejected' }],
+])('%s offers no Fetch', (_name, overrides) => {
+  renderRow(sampleAd(overrides))
+
+  expect(screen.queryByRole('button', { name: 'Fetch' })).toBeNull()
+})
+
+test('a requested ad says the next run fetches it instead of offering Fetch', () => {
+  renderRow(sampleAd({ fetchRequestedAt: '2026-11-23 09:00:00' }))
+
+  expect(screen.queryByRole('button', { name: 'Fetch' })).toBeNull()
+  expect(screen.getByText('Fetch requested — the next run fetches it')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Hand over' })).toBeVisible()
+})
+
+test('shows the pre-screen verdict with its reason', () => {
+  renderRow(sampleAd({ prescreen: { verdict: 'not_promising', reason: 'Mainly sales.' } }))
+
+  expect(screen.getByText('Pre-screen: Not promising — Mainly sales.')).toBeVisible()
+})
+
+test('the verdict and the click stay visible after the ad moves on', () => {
+  renderRow(
+    sampleAd({
+      state: 'dismissed',
+      title: '',
+      prescreen: { verdict: 'promising', reason: '' },
+      fetchRequestedAt: '2026-11-23 09:00:00',
+    }),
+  )
+
+  expect(screen.getByText('Pre-screen: Promising · Fetch requested')).toBeVisible()
 })

@@ -6,12 +6,16 @@ import { runDrafting } from './draftRun.ts'
 import type { DraftReport, DraftRunOptions } from './draftRun.ts'
 import { runEvaluation } from './evaluationRun.ts'
 import type { EvaluationReport, EvaluationRunOptions } from './evaluationRun.ts'
+import { runHandoverFetch } from './handoverFetchRun.ts'
+import type { HandoverFetchOptions, HandoverFetchReport } from './handoverFetchRun.ts'
 import { dismissExpiredHandovers } from './handoverExpiry.ts'
 import type { JobAppClient } from './jobApp.ts'
 import type { Mailbox } from './mailbox.ts'
+import { runPrescreen } from './prescreenRun.ts'
+import type { PrescreenReport, PrescreenRunOptions } from './prescreenRun.ts'
 import type { MailMessage } from './smtp.ts'
 import type { RunnerState } from './state.ts'
-import { composeSummary, isEmpty } from './summary.ts'
+import { composeSummary, isEmpty, prescreenTally } from './summary.ts'
 import type { Problem } from './summary.ts'
 import { syncProfile } from './sync.ts'
 import type { SyncOptions, SyncResult } from './sync.ts'
@@ -27,6 +31,8 @@ export interface DailyRunOptions {
   gate: () => Promise<{ version: string; reverified: boolean }>
   // Null when config has no syncFolder.
   sync: Omit<SyncOptions, 'jobApp'> | null
+  prescreen: Omit<PrescreenRunOptions, 'jobApp'>
+  handoverFetch: Omit<HandoverFetchOptions, 'jobApp' | 'state'>
   evaluation: Omit<EvaluationRunOptions, 'jobApp' | 'checkHealth'>
   drafting: Omit<DraftRunOptions, 'jobApp' | 'checkHealth'>
   summary: { recipient: string; alwaysSend: boolean; appUrl: string; lanUrl?: string }
@@ -40,9 +46,11 @@ export interface DailyReport {
   dismissed: number | null
   sandbox: { version: string; reverified: boolean } | null
   sync: SyncResult | null
+  prescreen: PrescreenReport | null
+  handoverFetch: HandoverFetchReport | null
   evaluation: EvaluationReport | null
   drafting: DraftReport | null
-  // Why the model steps (sync, evaluation, drafting) were skipped: reported,
+  // Why the model steps (sync to drafting) were skipped: reported,
   // but not a failure of the run.
   skipped: Problem | null
   // Steps that failed with a CliError; any of them fails the run.
@@ -98,8 +106,13 @@ async function modelSteps(run: Run): Promise<void> {
     return
   }
   if (!(await passGate(run))) return
-  const { jobApp, sync } = options
+  const { jobApp, sync, state } = options
   if (sync) report.sync = await guarded(run, 'sync', () => syncProfile({ ...sync, jobApp }))
+  report.prescreen = await guarded(run, 'pre-screen', () => runPrescreen({ ...options.prescreen, jobApp }))
+  // Here rather than in collect: text is fetched only in a run that can
+  // evaluate it the same day.
+  const fetchOptions = { ...options.handoverFetch, jobApp, state }
+  report.handoverFetch = await guarded(run, 'hand-over fetch', () => runHandoverFetch(fetchOptions))
   const checkHealth = async () => health
   report.evaluation = await guarded(run, 'evaluate', () => runEvaluation({ ...options.evaluation, jobApp, checkHealth }))
   report.drafting = await guarded(run, 'draft', () => runDrafting({ ...options.drafting, jobApp, checkHealth }))
@@ -111,11 +124,13 @@ async function sendSummary({ options, report }: Run): Promise<void> {
   const { jobApp, state } = options
   const listed = await Promise.all(REPORTED_STATES.map((adState) => jobApp.listAds(adState)))
   const ads = listed.flat().filter((ad) => ad.reportedAt === null)
+  const prescreened = report.prescreen?.ads ?? []
   const sourceFailures = state.readFailures()
   const problems = [...(report.skipped ? [report.skipped] : []), ...report.failures]
-  if (isEmpty({ ads, sourceFailures, problems }) && !options.summary.alwaysSend) return
+  if (isEmpty({ ads, prescreened, sourceFailures, problems }) && !options.summary.alwaysSend) return
   const { appUrl, lanUrl } = options.summary
-  const summary = composeSummary({ ads, sourceFailures, problems, appUrl, lanUrl })
+  const tally = prescreenTally(await jobApp.listAllAds(), options.now())
+  const summary = composeSummary({ ads, prescreened, tally, sourceFailures, problems, appUrl, lanUrl })
   await options.send({ to: options.summary.recipient, ...summary, date: options.now() })
   report.sent = true
   await jobApp.markReported(ads.map((ad) => ad.id))
@@ -128,6 +143,8 @@ export async function runDaily(options: DailyRunOptions): Promise<DailyReport> {
     dismissed: null,
     sandbox: null,
     sync: null,
+    prescreen: null,
+    handoverFetch: null,
     evaluation: null,
     drafting: null,
     skipped: null,

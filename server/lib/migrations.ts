@@ -43,10 +43,25 @@ export function migrateAttachmentProfileSync(db: Database.Database): void {
   db.exec('ALTER TABLE attachments ADD COLUMN profile_sync INTEGER NOT NULL DEFAULT 0')
 }
 
+// A database from before the ads table has none to alter: SCHEMA creates it
+// with both columns.
+export function migrateAdFetch(db: Database.Database): void {
+  const columns = db.pragma('table_info(ads)') as { name: string }[]
+  if (columns.length === 0 || columns.some((column) => column.name === 'prescreen')) return
+
+  db.transaction(() => {
+    db.exec(`
+      ALTER TABLE ads ADD COLUMN prescreen TEXT;
+      ALTER TABLE ads ADD COLUMN fetch_requested_at TEXT;
+    `)
+  })()
+}
+
 export function migrate(db: Database.Database): void {
   migrateApplicationDates(db)
   migrateApplicationArchived(db)
   migrateUserRole(db)
   migrateAttachmentUploadedAt(db)
   migrateAttachmentProfileSync(db)
+  migrateAdFetch(db)
 }

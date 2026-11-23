@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest'
 import { AdList } from './AdList'
 import type { AdSummary } from '../types'
 
-const actions = { onHandOver: vi.fn(), onRetry: vi.fn(), onDismiss: vi.fn() }
+const actions = { onHandOver: vi.fn(), onFetch: vi.fn(), onRetry: vi.fn(), onDismiss: vi.fn() }
 
 const ad: AdSummary = {
   id: 1,
@@ -17,6 +17,8 @@ const ad: AdSummary = {
   deadline: '',
   state: 'failed',
   evaluation: null,
+  prescreen: null,
+  fetchRequestedAt: null,
   applicationId: null,
   duplicateOf: null,
   attempts: 3,

@@ -8,7 +8,7 @@ import type { ScreenCounts } from './screen.ts'
 
 export interface EvaluationRunOptions {
   jobApp: JobAppClient
-  config: RunnerConfig
+  config: Pick<RunnerConfig, 'titleRules' | 'evaluation'>
   checkHealth: () => Promise<HealthResult>
   evaluate: (ad: Ad) => Promise<EvaluationOutcome>
 }

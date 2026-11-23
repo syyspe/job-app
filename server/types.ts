@@ -73,6 +73,11 @@ export interface AdEvaluation {
   reasons: string[]
 }
 
+export interface AdPrescreen {
+  verdict: 'promising' | 'not_promising'
+  reason: string
+}
+
 export interface AdSummary {
   id: number
   source: string
@@ -85,6 +90,8 @@ export interface AdSummary {
   deadline: string
   state: AdState
   evaluation: AdEvaluation | null
+  prescreen: AdPrescreen | null
+  fetchRequestedAt: string | null
   applicationId: number | null
   duplicateOf: number | null
   attempts: number

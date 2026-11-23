@@ -1,4 +1,4 @@
-import type { Ad, AdEvaluation, AdState, AdSummary, SourceMode } from '../types.ts'
+import type { Ad, AdEvaluation, AdPrescreen, AdState, AdSummary, SourceMode } from '../types.ts'
 
 export interface AdRow {
   id: number
@@ -15,6 +15,8 @@ export interface AdRow {
   state: AdState
   body: string | null
   evaluation: string | null
+  prescreen: string | null
+  fetch_requested_at: string | null
   application_id: number | null
   duplicate_of: number | null
   attempts: number
@@ -37,6 +39,8 @@ export function toAdSummary(row: AdRow): AdSummary {
     deadline: row.deadline,
     state: row.state,
     evaluation: row.evaluation ? (JSON.parse(row.evaluation) as AdEvaluation) : null,
+    prescreen: row.prescreen ? (JSON.parse(row.prescreen) as AdPrescreen) : null,
+    fetchRequestedAt: row.fetch_requested_at,
     applicationId: row.application_id,
     duplicateOf: row.duplicate_of,
     attempts: row.attempts,

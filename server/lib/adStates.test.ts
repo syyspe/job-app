@@ -13,7 +13,7 @@ import {
 
 const ALLOWED: Record<AdState, AdState[]> = {
   new: ['title_rejected', 'awaiting_handover', 'ready', 'duplicate', 'failed', 'dismissed'],
-  awaiting_handover: ['ready', 'dismissed'],
+  awaiting_handover: ['ready', 'dismissed', 'failed'],
   ready: ['suitable', 'unsuitable', 'duplicate', 'failed', 'dismissed'],
   suitable: ['failed', 'dismissed'],
   drafted: [],
@@ -54,7 +54,7 @@ test('states a summary covers blank once reported', () => {
 })
 
 test('attempts are recorded only while work is pending', () => {
-  expect(AD_STATES.filter(recordsAttempts).sort()).toEqual(['new', 'ready', 'suitable'])
+  expect(AD_STATES.filter(recordsAttempts).sort()).toEqual(['awaiting_handover', 'new', 'ready', 'suitable'])
 })
 
 test('a retry returns the ad to where its source mode starts', () => {

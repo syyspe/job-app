@@ -10,13 +10,16 @@ import {
   ingestAd,
   listAds,
   markReported,
+  requestFetch,
   requireAd,
+  setPrescreen,
   transitionAd,
 } from '../lib/ads.ts'
 import {
   parseAdDraft,
   parseAdHandover,
   parseAdIngest,
+  parseAdPrescreen,
   parseAdTransition,
   parseReportedIds,
   parseStateFilter,
@@ -69,6 +72,24 @@ function handoverHandler(db: Database.Database) {
       return handOverAd(db, ad, handover)
     })()
     res.json(toAd(moved))
+  }
+}
+
+function fetchRequestHandler(db: Database.Database) {
+  return (req: Request, res: Response) => {
+    const ad = db.transaction(() => requestFetch(db, requireAd(db, Number(req.params.id), req.userId)))()
+    res.json(toAd(ad))
+  }
+}
+
+function prescreenHandler(db: Database.Database) {
+  return (req: Request, res: Response) => {
+    const prescreen = parseAdPrescreen(req.body)
+    const ad = db.transaction(() => {
+      const ad = requireAd(db, Number(req.params.id), req.userId)
+      return setPrescreen(db, ad, prescreen)
+    })()
+    res.json(toAd(ad))
   }
 }
 
@@ -131,6 +152,8 @@ export function createAdsRouter(db: Database.Database, uploadsDir: string): Rout
   router.get('/ads/:id', getHandler(db))
   router.post('/ads/:id/transition', transitionHandler(db))
   router.post('/ads/:id/handover', handoverHandler(db))
+  router.post('/ads/:id/fetch-request', fetchRequestHandler(db))
+  router.post('/ads/:id/prescreen', prescreenHandler(db))
   router.post('/ads/:id/draft', checkAdOwned(db), draftUpload, draftHandler(db, uploadsDir))
 
   return router
