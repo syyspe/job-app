@@ -12,6 +12,7 @@ export interface SummaryInput {
   sourceFailures: SourceFailure[]
   problems: Problem[]
   appUrl: string
+  lanUrl?: string
 }
 
 export interface Summary {
@@ -49,7 +50,7 @@ function subjectOf(input: SummaryInput): string {
   ].join(', ')
 }
 
-function bodyOf({ ads, sourceFailures, problems, appUrl }: SummaryInput): string {
+function bodyOf({ ads, sourceFailures, problems, appUrl, lanUrl }: SummaryInput): string {
   return [
     ...section('Drafts', inState(ads, 'drafted').map((ad) => `${ad.title}, ${ad.company} (application ${ad.applicationId})`)),
     ...section(
@@ -60,6 +61,7 @@ function bodyOf({ ads, sourceFailures, problems, appUrl }: SummaryInput): string
     ...section('Source failures', sourceFailures.map(({ source, date, kind }) => `${source} ${date} ${kind}`)),
     ...section('Problems', problems.map(({ step, message }) => `${step}: ${message}`)),
     `Open job-app: ${appUrl}`,
+    ...(lanUrl ? [`Open job-app (LAN): ${lanUrl}`] : []),
     '',
   ].join('\n')
 }

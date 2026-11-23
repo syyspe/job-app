@@ -19,6 +19,13 @@ test('nothing to report composes the empty summary', () => {
   })
 })
 
+test('a lanUrl adds a second link directly under the first', () => {
+  const lanUrl = 'https://192.0.2.1:3001'
+  const summary = composeSummary({ ads: [], sourceFailures: [], problems: [], appUrl, lanUrl })
+
+  expect(summary.text).toBe(`Open job-app: ${appUrl}\nOpen job-app (LAN): ${lanUrl}\n`)
+})
+
 test('isEmpty is true only when every list is empty', () => {
   const empty = { ads: [], sourceFailures: [], problems: [] }
 

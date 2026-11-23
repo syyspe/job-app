@@ -167,10 +167,18 @@ describe('daily run', () => {
     expect(loadDailyRunConfig(path).summary.alwaysSend).toBe(true)
   })
 
+  test('lanUrl is read', () => {
+    const path = writeConfig({ summary: { recipient: 'me@mail.example', lanUrl: 'https://192.0.2.1:3001' } })
+
+    expect(loadDailyRunConfig(path).summary.lanUrl).toBe('https://192.0.2.1:3001')
+  })
+
   test.each([
     ['no summary key', {}, 'summary'],
     ['a recipient that is not an address', { summary: { recipient: 'me' } }, 'summary.recipient'],
     ['an alwaysSend that is not a boolean', { summary: { recipient: 'me@mail.example', alwaysSend: 'yes' } }, 'summary.alwaysSend'],
+    ['a lanUrl that is not a URL', { summary: { recipient: 'me@mail.example', lanUrl: '192.0.2.1:3001' } }, 'summary.lanUrl'],
+    ['a lanUrl that is not http', { summary: { recipient: 'me@mail.example', lanUrl: 'ftp://192.0.2.1' } }, 'summary.lanUrl'],
     ['a zero wait', { handoverWaitDays: 0, summary: { recipient: 'me@mail.example' } }, 'handoverWaitDays'],
   ])('%s is an exit-2 error naming the field', (_name, value, field) => {
     const path = writeConfig(value)

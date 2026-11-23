@@ -68,6 +68,7 @@ interface Overrides {
   openMailbox?: DailyRunOptions['openMailbox']
   evaluate?: () => Promise<EvaluationOutcome>
   alwaysSend?: boolean
+  lanUrl?: string
 }
 
 function options(overrides: Overrides = {}): DailyRunOptions {
@@ -88,7 +89,12 @@ function options(overrides: Overrides = {}): DailyRunOptions {
       evaluate: overrides.evaluate ?? (async () => (steps.push('evaluate'), suitable)),
     },
     drafting: { config: drafting, write: async () => (steps.push('draft'), written), today: '2026-11-20' },
-    summary: { recipient: 'me@mail.example', alwaysSend: overrides.alwaysSend ?? false, appUrl: 'https://jobs.lan.example' },
+    summary: {
+      recipient: 'me@mail.example',
+      alwaysSend: overrides.alwaysSend ?? false,
+      appUrl: 'https://jobs.lan.example',
+      lanUrl: overrides.lanUrl,
+    },
     send: overrides.send ?? (async (message) => void (steps.push('send'), sent.push(message))),
     now: () => NOW,
   }
@@ -121,6 +127,12 @@ test('nothing to report with alwaysSend sends the empty summary', async () => {
   expect(sent).toHaveLength(1)
   expect(sent[0].subject).toBe('job agent: 0 drafts, 0 title rejected, 0 failed, 0 source failures, 0 problems')
   expect(sent[0].text).toContain('Open job-app:')
+})
+
+test('a configured lanUrl reaches the summary', async () => {
+  await runDaily(options({ alwaysSend: true, lanUrl: 'https://192.0.2.1:3001' }))
+
+  expect(sent[0].text).toContain('Open job-app (LAN): https://192.0.2.1:3001\n')
 })
 
 test('ads already reported are not reported again', async () => {
