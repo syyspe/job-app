@@ -214,6 +214,15 @@ export async function handoverAd(id: number, input: AdHandoverInput): Promise<Ad
   return parseJson(response)
 }
 
+/** Marks the ad for the next daily run to fetch; the ad stays awaiting hand-over. */
+export async function requestFetch(id: number): Promise<AdSummary> {
+  const response = await fetch(`/api/ads/${id}/fetch-request`, {
+    method: 'POST',
+    credentials: 'same-origin',
+  })
+  return parseJson(response)
+}
+
 export function attachmentUrl(id: number): string {
   return `/api/attachments/${id}`
 }

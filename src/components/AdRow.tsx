@@ -3,7 +3,7 @@ import { AdHandoverForm } from './AdHandoverForm.tsx'
 import { canDismiss, canHandOver } from '../lib/adStates.ts'
 import { formatDay } from '../lib/dates.ts'
 import { sourceLabel } from '../lib/sources.ts'
-import type { AdHandoverInput, AdSummary } from '../types.ts'
+import type { AdHandoverInput, AdPrescreen, AdSummary } from '../types.ts'
 
 type Mode = 'idle' | 'handover' | 'dismiss'
 
@@ -14,6 +14,8 @@ function displayTitle(ad: AdSummary): string {
 export interface AdActions {
   /** Resolves to whether the ad was handed over, so a failure can keep the form. */
   onHandOver: (id: number, input: AdHandoverInput) => Promise<boolean>
+  /** Marks the ad for the next daily run to fetch. */
+  onFetch: (id: number) => void
   onRetry: (ad: AdSummary) => void
   onDismiss: (id: number) => void
 }
@@ -30,6 +32,29 @@ function AdFacts({ ad }: { ad: AdSummary }) {
       </a>
     </p>
   )
+}
+
+const VERDICT_LABELS: Record<AdPrescreen['verdict'], string> = {
+  promising: 'Promising',
+  not_promising: 'Not promising',
+}
+
+/** Kept after the ad moves on, so the verdict can be judged against the click. */
+function AdPrescreenLine({ ad }: { ad: AdSummary }) {
+  if (!ad.prescreen) return null
+  const { verdict, reason } = ad.prescreen
+  return (
+    <p className="ad-prescreen">
+      Pre-screen: {VERDICT_LABELS[verdict]}
+      {reason && ` — ${reason}`}
+      {ad.fetchRequestedAt && ' · Fetch requested'}
+    </p>
+  )
+}
+
+/** Only a waiting ad from a source the runner can fetch for the user. */
+function canFetch(ad: AdSummary): boolean {
+  return ad.state === 'awaiting_handover' && ad.sourceMode === 'handover'
 }
 
 interface DismissConfirmProps {
@@ -54,16 +79,30 @@ function DismissConfirm({ onConfirm, onCancel }: DismissConfirmProps) {
 interface AdButtonsProps {
   ad: AdSummary
   onRetry: () => void
+  onFetch: () => void
   onModeChange: (mode: Mode) => void
 }
 
-function AdButtons({ ad, onRetry, onModeChange }: AdButtonsProps) {
+function FetchButton({ ad, onFetch }: Pick<AdButtonsProps, 'ad' | 'onFetch'>) {
+  if (ad.fetchRequestedAt) {
+    return <span className="ad-fetch-requested">Fetch requested — the next run fetches it</span>
+  }
+  return (
+    <button type="button" className="button button-primary" onClick={onFetch}>
+      Fetch
+    </button>
+  )
+}
+
+function AdButtons({ ad, onRetry, onFetch, onModeChange }: AdButtonsProps) {
+  const fetchable = canFetch(ad)
   return (
     <div className="ad-actions">
+      {fetchable && <FetchButton ad={ad} onFetch={onFetch} />}
       {canHandOver(ad.state) && (
         <button
           type="button"
-          className="button button-primary"
+          className={fetchable ? 'button' : 'button button-primary'}
           onClick={() => onModeChange('handover')}
         >
           Hand over
@@ -100,12 +139,18 @@ export function AdRow({ ad, actions }: AdRowProps) {
     <li className="ad-item" data-state={ad.state}>
       <span className="ad-title">{displayTitle(ad)}</span>
       <AdFacts ad={ad} />
+      <AdPrescreenLine ad={ad} />
       {ad.evaluation && <p className="ad-fit">{ad.evaluation.fitSummary}</p>}
       {ad.state === 'failed' && ad.lastError && (
         <p className="ad-error">Failed with {ad.lastError}</p>
       )}
       {mode === 'idle' && (
-        <AdButtons ad={ad} onRetry={() => actions.onRetry(ad)} onModeChange={setMode} />
+        <AdButtons
+          ad={ad}
+          onRetry={() => actions.onRetry(ad)}
+          onFetch={() => actions.onFetch(ad.id)}
+          onModeChange={setMode}
+        />
       )}
       {mode === 'handover' && (
         <AdHandoverForm

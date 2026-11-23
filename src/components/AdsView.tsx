@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AdList } from './AdList.tsx'
 import type { AdActions } from './AdRow.tsx'
 import { AD_STATE_LABELS, AD_STATE_ORDER, retryTarget } from '../lib/adStates.ts'
-import { handoverAd, listAds, transitionAd } from '../lib/api.ts'
+import { handoverAd, listAds, requestFetch, transitionAd } from '../lib/api.ts'
 import { useApiAction } from '../lib/apiAction.ts'
 import type { AdState, AdSummary } from '../types.ts'
 
@@ -32,6 +32,7 @@ function useAds(onUnauthorized: () => void): { ads: AdSummary[]; actions: AdActi
     ads,
     actions: {
       onHandOver: (id, input) => change(() => handoverAd(id, input), 'Ad handed over'),
+      onFetch: (id) => change(() => requestFetch(id), 'Fetch requested'),
       onRetry: (ad) =>
         change(
           () => transitionAd(ad.id, retryTarget(ad.sourceMode)),
