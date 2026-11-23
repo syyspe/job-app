@@ -5,6 +5,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
+  migrateAdFetch,
   migrateApplicationArchived,
   migrateApplicationDates,
   migrateAttachmentProfileSync,
@@ -45,7 +46,13 @@ beforeEach(() => {
       original_name  TEXT NOT NULL,
       mime_type      TEXT NOT NULL
     );
+
+    CREATE TABLE ads (
+      id    INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL DEFAULT ''
+    );
   `)
+  db.prepare(`INSERT INTO ads (id, title) VALUES (1, 'Engineer')`).run()
   db.prepare(
     `INSERT INTO applications (id, company, role, date_applied, status, link, notes)
      VALUES (1, 'Acme', 'Engineer', '2026-01-01', 'applied', '', '')`,
@@ -176,4 +183,28 @@ test('migrating profile_sync twice is a no-op the second time', () => {
     profile_sync: number
   }
   expect(attachment.profile_sync).toBe(1)
+})
+
+test('migrating a legacy database gives existing ads no pre-screen and no fetch request', () => {
+  migrateAdFetch(db)
+
+  const ad = db.prepare('SELECT * FROM ads WHERE id = 1').get() as {
+    title: string
+    prescreen: string | null
+    fetch_requested_at: string | null
+  }
+  expect(ad.title).toBe('Engineer')
+  expect(ad.prescreen).toBeNull()
+  expect(ad.fetch_requested_at).toBeNull()
+})
+
+test('migrating the ad fetch columns twice is a no-op the second time', () => {
+  migrateAdFetch(db)
+  db.prepare(`UPDATE ads SET fetch_requested_at = '2026-01-01 00:00:00' WHERE id = 1`).run()
+
+  expect(() => migrateAdFetch(db)).not.toThrow()
+  const ad = db.prepare('SELECT fetch_requested_at FROM ads WHERE id = 1').get() as {
+    fetch_requested_at: string
+  }
+  expect(ad.fetch_requested_at).toBe('2026-01-01 00:00:00')
 })

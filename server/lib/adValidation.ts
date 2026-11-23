@@ -1,5 +1,5 @@
 import { AD_STATES, SOURCE_MODES } from '../types.ts'
-import type { AdEvaluation, AdState, SourceMode } from '../types.ts'
+import type { AdEvaluation, AdPrescreen, AdState, SourceMode } from '../types.ts'
 import { canonicalUrl } from './adDedup.ts'
 import { HttpError } from './httpError.ts'
 import { fieldsOf, validateInput } from './validation.ts'
@@ -141,6 +141,20 @@ export function parseAdHandover(body: unknown): AdHandover {
     title: optionalText(fields, 'title'),
     company: optionalText(fields, 'company'),
   }
+}
+
+const PRESCREEN_VERDICTS = ['promising', 'not_promising'] as const
+const MAX_PRESCREEN_REASON = 300
+
+export function parseAdPrescreen(body: unknown): AdPrescreen {
+  const fields = fieldsOf(body)
+  const verdict = PRESCREEN_VERDICTS.find((candidate) => candidate === fields.verdict)
+  if (!verdict) throw new HttpError(400, `verdict must be one of: ${PRESCREEN_VERDICTS.join(', ')}`)
+  const reason = requiredText(fields, 'reason')
+  if (reason.length > MAX_PRESCREEN_REASON) {
+    throw new HttpError(400, `reason must be at most ${MAX_PRESCREEN_REASON} characters`)
+  }
+  return { verdict, reason }
 }
 
 export function parseReportedIds(body: unknown): number[] {

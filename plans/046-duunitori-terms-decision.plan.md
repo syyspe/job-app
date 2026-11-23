@@ -66,8 +66,10 @@ Server
 - `server/db/index.ts`, `server/lib/migrations.ts` — `migrateAdFetch`: adds
   `prescreen TEXT` and `fetch_requested_at TEXT` to `ads`, idempotent like the
   others; the `CREATE TABLE` gets both columns.
-- `server/types.ts`, `src/types.ts` — `AdPrescreen {verdict, reason}`;
+- `server/types.ts` — `AdPrescreen {verdict, reason}`;
   `AdSummary` gains `prescreen: AdPrescreen | null`, `fetchRequestedAt: string | null`.
+  `src/types.ts` gets the same in the client step (6): the new required
+  fields break the client test fixtures that 045 also edits.
 - `server/models/ad.ts` — row fields and mapping.
 - `server/lib/adStates.ts` — `awaiting_handover` → `failed` allowed;
   `awaiting_handover` joins `ATTEMPT_STATES`. Retry is unchanged

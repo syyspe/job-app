@@ -47,7 +47,7 @@ describe('failed attempts', () => {
     expect((await transition(ad.id, { to: 'ready', body: 'Text.' })).status).toBe(409)
   })
 
-  test('a same-state attempt outside new, ready and suitable is 409', async () => {
+  test('a same-state attempt outside new, awaiting_handover, ready and suitable is 409', async () => {
     const ad = await ingest()
     await moved(ad.id, { to: 'failed', error: 'gone' })
 
