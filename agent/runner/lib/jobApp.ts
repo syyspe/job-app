@@ -124,8 +124,16 @@ async function fetchJobApp(config: JobAppConfig, request: JobAppRequest, cookie?
   } catch (err) {
     // fetch rejects with a TypeError when the request itself fails.
     if (!(err instanceof TypeError)) throw err
-    throw new CliError(1, `cannot reach job-app at ${config.baseUrl}`, { cause: err })
+    throw new CliError(1, `cannot reach job-app at ${config.baseUrl}${causeCode(err)}`, { cause: err })
   }
+}
+
+// The cause's code tells a refused connection (ECONNREFUSED) from a DNS miss
+// (ENOTFOUND) or an untrusted certificate (UNABLE_TO_VERIFY_LEAF_SIGNATURE).
+// Some causes carry none, such as fetch's blocked-port rejection.
+function causeCode(err: TypeError): string {
+  const code = (err.cause as { code?: unknown } | undefined)?.code
+  return typeof code === 'string' ? ` (${code})` : ''
 }
 
 async function failure(request: JobAppRequest, response: Response): Promise<CliError> {
