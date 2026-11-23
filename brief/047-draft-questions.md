@@ -32,7 +32,6 @@ attachment. I want to answer the questions in the app directly.
    question and the answer (e.g. `q1: <question>` followed by `→ <answer>`).
 6. Any `.md` attachment — not only the agent's — can be edited as raw text in
    the UI, with the same keep-the-original rule as 4.
-7. The editor has a rendered Markdown preview.
 
 ## Approach
 
@@ -51,6 +50,7 @@ it, so the keep-the-original behaviour needs something new on the server.
   picked up by the next `agent:run` / `agent:draft`, like 046's Duunitori
   fetch — a second mechanism, left for a later stream.
 - Editing non-`.md` attachments (`.docx`, `.pdf`, `.txt`).
+- A rendered Markdown preview — the editor is raw text only.
 - Answering via the job-app MCP tools from Claude Desktop — **unless** it
   fits this stream naturally and is low effort; the plan decides and records
   which.
@@ -69,8 +69,6 @@ it, so the keep-the-original behaviour needs something new on the server.
   are free text I can edit, so parsing them is fragile.
 - How `profile_sync` ("Add to profile") interacts with an edited copy — does
   the mark stay on the original, move, or apply to neither?
-- The Markdown preview: a renderer is a new dependency, which needs my
-  approval, against a small hand-rolled one.
 - What "edited copy" naming looks like when the original name has no `.md`
   suffix, or a copy with that name already exists.
 - Whether the MCP answering fits (see Out of scope).
