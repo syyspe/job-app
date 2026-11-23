@@ -48,10 +48,9 @@ agent stay as they are.
 
 ## Parallel streams
 
-- `046-duunitori-terms-decision` has a brief but no plan yet, and its brief
-  touches no inbox code unless its choice is (d). No overlap found, so this
-  plan neither sequences after it nor extracts shared work. If 046 picks (d),
-  it rebases on this stream.
+- `046-duunitori-terms-decision` did not pick (d), so it touches no inbox
+  code and nothing overlaps; sequence: 046 waits for this stream to merge
+  before it merges. Nothing here waits on 046.
 - `inbox-redesign` (later, not started) will rework the same filter row.
   This plan only removes two buttons, so the redesign has nothing to undo.
 
