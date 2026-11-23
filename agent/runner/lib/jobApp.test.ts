@@ -67,6 +67,16 @@ test('an unreachable job-app names its URL', async () => {
   })
 })
 
+test('an unreachable job-app names the cause code when there is one', async () => {
+  const closed = await startFakeJobApp([])
+  await closed.close()
+
+  await expect(client({ baseUrl: closed.url }).listPendingSync()).rejects.toMatchObject({
+    exitCode: 1,
+    message: `cannot reach job-app at ${closed.url} (ECONNREFUSED)`,
+  })
+})
+
 test('a failing response passes the API error through', async () => {
   fake.failure = 'status'
 
