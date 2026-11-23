@@ -35,6 +35,13 @@ const applications: Application[] = [
   },
 ]
 
+const drafting = {
+  questions: [],
+  onAnswer: vi.fn(),
+  onLoadAttachmentText: vi.fn(),
+  onSaveAttachmentText: vi.fn(),
+}
+
 test('renders a row for each application', () => {
   render(
     <ApplicationList
@@ -48,6 +55,7 @@ test('renders a row for each application', () => {
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={0}
+      drafting={drafting}
     />,
   )
 
@@ -68,6 +76,7 @@ test('shows a due date suffix only when the application has a deadline', () => {
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={0}
+      drafting={drafting}
     />,
   )
 
@@ -90,6 +99,7 @@ test('the collapsed list shows no detail panel', () => {
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={0}
+      drafting={drafting}
     />,
   )
 
@@ -113,6 +123,7 @@ test('the expanded row shows its detail panel and reports a delete', async () =>
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={0}
+      drafting={drafting}
     />,
   )
 
@@ -136,6 +147,7 @@ test('each row reports whether it is expanded', () => {
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={0}
+      drafting={drafting}
     />,
   )
 
@@ -162,6 +174,7 @@ test('the empty state names the app and points at the form', () => {
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={0}
+      drafting={drafting}
     />,
   )
 
@@ -191,6 +204,7 @@ function expandedList(expandedId: number, onSetArchived = vi.fn()) {
       onRemoveAttachment={vi.fn()}
       onSetArchived={onSetArchived}
       hiddenArchivedCount={0}
+      drafting={drafting}
     />
   )
 }
@@ -234,6 +248,7 @@ test('an archived row is marked as archived', () => {
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={0}
+      drafting={drafting}
     />,
   )
 
@@ -255,6 +270,7 @@ test('an empty list with archived applications hidden says so instead', () => {
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={2}
+      drafting={drafting}
     />,
   )
 
@@ -276,6 +292,7 @@ test('the hidden-archived line reads as a singular for one application', () => {
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
       hiddenArchivedCount={1}
+      drafting={drafting}
     />,
   )
 

@@ -43,6 +43,15 @@ export function migrateAttachmentProfileSync(db: Database.Database): void {
   db.exec('ALTER TABLE attachments ADD COLUMN profile_sync INTEGER NOT NULL DEFAULT 0')
 }
 
+export function migrateAttachmentEditedFrom(db: Database.Database): void {
+  const columns = db.pragma('table_info(attachments)') as { name: string }[]
+  if (columns.some((column) => column.name === 'edited_from')) return
+
+  db.exec(
+    'ALTER TABLE attachments ADD COLUMN edited_from INTEGER REFERENCES attachments(id) ON DELETE SET NULL',
+  )
+}
+
 // A database from before the ads table has none to alter: SCHEMA creates it
 // with both columns.
 export function migrateAdFetch(db: Database.Database): void {
@@ -63,5 +72,6 @@ export function migrate(db: Database.Database): void {
   migrateUserRole(db)
   migrateAttachmentUploadedAt(db)
   migrateAttachmentProfileSync(db)
+  migrateAttachmentEditedFrom(db)
   migrateAdFetch(db)
 }

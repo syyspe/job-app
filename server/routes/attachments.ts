@@ -7,6 +7,7 @@ import { unlinkIfExists } from '../lib/files.ts'
 import { insertAttachment, touchApplication } from '../lib/applications.ts'
 import { createUpload } from '../lib/uploads.ts'
 import { HttpError } from '../lib/httpError.ts'
+import { saveMarkdownText } from '../lib/markdownEdits.ts'
 import type { AttachmentRow } from '../models/attachment.ts'
 
 function checkApplicationExists(db: Database.Database) {
@@ -80,6 +81,22 @@ function replaceHandler(db: Database.Database, uploadsDir: string) {
 
     const row = db.prepare('SELECT * FROM attachments WHERE id = ?').get(id) as AttachmentRow
     res.json(toAttachment(row))
+  }
+}
+
+function saveTextHandler(db: Database.Database, uploadsDir: string) {
+  return (req: Request, res: Response) => {
+    const { text } = (req.body ?? {}) as Record<string, unknown>
+    if (typeof text !== 'string') throw new HttpError(400, 'text must be a string')
+
+    const row = findOwnedAttachment(db, Number(req.params.id), req.userId) as AttachmentRow
+    const saved = db.transaction(() => {
+      const result = saveMarkdownText(db, uploadsDir, { row, text })
+      touchApplication(db, row.application_id)
+      return result
+    })()
+    if (saved.replacedStoredName) unlinkIfExists(join(uploadsDir, saved.replacedStoredName))
+    res.json(toAttachment(saved.row))
   }
 }
 
@@ -160,6 +177,7 @@ export function createAttachmentsRouter(
     upload.single('file'),
     replaceHandler(db, uploadsDir),
   )
+  router.put('/attachments/:id/text', checkAttachmentOwned(db), saveTextHandler(db, uploadsDir))
   router.put('/attachments/:id/profile-sync', profileSyncHandler(db))
   router.delete('/attachments/:id', removeHandler(db, uploadsDir))
 

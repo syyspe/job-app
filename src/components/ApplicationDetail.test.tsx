@@ -26,11 +26,16 @@ const application: Application = {
       mimeType: 'application/pdf',
       uploadedAt: '2026-01-15 09:00:00',
       profileSyncPending: false,
+      editedFromId: null,
     },
   ],
 }
 
 type DetailProps = ComponentProps<typeof ApplicationDetail>
+
+function drafting(overrides: Partial<DetailProps['drafting']> = {}): DetailProps['drafting'] {
+  return { questions: [], onAnswer: vi.fn(), onLoadAttachmentText: vi.fn(), onSaveAttachmentText: vi.fn(), ...overrides }
+}
 
 function renderDetail(overrides: Partial<DetailProps> = {}) {
   return render(
@@ -42,6 +47,7 @@ function renderDetail(overrides: Partial<DetailProps> = {}) {
       onSetProfileSync={vi.fn()}
       onRemoveAttachment={vi.fn()}
       onSetArchived={vi.fn()}
+      drafting={drafting()}
       {...overrides}
     />,
   )
@@ -101,4 +107,24 @@ test('an archived application offers Unarchive', async () => {
 
   await user.click(screen.getByRole('button', { name: 'Unarchive' }))
   expect(onSetArchived).toHaveBeenCalledWith(false)
+})
+
+test('open questions show above the attachments and report their answers', async () => {
+  const user = userEvent.setup()
+  const onAnswer = vi.fn()
+  renderDetail({ drafting: drafting({ questions: [{ id: 'q1', text: 'Why Acme?' }], onAnswer }) })
+
+  const region = screen.getByRole('region', { name: 'Open questions' })
+  const attachment = screen.getByRole('link', { name: 'resume.pdf' })
+  expect(region.compareDocumentPosition(attachment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  await user.type(screen.getByRole('textbox', { name: 'q1 Why Acme?' }), 'Great product')
+  await user.click(screen.getByRole('button', { name: 'Save answers' }))
+
+  expect(onAnswer).toHaveBeenCalledWith({ q1: 'Great product' })
+})
+
+test('no open questions, no questions block', () => {
+  renderDetail()
+
+  expect(screen.queryByRole('region', { name: 'Open questions' })).toBeNull()
 })

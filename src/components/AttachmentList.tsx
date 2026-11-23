@@ -1,14 +1,15 @@
+import { useState } from 'react'
 import type { ChangeEvent } from 'react'
+import { AttachmentEditor } from './AttachmentEditor.tsx'
 import { attachmentUrl } from '../lib/api.ts'
 import type { Attachment } from '../types.ts'
 
-interface AttachmentItemProps {
+interface ProfileSyncToggleProps {
   attachment: Attachment
   onSetProfileSync: (id: number, pending: boolean) => void
-  onRemove: (id: number) => void
 }
 
-function ProfileSyncToggle({ attachment, onSetProfileSync }: Omit<AttachmentItemProps, 'onRemove'>) {
+function ProfileSyncToggle({ attachment, onSetProfileSync }: ProfileSyncToggleProps) {
   const { id, originalName, profileSyncPending } = attachment
   if (!profileSyncPending) {
     return (
@@ -37,20 +38,74 @@ function ProfileSyncToggle({ attachment, onSetProfileSync }: Omit<AttachmentItem
   )
 }
 
-function AttachmentItem({ attachment, onSetProfileSync, onRemove }: AttachmentItemProps) {
+interface EditControlProps {
+  attachment: Attachment
+  superseded: boolean
+  onEdit: () => void
+}
+
+function EditControl({ attachment, superseded, onEdit }: EditControlProps) {
+  if (superseded) return <span className="superseded-note">Original, kept unchanged</span>
+  if (!attachment.originalName.toLowerCase().endsWith('.md')) return null
   return (
-    <li className="attachment-item">
+    <button
+      type="button"
+      className="button"
+      aria-label={`Edit ${attachment.originalName}`}
+      onClick={onEdit}
+    >
+      Edit
+    </button>
+  )
+}
+
+export interface AttachmentTextHandlers {
+  onLoadText: (id: number) => Promise<string | null>
+  onSaveText: (id: number, text: string) => Promise<boolean>
+}
+
+type AttachmentItemProps = Omit<EditControlProps, 'onEdit'> & {
+  onSetProfileSync: (id: number, pending: boolean) => void
+  onRemove: (id: number) => void
+  editing: AttachmentTextHandlers
+}
+
+function AttachmentItem(props: AttachmentItemProps) {
+  const { attachment, superseded, onSetProfileSync, onRemove, editing } = props
+  const [draft, setDraft] = useState<string | null>(null)
+
+  async function handleEdit() {
+    const text = await editing.onLoadText(attachment.id)
+    if (text !== null) setDraft(text)
+  }
+
+  async function handleSave(text: string) {
+    if (await editing.onSaveText(attachment.id, text)) setDraft(null)
+  }
+
+  return (
+    <li className="attachment-item" data-superseded={superseded}>
       <a href={attachmentUrl(attachment.id)}>{attachment.originalName}</a>
-      <div className="attachment-actions">
-        <ProfileSyncToggle attachment={attachment} onSetProfileSync={onSetProfileSync} />
-        <button
-          type="button"
-          className="button button-danger"
-          onClick={() => onRemove(attachment.id)}
-        >
-          Remove file
-        </button>
-      </div>
+      {draft !== null ? (
+        <AttachmentEditor
+          attachment={attachment}
+          initialText={draft}
+          onSave={handleSave}
+          onCancel={() => setDraft(null)}
+        />
+      ) : (
+        <div className="attachment-actions">
+          <EditControl attachment={attachment} superseded={superseded} onEdit={handleEdit} />
+          <ProfileSyncToggle attachment={attachment} onSetProfileSync={onSetProfileSync} />
+          <button
+            type="button"
+            className="button button-danger"
+            onClick={() => onRemove(attachment.id)}
+          >
+            Remove file
+          </button>
+        </div>
+      )}
     </li>
   )
 }
@@ -60,6 +115,7 @@ interface AttachmentListProps {
   onUpload: (file: File) => void
   onSetProfileSync: (id: number, pending: boolean) => void
   onRemove: (id: number) => void
+  editing: AttachmentTextHandlers
 }
 
 export function AttachmentList({
@@ -67,7 +123,11 @@ export function AttachmentList({
   onUpload,
   onSetProfileSync,
   onRemove,
+  editing,
 }: AttachmentListProps) {
+  // An original with an edited copy is superseded: the copy is the one to edit.
+  const supersededIds = new Set(attachments.map((attachment) => attachment.editedFromId))
+
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (file) {
@@ -83,8 +143,10 @@ export function AttachmentList({
           <AttachmentItem
             key={attachment.id}
             attachment={attachment}
+            superseded={supersededIds.has(attachment.id)}
             onSetProfileSync={onSetProfileSync}
             onRemove={onRemove}
+            editing={editing}
           />
         ))}
       </ul>

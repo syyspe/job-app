@@ -5,11 +5,15 @@ import { ApplicationSort } from './ApplicationSort.tsx'
 import { ArchivedToggle } from './ArchivedToggle.tsx'
 import { Pagination } from './Pagination.tsx'
 import {
+  answerQuestions,
   createApplication,
   deleteApplication,
   deleteAttachment,
+  getAttachmentText,
   getConfig,
+  getOpenQuestions,
   listApplications,
+  saveAttachmentText,
   setArchived,
   setAttachmentProfileSync,
   updateApplication,
@@ -19,9 +23,10 @@ import { useApiAction } from '../lib/apiAction.ts'
 import { paginate } from '../lib/paging.ts'
 import { sortApplications } from '../lib/sorting.ts'
 import type { Sort } from '../lib/sorting.ts'
-import type { Application, ApplicationInput } from '../types.ts'
+import type { Application, ApplicationInput, OpenQuestion } from '../types.ts'
 
 type Change = (call: () => Promise<unknown>, message: string) => Promise<void>
+type Run = ReturnType<typeof useApiAction>
 
 function changeHandlers(change: Change) {
   return {
@@ -43,7 +48,52 @@ function changeHandlers(change: Change) {
       ),
     handleRemoveAttachment: (attachmentId: number) =>
       change(() => deleteAttachment(attachmentId), 'Attachment removed'),
+    handleAnswer: (applicationId: number, answers: Record<string, string>) =>
+      change(() => answerQuestions(applicationId, answers), 'Answers saved'),
   }
+}
+
+// These report back to the editor: the text it opens with, and whether the
+// save went through, so a failed save keeps the editor and its text open.
+function attachmentTextHandlers(run: Run, reload: () => Promise<void>) {
+  return {
+    onLoadAttachmentText: async (id: number): Promise<string | null> => {
+      let text: string | null = null
+      await run(async () => {
+        text = await getAttachmentText(id)
+      })
+      return text
+    },
+    onSaveAttachmentText: async (id: number, text: string): Promise<boolean> => {
+      let saved = false
+      await run(async () => {
+        await saveAttachmentText(id, text)
+        saved = true
+        await reload()
+      }, 'Attachment saved')
+      return saved
+    },
+  }
+}
+
+interface LoadedQuestions {
+  applicationId: number
+  list: OpenQuestion[]
+}
+
+// Refetched on every reload (the applications dependency): an upload, edit or
+// answer can change which markers remain.
+function useOpenQuestions(run: Run, expandedId: number | null, applications: Application[]) {
+  const [loaded, setLoaded] = useState<LoadedQuestions | null>(null)
+
+  useEffect(() => {
+    if (expandedId === null) return
+    void run(async () => {
+      setLoaded({ applicationId: expandedId, list: await getOpenQuestions(expandedId) })
+    })
+  }, [run, expandedId, applications])
+
+  return loaded?.applicationId === expandedId ? loaded.list : []
 }
 
 function useApplications(onUnauthorized: () => void) {
@@ -51,6 +101,7 @@ function useApplications(onUnauthorized: () => void) {
   const [pageSize, setPageSize] = useState<number | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const run = useApiAction(onUnauthorized)
+  const questions = useOpenQuestions(run, expandedId, applications)
 
   async function reload() {
     setApplications(await listApplications())
@@ -88,6 +139,7 @@ function useApplications(onUnauthorized: () => void) {
     setExpandedId,
     handleDelete,
     ...changeHandlers(change),
+    drafting: { questions, ...attachmentTextHandlers(run, reload) },
   }
 }
 
@@ -187,6 +239,7 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
           onSetProfileSync={apps.handleSetProfileSync}
           onRemoveAttachment={apps.handleRemoveAttachment}
           onSetArchived={apps.handleSetArchived}
+          drafting={{ ...apps.drafting, onAnswer: apps.handleAnswer }}
           hiddenArchivedCount={list.hiddenArchivedCount}
         />
         <Pagination page={list.currentPage} pageCount={list.pageCount} onChange={list.setPage} />

@@ -321,6 +321,27 @@ quiet.
 - Verification command: `npm test -- --maxWorkers=2`, then `npm run lint`
   and `npm run build`.
 
+## Departures during build
+
+- `saveMarkdownText(db, uploadsDir, { row, text })` bundles the row and text
+  into one argument, to stay within the three-parameter limit.
+- The `PUT /attachments/:id/text` tests are in
+  `server/routes/attachments.text.test.ts`, a sibling file (as `ads.*.test.ts`
+  are), not added to the 500-line `attachments.test.ts`.
+- `onSaveText`/`onSaveAttachmentText` returns whether the save went through.
+  The editor closes only on success, so a refused save (a 413, say) keeps the
+  text the user typed.
+- The four new props travel as one `drafting` object (`DraftEditing`, and
+  `ListDrafting` in the list, whose `onAnswer` names the application). The
+  attachment list takes `editing: { onLoadText, onSaveText }`. Four flat props
+  pushed five components over the 40-line limit.
+- The editor's buttons are named `Save <name>` and `Cancel editing <name>`.
+  A bare "Save" clashed with the application form's own Save.
+- `OpenQuestions` sends answers only for the questions still listed. Typed
+  text for a question answered since then would otherwise be re-sent and
+  refused with a 409.
+- `mcp/server.test.ts` pins the tool list, so it now lists fifteen tools.
+
 ## Risks / rollback
 
 - The `edited_from` column is additive, and older code ignores it. To roll

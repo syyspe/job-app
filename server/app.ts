@@ -7,6 +7,7 @@ import { createApplicationsRouter } from './routes/applications.ts'
 import { createAttachmentsRouter } from './routes/attachments.ts'
 import { createAuthRouter } from './routes/auth.ts'
 import { createConfigRouter } from './routes/config.ts'
+import { createQuestionsRouter } from './routes/questions.ts'
 import { createUsersRouter } from './routes/users.ts'
 import { requireAdmin, requireSession } from './middleware/auth.ts'
 import { requireParsableBody } from './middleware/contentType.ts'
@@ -42,6 +43,7 @@ export function createApp(
   app.use('/api', createConfigRouter(pageSize))
   app.use('/api', createApplicationsRouter(db, uploadsDir))
   app.use('/api', createAttachmentsRouter(db, uploadsDir))
+  app.use('/api', createQuestionsRouter(db, uploadsDir))
   app.use('/api', createAdsRouter(db, uploadsDir))
   app.use('/api/users', requireAdmin(db))
   app.use('/api', createUsersRouter(db, uploadsDir))

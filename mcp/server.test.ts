@@ -13,10 +13,11 @@ afterEach(async () => {
   await harness.close()
 })
 
-test('the server offers exactly the thirteen job-application tools', async () => {
+test('the server offers exactly the fifteen job-application tools', async () => {
   const { tools } = await harness.client.listTools()
 
   expect(tools.map((tool) => tool.name).sort()).toEqual([
+    'answer_questions',
     'archive_application',
     'attach_file',
     'create_application',
@@ -27,6 +28,7 @@ test('the server offers exactly the thirteen job-application tools', async () =>
     'handover_ad',
     'list_ads',
     'list_applications',
+    'list_open_questions',
     'read_attachment',
     'replace_attachment',
     'update_application',

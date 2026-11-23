@@ -68,7 +68,8 @@ const SCHEMA = `
     original_name  TEXT NOT NULL,
     mime_type      TEXT NOT NULL,
     uploaded_at    TEXT NOT NULL DEFAULT '',
-    profile_sync   INTEGER NOT NULL DEFAULT 0
+    profile_sync   INTEGER NOT NULL DEFAULT 0,
+    edited_from    INTEGER REFERENCES attachments(id) ON DELETE SET NULL
   );
 `
 
