@@ -1,9 +1,15 @@
 import { useState } from 'react'
 import { AdHandoverForm } from './AdHandoverForm.tsx'
 import { canDismiss, canHandOver } from '../lib/adStates.ts'
+import { formatDay } from '../lib/dates.ts'
+import { sourceLabel } from '../lib/sources.ts'
 import type { AdHandoverInput, AdSummary } from '../types.ts'
 
 type Mode = 'idle' | 'handover' | 'dismiss'
+
+function displayTitle(ad: AdSummary): string {
+  return ad.title || `${sourceLabel(ad.source)} ad · ${formatDay(ad.firstSeenAt)}`
+}
 
 export interface AdActions {
   /** Resolves to whether the ad was handed over, so a failure can keep the form. */
@@ -92,7 +98,7 @@ export function AdRow({ ad, actions }: AdRowProps) {
 
   return (
     <li className="ad-item" data-state={ad.state}>
-      <span className="ad-title">{ad.title || 'Untitled ad'}</span>
+      <span className="ad-title">{displayTitle(ad)}</span>
       <AdFacts ad={ad} />
       {ad.evaluation && <p className="ad-fit">{ad.evaluation.fitSummary}</p>}
       {ad.state === 'failed' && ad.lastError && (

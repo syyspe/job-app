@@ -18,3 +18,7 @@ export function formatTimestamp(sqliteTimestamp: string): string {
   const at = new Date(sqliteTimestamp.replace(' ', 'T'))
   return `${DATE.format(at)}, ${TIME.format(at)}`
 }
+
+export function formatDay(sqliteTimestamp: string): string {
+  return DATE.format(new Date(sqliteTimestamp.replace(' ', 'T')))
+}

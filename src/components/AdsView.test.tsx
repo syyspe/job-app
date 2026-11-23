@@ -91,9 +91,26 @@ test('orders the state filters by urgency', async () => {
     'Drafted 0',
     'Title rejected 0',
     'Unsuitable 0',
-    'Duplicate 0',
-    'Dismissed 0',
   ])
+})
+
+test('dismissed and duplicate ads are never listed', async () => {
+  const user = userEvent.setup()
+  stubAds([
+    sampleAd({ id: 3, title: 'Dismissed ad', state: 'dismissed' }),
+    sampleAd({ id: 4, title: 'Duplicate ad', state: 'duplicate', duplicateOf: 1 }),
+  ])
+  renderView()
+  await screen.findByText('No ads in Awaiting hand-over')
+
+  const group = within(screen.getByRole('group', { name: 'Filter ads by state' }))
+  expect(group.queryByRole('button', { name: /^Dismissed/ })).not.toBeInTheDocument()
+  expect(group.queryByRole('button', { name: /^Duplicate/ })).not.toBeInTheDocument()
+  for (const button of group.getAllByRole('button')) {
+    await user.click(button)
+    expect(screen.queryByText('Dismissed ad')).not.toBeInTheDocument()
+    expect(screen.queryByText('Duplicate ad')).not.toBeInTheDocument()
+  }
 })
 
 test('a state filter shows that state', async () => {
