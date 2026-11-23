@@ -29,7 +29,7 @@ export interface DailyRunOptions {
   sync: Omit<SyncOptions, 'jobApp'> | null
   evaluation: Omit<EvaluationRunOptions, 'jobApp' | 'checkHealth'>
   drafting: Omit<DraftRunOptions, 'jobApp' | 'checkHealth'>
-  summary: { recipient: string; alwaysSend: boolean; appUrl: string }
+  summary: { recipient: string; alwaysSend: boolean; appUrl: string; lanUrl?: string }
   send: (message: MailMessage) => Promise<void>
   now: () => Date
 }
@@ -114,7 +114,8 @@ async function sendSummary({ options, report }: Run): Promise<void> {
   const sourceFailures = state.readFailures()
   const problems = [...(report.skipped ? [report.skipped] : []), ...report.failures]
   if (isEmpty({ ads, sourceFailures, problems }) && !options.summary.alwaysSend) return
-  const summary = composeSummary({ ads, sourceFailures, problems, appUrl: options.summary.appUrl })
+  const { appUrl, lanUrl } = options.summary
+  const summary = composeSummary({ ads, sourceFailures, problems, appUrl, lanUrl })
   await options.send({ to: options.summary.recipient, ...summary, date: options.now() })
   report.sent = true
   await jobApp.markReported(ads.map((ad) => ad.id))

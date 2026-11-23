@@ -104,6 +104,7 @@ function dailyOptions(setup: Setup, store: IndexStore | null): DailyRunOptions {
       recipient: setup.daily.summary.recipient,
       alwaysSend: setup.daily.summary.alwaysSend,
       appUrl: setup.jobAppEnv.baseUrl,
+      lanUrl: setup.daily.summary.lanUrl,
     },
     send: (message) => sendMail(message, { ...setup.smtp, envPath: envFile }),
     now: () => new Date(),

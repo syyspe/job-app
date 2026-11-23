@@ -482,12 +482,16 @@ sources.
    MAIL_SMTP_HOST=smtp.gmail.com
    ```
 
-2. Add the recipient, and optionally `alwaysSend` and the hand-over wait, to
-   `~/.config/job-agent/config.json`:
+2. Add the recipient, and optionally `alwaysSend`, `lanUrl` and the hand-over
+   wait, to `~/.config/job-agent/config.json`:
 
    ```json
    {
-     "summary": { "recipient": "<your own address>", "alwaysSend": true },
+     "summary": {
+       "recipient": "<your own address>",
+       "alwaysSend": true,
+       "lanUrl": "https://<LAN address>:3001"
+     },
      "handoverWaitDays": 7
    }
    ```
@@ -495,6 +499,9 @@ sources.
    `alwaysSend` defaults to false. When it is true, the summary arrives every
    run, so it also shows that the run happened. A run with nothing new sends
    only the job-app link.
+
+   When `lanUrl` is set, the summary carries a second link, to that address,
+   for reading it on the phone. It must be an http or https URL.
 
    An ad waiting for hand-over is dismissed `handoverWaitDays` days after it
    was first seen, or after its deadline day if that comes sooner.
