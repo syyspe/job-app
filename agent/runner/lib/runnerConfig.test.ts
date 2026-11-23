@@ -24,15 +24,21 @@ test('missing keys take their defaults and other keys are ignored', () => {
   expect(loadRunnerConfig(path)).toEqual({
     titleRules: { reject: [] },
     evaluation: { concurrency: 2, perRunCap: 10, timeoutMs: 300000 },
+    prescreen: { concurrency: 4, perRunCap: 40, timeoutMs: 120000 },
   })
 })
 
 test('configured values win over the defaults', () => {
-  const path = writeConfig({ titleRules: { reject: ['trainee'] }, evaluation: { concurrency: 4 } })
+  const path = writeConfig({
+    titleRules: { reject: ['trainee'] },
+    evaluation: { concurrency: 4 },
+    prescreen: { perRunCap: 5 },
+  })
 
   expect(loadRunnerConfig(path)).toEqual({
     titleRules: { reject: ['trainee'] },
     evaluation: { concurrency: 4, perRunCap: 10, timeoutMs: 300000 },
+    prescreen: { concurrency: 4, perRunCap: 5, timeoutMs: 120000 },
   })
 })
 
@@ -40,6 +46,8 @@ test.each([
   ['a concurrency above 8', { evaluation: { concurrency: 9 } }, 'evaluation.concurrency'],
   ['a fractional cap', { evaluation: { perRunCap: 1.5 } }, 'evaluation.perRunCap'],
   ['an empty reject phrase', { titleRules: { reject: [''] } }, 'titleRules.reject[0]'],
+  ['a pre-screen concurrency above 8', { prescreen: { concurrency: 9 } }, 'prescreen.concurrency'],
+  ['a pre-screen cap below 1', { prescreen: { perRunCap: 0 } }, 'prescreen.perRunCap'],
 ])('%s is an exit-2 error naming the field', (_name, value, field) => {
   const path = writeConfig(value)
 
@@ -88,16 +96,19 @@ describe('drafting', () => {
 })
 
 describe('sources', () => {
+  const fetchAd = () => Promise.resolve({ kind: 'gone' as const })
   const connectors = [
-    { id: 'auto', mode: 'automatic' as const },
-    { id: 'manual', mode: 'handover' as const },
+    { id: 'auto', fetchAd },
+    { id: 'manual' },
+    { id: 'fetching', fetchAd },
   ]
   const load = (sources: unknown) => loadSourcesConfig(writeConfig({ sources }), connectors)
 
   test('missing keys take their defaults and a missing source is disabled', () => {
     expect(load({ auto: { enabled: true, termsCheckedOn: '2026-11-20' } })).toEqual({
-      auto: { enabled: true, termsCheckedOn: '2026-11-20', dailyOpenCap: 20, minDelayMs: 15000 },
-      manual: { enabled: false, dailyOpenCap: 20, minDelayMs: 15000 },
+      auto: { enabled: true, termsCheckedOn: '2026-11-20', dailyOpenCap: 20, minDelayMs: 15000, fetch: 'requested' },
+      manual: { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'requested' },
+      fetching: { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'requested' },
     })
   })
 
@@ -107,17 +118,23 @@ describe('sources', () => {
     expect(config.auto).toMatchObject({ dailyOpenCap: 5, minDelayMs: 2000 })
   })
 
-  test('a hand-over source is enabled without a terms check', () => {
+  test('a source that never fetches is enabled without a terms check', () => {
     expect(load({ manual: { enabled: true } }).manual.enabled).toBe(true)
   })
 
-  test('an automatic source cannot be enabled before its terms are checked', () => {
-    const path = writeConfig({ sources: { auto: { enabled: true } } })
+  test('fetch is read', () => {
+    const config = load({ fetching: { enabled: true, termsCheckedOn: '2026-11-23', fetch: 'automatic' } })
+
+    expect(config.fetching.fetch).toBe('automatic')
+  })
+
+  test.each(['auto', 'fetching'])('%s cannot be enabled before its terms are checked', (id) => {
+    const path = writeConfig({ sources: { [id]: { enabled: true } } })
 
     expect(() => loadSourcesConfig(path, connectors)).toThrow(
       expect.objectContaining({
         exitCode: 2,
-        message: `${path}: sources.auto: termsCheckedOn is required to enable an automatic source`,
+        message: `${path}: sources.${id}: termsCheckedOn is required to enable a source that fetches`,
       }),
     )
   })
@@ -142,6 +159,7 @@ describe('sources', () => {
     ['a cap below 1', { manual: { enabled: true, dailyOpenCap: 0 } }, 'sources.manual.dailyOpenCap'],
     ['a delay below 1000', { manual: { enabled: true, minDelayMs: 999 } }, 'sources.manual.minDelayMs'],
     ['a malformed terms date', { manual: { enabled: true, termsCheckedOn: '20.11.2026' } }, 'sources.manual.termsCheckedOn'],
+    ['an unknown fetch mode', { manual: { enabled: true, fetch: 'always' } }, 'sources.manual.fetch'],
   ])('%s is an exit-2 error naming the field', (_name, sources, field) => {
     const path = writeConfig({ sources })
 

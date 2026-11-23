@@ -1,6 +1,7 @@
 // npm run agent:run — the daily run: collect, expire hand-overs, sync the
-// profile, evaluate, draft, and email one summary when there is news, or every
-// run with summary.alwaysSend. Task Scheduler starts it through daily-run.sh.
+// profile, pre-screen and fetch hand-overs, evaluate, draft, and email one
+// summary when there is news, or every run with summary.alwaysSend. Task
+// Scheduler starts it through daily-run.sh.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -19,10 +20,13 @@ import { formatDraftReport } from '../lib/draftRun.ts'
 import { loadJobAppEnv, loadMailEnv, loadSmtpEnv } from '../lib/env.ts'
 import { EVALUATION_FRAMING, EVALUATION_PROMPT, EVALUATION_SCHEMA, evaluateAd } from '../lib/evaluate.ts'
 import { formatEvaluationReport } from '../lib/evaluationRun.ts'
+import { formatHandoverFetchReport } from '../lib/handoverFetchRun.ts'
 import { createJobAppClient } from '../lib/jobApp.ts'
 import { acquireRunLock } from '../lib/lock.ts'
 import { openMailbox } from '../lib/mailbox.ts'
 import { createPoliteHttp } from '../lib/politeHttp.ts'
+import { PRESCREEN_FRAMING, PRESCREEN_PROMPT, PRESCREEN_SCHEMA, prescreenAd } from '../lib/prescreen.ts'
+import { formatPrescreenReport } from '../lib/prescreenRun.ts'
 import { buildSystemPrompt } from '../lib/prompts.ts'
 import { loadDailyRunConfig, loadDraftConfig, loadRunnerConfig, loadSourcesConfig } from '../lib/runnerConfig.ts'
 import { runSandboxed } from '../lib/sandbox.ts'
@@ -48,6 +52,7 @@ function loadSetup(env: Env) {
     drafting,
     sources: loadSourcesConfig(path, CONNECTORS),
     daily: loadDailyRunConfig(path),
+    prescreenPrompt: buildSystemPrompt(PRESCREEN_FRAMING, readConfigFile(join(prompts, 'prescreen.md'))),
     evaluatePrompt: buildSystemPrompt(EVALUATION_FRAMING, readConfigFile(join(prompts, 'evaluate.md'))),
     draftPrompt: buildSystemPrompt(DRAFT_FRAMING, readConfigFile(join(prompts, 'draft.md'))),
     cvTemplates: { fi: readConfigFile(drafting.cvTemplates.fi), en: readConfigFile(drafting.cvTemplates.en) },
@@ -61,14 +66,21 @@ function loadSetup(env: Env) {
 
 type Setup = ReturnType<typeof loadSetup>
 
-function collectOptions(setup: Setup, today: string): DailyRunOptions['collect'] {
+function fetchOptions(setup: Setup, today: string): DailyRunOptions['handoverFetch'] {
   const counters = createRunnerState(setup.stateDir).counters(today)
   const httpFor = (connector: SourceConnector) => {
     const { dailyOpenCap, minDelayMs } = setup.sources[connector.id]
     const hosts = connector.fetchHosts ?? []
     return createPoliteHttp({ sourceId: connector.id, hosts, dailyOpenCap, minDelayMs, counters, fetch, now: Date.now, sleep })
   }
-  return { connectors: CONNECTORS, sources: setup.sources, titleRules: setup.runner.titleRules.reject, today, httpFor }
+  return { connectors: CONNECTORS, sources: setup.sources, today, httpFor }
+}
+
+function prescreenOptions(setup: Setup): DailyRunOptions['prescreen'] {
+  const step = { claudeBin: CLAUDE_BIN, prompt: PRESCREEN_PROMPT, systemPrompt: setup.prescreenPrompt, schema: PRESCREEN_SCHEMA }
+  const { timeoutMs } = setup.runner.prescreen
+  const runStep = (input: string) => runSandboxed({ ...step, input, timeoutMs, env: process.env })
+  return { config: setup.runner.prescreen, prescreen: (ad) => prescreenAd(ad, runStep) }
 }
 
 function modelOptions(setup: Setup, today: string): Pick<DailyRunOptions, 'evaluation' | 'drafting' | 'gate'> {
@@ -91,11 +103,14 @@ function dailyOptions(setup: Setup, store: IndexStore | null): DailyRunOptions {
   const { profile, envFile } = setup
   const syncFolder = profile.syncFolder
   const ollama = createOllama({ url: profile.ollamaUrl, model: profile.embeddingModel })
+  const fetching = fetchOptions(setup, today)
   return {
     jobApp: createJobAppClient({ ...setup.jobAppEnv, envPath: envFile }),
     state: createRunnerState(setup.stateDir),
     openMailbox: () => openMailbox({ ...setup.mail, envPath: envFile }),
-    collect: collectOptions(setup, today),
+    collect: { ...fetching, titleRules: setup.runner.titleRules.reject },
+    handoverFetch: fetching,
+    prescreen: prescreenOptions(setup),
     handoverWaitDays: setup.daily.handoverWaitDays,
     checkHealth: () => checkOllama(profile),
     sync: syncFolder && store ? { config: { ...profile, syncFolder }, store, ollama } : null,
@@ -130,6 +145,8 @@ function earlyLines(report: DailyReport): string[] {
 function modelLines(report: DailyReport): string[] {
   return [
     ...(report.sync ? formatSyncResult(report.sync) : []),
+    ...(report.prescreen ? formatPrescreenReport(report.prescreen) : []),
+    ...(report.handoverFetch ? formatHandoverFetchReport(report.handoverFetch) : []),
     ...(report.evaluation ? formatEvaluationReport(report.evaluation) : []),
     ...(report.drafting ? formatDraftReport(report.drafting) : []),
   ]

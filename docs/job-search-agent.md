@@ -411,7 +411,8 @@ An ad waits in `awaiting_handover` for `handoverWaitDays` days after
 `first_seen_at`, 7 by default. If the ad has a deadline that falls sooner, it
 waits only until the end of that day. An ad with `fetch_requested_at` ignores
 `handoverWaitDays` and waits until the end of its deadline day, so a click on
-the last day isn't dismissed before the run that fetches it. The runner then
+the last day isn't dismissed before the run that fetches it; one without a
+deadline keeps the normal wait. The runner then
 moves it to `dismissed`. The same step dismisses hand-over ads in `ready` or
 `suitable` whose deadline has passed, which clears their text.
 

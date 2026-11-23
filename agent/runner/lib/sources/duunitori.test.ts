@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { alert, fixture } from '../../../test/fakeSources.ts'
+import { alert, fakePoliteHttp, fixture } from '../../../test/fakeSources.ts'
 import { duunitori } from './duunitori.ts'
 
 const message = alert({
@@ -15,10 +15,9 @@ test('matches its alerts only', () => {
   expect(duunitori.matches({ ...message, subject: 'Työelämän uutiset' })).toBe(false)
 })
 
-test('is a hand-over source that never fetches', () => {
+test('is a hand-over source that fetches only its own host', () => {
   expect(duunitori.mode).toBe('handover')
-  expect(duunitori.fetchAd).toBeUndefined()
-  expect(duunitori.fetchHosts).toBeUndefined()
+  expect(duunitori.fetchHosts).toEqual(['duunitori.fi'])
 })
 
 test('parses the matched ads, dropping tracker links and the recommendations', () => {
@@ -50,4 +49,28 @@ test('parses the matched ads, dropping tracker links and the recommendations', (
 
 test('an unrecognised structure parses to no candidates', () => {
   expect(duunitori.parseAlert({ ...message, html: '<p>Ei uusia</p>' })).toEqual([])
+})
+
+const candidate = {
+  externalId: '10000001',
+  url: 'https://duunitori.fi/tyopaikat/tyo/esimerkki-oy-testaaja-abcde-10000001',
+  title: 'Testaaja',
+}
+
+test('fetchAd reads the JSON-LD description, deadline and company of the ad URL alone', async () => {
+  const http = fakePoliteHttp({ kind: 'page', html: fixture('duunitori-page.html') })
+
+  expect(await duunitori.fetchAd!(candidate, http)).toEqual({
+    kind: 'ok',
+    text: 'Etsimme testaajaa Tampereelle.\n\nHaku päättyy 2.12.',
+    company: 'esimerkki-oy',
+    deadline: '2026-12-02',
+  })
+  expect(http.urls).toEqual([candidate.url])
+})
+
+test('fetchAd passes gone through, and a page without JSON-LD is no_ad_text', async () => {
+  expect(await duunitori.fetchAd!(candidate, fakePoliteHttp({ kind: 'gone' }))).toEqual({ kind: 'gone' })
+  const page = fakePoliteHttp({ kind: 'page', html: '<main><h1>Testaaja</h1></main>' })
+  expect(await duunitori.fetchAd!(candidate, page)).toEqual({ kind: 'failed', category: 'no_ad_text' })
 })

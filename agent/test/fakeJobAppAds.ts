@@ -24,6 +24,8 @@ export interface FakeAd {
   evaluation: FakeEvaluation | null
   body: string | null
   applicationId: number | null
+  prescreen: { verdict: 'promising' | 'not_promising'; reason: string } | null
+  fetchRequestedAt: string | null
   firstSeenAt: string
   reportedAt: string | null
 }
@@ -60,6 +62,8 @@ export function fakeAd(fields: Partial<FakeAd> & { id: number }): FakeAd {
     evaluation: null,
     body: null,
     applicationId: null,
+    prescreen: null,
+    fetchRequestedAt: null,
     reportedAt: null,
     firstSeenAt: `2026-11-${String(fields.id).padStart(2, '0')} 08:00:00`,
     ...fields,
@@ -104,6 +108,15 @@ async function answerTransition({ fake, ad }: TransitionTarget, req: IncomingMes
   const transition = { id: ad.id, ...(await readJson(req)) } as FakeTransition
   fake.transitions.push(transition)
   applyTransition(ad, transition)
+  sendJson(res, 200, summary(ad))
+}
+
+// Only an awaiting_handover ad takes a pre-screen, as on the server.
+async function answerPrescreen({ fake, ad }: TransitionTarget, req: IncomingMessage, res: ServerResponse) {
+  const prescreen = (await readJson(req)) as FakeAd['prescreen']
+  fake.prescreens.push({ id: ad.id, prescreen })
+  if (ad.state !== 'awaiting_handover') return sendJson(res, 409, { error: `an ad cannot be pre-screened from ${ad.state}` })
+  ad.prescreen = prescreen
   sendJson(res, 200, summary(ad))
 }
 
@@ -160,7 +173,7 @@ function answerAdCollection(fake: FakeJobApp, req: IncomingMessage, res: ServerR
   if (req.method === 'POST') return void answerIngest(fake, req, res)
   if (fake.failure === 'malformed') return sendJson(res, 200, { ads: 'nope' })
   const state = new URL(req.url ?? '', 'http://fake').searchParams.get('state')
-  const listed = fake.ads.filter((ad) => ad.state === state)
+  const listed = fake.ads.filter((ad) => state === null || ad.state === state)
   sendJson(res, 200, listed.toSorted((a, b) => b.firstSeenAt.localeCompare(a.firstSeenAt)).map(summary))
 }
 
@@ -168,10 +181,11 @@ export function answerAds(fake: FakeJobApp, req: IncomingMessage, res: ServerRes
   const url = new URL(req.url ?? '', 'http://fake')
   if (url.pathname === '/api/ads/reported') return void answerReported(fake, req, res)
   if (url.pathname === '/api/ads') return answerAdCollection(fake, req, res)
-  const [, id, action] = /^\/api\/ads\/(\d+)(\/transition|\/draft)?$/.exec(url.pathname) ?? []
+  const [, id, action] = /^\/api\/ads\/(\d+)(\/transition|\/draft|\/prescreen)?$/.exec(url.pathname) ?? []
   const ad = fake.ads.find((candidate) => candidate.id === Number(id))
   if (!ad) return sendJson(res, 404, { error: 'ad not found' })
   if (action === '/transition') return void answerTransition({ fake, ad }, req, res)
   if (action === '/draft') return void answerDraft({ fake, ad }, req, res)
+  if (action === '/prescreen') return void answerPrescreen({ fake, ad }, req, res)
   sendJson(res, 200, ad)
 }

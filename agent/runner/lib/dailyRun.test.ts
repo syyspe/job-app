@@ -14,7 +14,9 @@ import type { DailyRunOptions } from './dailyRun.ts'
 import type { DraftOutcome } from './draft.ts'
 import type { EvaluationOutcome } from './evaluate.ts'
 import { createJobAppClient } from './jobApp.ts'
+import type { PrescreenOutcome } from './prescreen.ts'
 import type { MailMessage } from './smtp.ts'
+import type { SourceConnector } from './sources/types.ts'
 import { createRunnerState } from './state.ts'
 import type { RunnerState } from './state.ts'
 
@@ -61,6 +63,20 @@ const written: DraftOutcome = {
 
 const NOW = new Date(2026, 10, 20, 20, 0)
 
+const promising: PrescreenOutcome = { kind: 'screened', prescreen: { verdict: 'promising', reason: 'Test work.' } }
+
+// A hand-over source that fetches: every page holds the same ad text.
+const fetching: SourceConnector = {
+  id: 'fetching',
+  mode: 'handover',
+  fetchHosts: ['fetching.example'],
+  matches: () => false,
+  parseAlert: () => [],
+  fetchAd: async () => (steps.push('fetch'), { kind: 'ok', text: 'The fetched ad.' }),
+}
+
+const FETCHING_ON = { enabled: true, termsCheckedOn: '2026-11-23', dailyOpenCap: 20, minDelayMs: 1000, fetch: 'requested' as const }
+
 interface Overrides {
   health?: HealthResult
   gate?: DailyRunOptions['gate']
@@ -84,6 +100,16 @@ function options(overrides: Overrides = {}): DailyRunOptions {
     checkHealth: async () => (steps.push('health'), overrides.health ?? { ok: true }),
     gate: overrides.gate ?? (async () => (steps.push('gate'), { version: '9.9.9', reverified: false })),
     sync: null,
+    prescreen: {
+      config: { concurrency: 1, perRunCap: 10, timeoutMs: 1000 },
+      prescreen: async () => (steps.push('prescreen'), promising),
+    },
+    handoverFetch: {
+      connectors: [fetching],
+      sources: { fetching: FETCHING_ON },
+      today: '2026-11-20',
+      httpFor: () => ({ dayEnded: false, get: async () => ({ kind: 'gone' }) }),
+    },
     evaluation: {
       config: { titleRules: { reject: [] }, evaluation },
       evaluate: overrides.evaluate ?? (async () => (steps.push('evaluate'), suitable)),
@@ -111,6 +137,43 @@ test('steps run in order and the drafted ad is reported once', async () => {
   expect(sent[0].subject).toBe('job agent: 1 draft, 0 title rejected, 0 failed, 0 source failures, 0 problems')
   expect(fake.ads[0]).toMatchObject({ state: 'drafted', reportedAt: '2026-12-01 20:00:00' })
   expect(mailbox.closed).toBe(true)
+})
+
+test('a waiting hand-over is pre-screened, then fetched on request, then evaluated and drafted', async () => {
+  fake.ads.push(
+    fakeAd({
+      id: 1,
+      source: 'fetching',
+      sourceMode: 'handover',
+      state: 'awaiting_handover',
+      title: 'Tester',
+      company: 'Acme',
+      fetchRequestedAt: '2026-11-20 09:00:00',
+      firstSeenAt: '2026-11-20 08:00:00',
+    }),
+  )
+
+  const report = await runDaily(options())
+
+  expect(steps).toEqual(['collect', 'health', 'gate', 'prescreen', 'fetch', 'evaluate', 'draft', 'send'])
+  expect(report.prescreen?.screened).toEqual({ promising: 1, notPromising: 0 })
+  expect(report.handoverFetch).toEqual({
+    fetching: { ready: 1, duplicate: 0, gone: 0, retrying: 0, failed: 0, blocked: 0 },
+  })
+  expect(fake.ads[0]).toMatchObject({ state: 'drafted', prescreen: { verdict: 'promising', reason: 'Test work.' } })
+  expect(sent[0].text).toContain('Pre-screened (1)\n- Tester, Acme: promising — Test work.\n')
+  expect(sent[0].text).toContain('Pre-screen vs. Fetch, last 14 days: promising 1 (fetched 1), not promising 0 (fetched 0)')
+})
+
+test('a pre-screen alone makes the summary worth sending', async () => {
+  fake.ads.push(
+    fakeAd({ id: 1, source: 'fetching', sourceMode: 'handover', state: 'awaiting_handover', firstSeenAt: '2026-11-20 08:00:00' }),
+  )
+
+  const report = await runDaily(options())
+
+  expect(report.sent).toBe(true)
+  expect(steps).toEqual(['collect', 'health', 'gate', 'prescreen', 'send'])
 })
 
 test('nothing to report sends no mail', async () => {
@@ -185,7 +248,17 @@ test('Ollama down still collects and expires, skips the model steps and reports 
 })
 
 test('a gate failure skips the model steps with its message', async () => {
-  fake.ads.push(fakeAd({ id: 1, state: 'ready' }))
+  fake.ads.push(
+    fakeAd({ id: 1, state: 'ready' }),
+    fakeAd({
+      id: 2,
+      source: 'fetching',
+      sourceMode: 'handover',
+      state: 'awaiting_handover',
+      fetchRequestedAt: '2026-11-20 09:00:00',
+      firstSeenAt: '2026-11-20 08:00:00',
+    }),
+  )
   const gate = async () => {
     throw new CliError(1, 'sandbox check failed for claude 9.9.9: no Bash')
   }
@@ -194,7 +267,10 @@ test('a gate failure skips the model steps with its message', async () => {
 
   expect(report.skipped).toEqual({ step: 'model steps', message: 'sandbox check failed for claude 9.9.9: no Bash' })
   expect(report.failures).toEqual([])
-  expect(fake.ads[0].state).toBe('ready')
+  expect(steps).toEqual(['collect', 'health', 'send'])
+  expect(report.prescreen).toBeNull()
+  expect(report.handoverFetch).toBeNull()
+  expect(fake.ads.map((ad) => ad.state)).toEqual(['ready', 'awaiting_handover'])
   expect(sent[0].text).toContain('- model steps: sandbox check failed for claude 9.9.9: no Bash')
 })
 

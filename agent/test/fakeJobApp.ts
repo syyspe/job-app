@@ -22,6 +22,7 @@ export interface FakeJobApp {
   ads: FakeAd[]
   transitions: FakeTransition[]
   drafts: FakeDraft[]
+  prescreens: { id: number; prescreen: FakeAd['prescreen'] }[]
   // Every request as `<method> <url>`, logins included.
   requests: string[]
   flagCalls: { id: number; pending: boolean; storedName?: string }[]
@@ -112,6 +113,7 @@ export async function startFakeJobApp(attachments: FakeAttachment[] = []): Promi
     ads: [],
     transitions: [],
     drafts: [],
+    prescreens: [],
     requests: [],
     flagCalls: [],
     logins: 0,

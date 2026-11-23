@@ -12,6 +12,13 @@ const runnerConfigSchema = z.object({
       timeoutMs: z.int().min(1).default(300000),
     })
     .default({ concurrency: 2, perRunCap: 10, timeoutMs: 300000 }),
+  prescreen: z
+    .object({
+      concurrency: z.int().min(1).max(8).default(4),
+      perRunCap: z.int().min(1).default(40),
+      timeoutMs: z.int().min(1).default(120000),
+    })
+    .default({ concurrency: 4, perRunCap: 40, timeoutMs: 120000 }),
 })
 
 const draftConfigSchema = z.object({
@@ -58,6 +65,9 @@ const sourceSchema = z.object({
   termsCheckedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD').optional(),
   dailyOpenCap: z.int().min(1).default(20),
   minDelayMs: z.int().min(1000).default(15000),
+  // Read only for a hand-over connector with a fetchAd: fetch on the user's
+  // click alone, or also every ad the pre-screen calls promising.
+  fetch: z.enum(['requested', 'automatic']).default('requested'),
 })
 
 const sourcesConfigSchema = z.object({ sources: z.record(z.string(), sourceSchema).default({}) })
@@ -65,18 +75,18 @@ const sourcesConfigSchema = z.object({ sources: z.record(z.string(), sourceSchem
 export type SourceConfig = z.infer<typeof sourceSchema>
 export type SourcesConfig = Record<string, SourceConfig>
 
-const DISABLED: SourceConfig = { enabled: false, dailyOpenCap: 20, minDelayMs: 15000 }
+const DISABLED: SourceConfig = { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'requested' }
 
 // Every connector gets an entry; one missing from config is disabled.
-export function loadSourcesConfig(path: string, connectors: Pick<SourceConnector, 'id' | 'mode'>[]): SourcesConfig {
+export function loadSourcesConfig(path: string, connectors: Pick<SourceConnector, 'id' | 'fetchAd'>[]): SourcesConfig {
   const { sources } = parseConfigFile(path, sourcesConfigSchema)
   const unknown = Object.keys(sources).find((id) => !connectors.some((connector) => connector.id === id))
   if (unknown) throw new CliError(2, `${path}: sources.${unknown}: unknown source`)
   const config: SourcesConfig = {}
-  for (const { id, mode } of connectors) {
+  for (const { id, fetchAd } of connectors) {
     config[id] = sources[id] ?? DISABLED
-    if (mode === 'automatic' && config[id].enabled && !config[id].termsCheckedOn) {
-      throw new CliError(2, `${path}: sources.${id}: termsCheckedOn is required to enable an automatic source`)
+    if (fetchAd && config[id].enabled && !config[id].termsCheckedOn) {
+      throw new CliError(2, `${path}: sources.${id}: termsCheckedOn is required to enable a source that fetches`)
     }
   }
   if (!Object.values(config).some((source) => source.enabled)) {

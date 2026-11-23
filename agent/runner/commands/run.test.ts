@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { startFakeJobApp } from '../../test/fakeJobApp.ts'
@@ -25,7 +25,7 @@ function config(): Record<string, unknown> {
     ollamaUrl: UNREACHABLE_URL,
     embeddingModel: 'test-embed',
     corpus: [{ path: join(dir.root, 'corpus'), label: 'facts' }],
-    sources: { duunitori: { enabled: true } },
+    sources: { duunitori: { enabled: true, termsCheckedOn: '2026-11-23' } },
     drafting: {
       filePrefix: 'Tester',
       cvTemplates: { fi: join(dir.root, 'cv-fi.md'), en: join(dir.root, 'cv-en.md') },
@@ -40,6 +40,7 @@ beforeEach(async () => {
   stateDir = join(dir.root, '.local/state/job-agent')
   dir.write('cv-fi.md', 'CV fi')
   dir.write('cv-en.md', 'CV en')
+  dir.write('.config/job-agent/prompts/prescreen.md', 'Pre-screen.')
   dir.write('.config/job-agent/prompts/evaluate.md', 'Evaluate.')
   dir.write('.config/job-agent/prompts/draft.md', 'Draft.')
   dir.write('.config/job-agent/config.json', JSON.stringify(config()))
@@ -73,6 +74,19 @@ test('a config without a summary recipient exits 2 before taking the lock', asyn
 
   expectOneLineError(await run(), 2, `${path}: summary: Invalid input: expected object, received undefined`)
   expect(existsSync(join(stateDir, 'run.lock'))).toBe(false)
+})
+
+test('an enabled Duunitori without termsCheckedOn exits 2', async () => {
+  const path = dir.write('.config/job-agent/config.json', JSON.stringify({ ...config(), sources: { duunitori: { enabled: true } } }))
+
+  expectOneLineError(await run(), 2, `${path}: sources.duunitori: termsCheckedOn is required to enable a source that fetches`)
+})
+
+test('a missing pre-screen prompt exits 2 naming it', async () => {
+  const prompt = join(dir.root, '.config/job-agent/prompts/prescreen.md')
+  rmSync(prompt)
+
+  expectOneLineError(await run(), 2, `${prompt}: file not found`)
 })
 
 test('an env file without MAIL_SMTP_HOST exits 2', async () => {

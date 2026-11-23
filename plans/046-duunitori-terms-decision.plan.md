@@ -112,7 +112,9 @@ Runner
   hand-over sources with `prescreen === null`, oldest first, up to
   `perRunCap`, through `mapLimit`. Success posts `/prescreen`. A failure moves
   and counts nothing, and the ad is retried next run, until expiry. Returns
-  `{screened: {promising, notPromising}, failed, queued, ids}`.
+  `{screened: {promising, notPromising}, failed, queued, ads}`, the ads as
+  `/prescreen` answered, so the summary shows them even if a later step in the
+  run blanks them.
 - `agent/runner/lib/handoverFetchRun.ts` (new) — for each enabled hand-over
   connector with a `fetchAd`, the `awaiting_handover` ads of that source,
   oldest first. With `fetch: requested` it takes the ads with

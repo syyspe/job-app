@@ -15,7 +15,7 @@ const mail = 'MAIL_IMAP_HOST=127.0.0.1\nMAIL_USERNAME=alerts@mail.example\nMAIL_
 
 beforeEach(() => {
   dir = makeTempDir()
-  dir.write('.config/job-agent/config.json', JSON.stringify({ sources: { duunitori: { enabled: true } } }))
+  dir.write('.config/job-agent/config.json', JSON.stringify({ sources: { duunitori: { enabled: true, termsCheckedOn: '2026-11-23' } } }))
   dir.write('.config/job-agent/env', env + mail)
 })
 
@@ -36,7 +36,7 @@ function expectOneLineError(result: RunResult, status: number, message: string) 
 test('an automatic source enabled without a terms check exits 2', async () => {
   const path = dir.write('.config/job-agent/config.json', JSON.stringify({ sources: { nordea: { enabled: true } } }))
 
-  expectOneLineError(await run(), 2, `${path}: sources.nordea: termsCheckedOn is required to enable an automatic source`)
+  expectOneLineError(await run(), 2, `${path}: sources.nordea: termsCheckedOn is required to enable a source that fetches`)
 })
 
 test('no source enabled exits 2 before any mail is read', async () => {

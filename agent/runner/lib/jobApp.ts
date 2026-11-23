@@ -27,6 +27,8 @@ const adSummaryShape = {
   attempts: z.number(),
   lastError: z.string().nullable(),
   applicationId: z.number().nullable(),
+  prescreen: z.object({ verdict: z.enum(['promising', 'not_promising']), reason: z.string() }).nullable(),
+  fetchRequestedAt: z.string().nullable(),
   firstSeenAt: z.string(),
   reportedAt: z.string().nullable(),
 }
@@ -41,6 +43,7 @@ const draftResponseSchema = z.object({ application: z.object({ id: z.number() })
 // Only the fields the runner reads; the API sends more.
 export type AdSummary = z.infer<typeof adSummarySchema>
 export type Ad = z.infer<typeof adSchema>
+export type AdPrescreen = NonNullable<AdSummary['prescreen']>
 
 export interface AdTransition {
   to: string
@@ -92,8 +95,10 @@ export interface JobAppClient {
   clearProfileSync: (id: number, storedName: string) => Promise<boolean>
   ingestAd: (input: AdIngest) => Promise<IngestedAd>
   listAds: (state: string) => Promise<AdSummary[]>
+  listAllAds: () => Promise<AdSummary[]>
   getAd: (id: number) => Promise<Ad>
   transitionAd: (id: number, transition: AdTransition) => Promise<AdSummary>
+  setPrescreen: (id: number, prescreen: AdPrescreen) => Promise<AdSummary>
   draftAd: (id: number, upload: DraftUpload) => Promise<{ applicationId: number }>
   markReported: (ids: number[]) => Promise<void>
 }
@@ -209,9 +214,12 @@ export function createJobAppClient(config: JobAppConfig): JobAppClient {
       return { ad: parsed.data, created: response.status === 201 }
     },
     listAds: (state) => receive(send, { method: 'GET', path: `/api/ads?state=${state}` }, z.array(adSummarySchema)),
+    listAllAds: () => receive(send, { method: 'GET', path: '/api/ads' }, z.array(adSummarySchema)),
     getAd: (id) => receive(send, { method: 'GET', path: `/api/ads/${id}` }, adSchema),
     transitionAd: (id, transition) =>
       receive(send, { method: 'POST', path: `/api/ads/${id}/transition`, body: transition }, adSummarySchema),
+    setPrescreen: (id, prescreen) =>
+      receive(send, { method: 'POST', path: `/api/ads/${id}/prescreen`, body: prescreen }, adSummarySchema),
     draftAd: async (id, upload) => {
       const request: JobAppRequest = { method: 'POST', path: `/api/ads/${id}/draft`, body: draftForm(upload) }
       const { application } = await receive(send, request, draftResponseSchema)

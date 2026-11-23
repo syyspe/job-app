@@ -112,6 +112,31 @@ test('lists ads by state, reads one with its body and transitions it', async () 
   expect(fake.transitions).toEqual([{ id: 1, to: 'ready', error: 'timeout' }])
 })
 
+test('lists every ad and stores a pre-screen', async () => {
+  fake.ads.push(
+    fakeAd({ id: 1, state: 'awaiting_handover', sourceMode: 'handover' }),
+    fakeAd({ id: 2, state: 'dismissed', fetchRequestedAt: '2026-11-20 09:00:00' }),
+  )
+  const jobApp = client()
+
+  expect((await jobApp.listAllAds()).map((ad) => [ad.id, ad.fetchRequestedAt])).toEqual([
+    [2, '2026-11-20 09:00:00'],
+    [1, null],
+  ])
+  const prescreen = { verdict: 'promising' as const, reason: 'Fits.' }
+  expect(await jobApp.setPrescreen(1, prescreen)).toMatchObject({ id: 1, prescreen })
+  expect(fake.prescreens).toEqual([{ id: 1, prescreen }])
+})
+
+test('a refused pre-screen is a CliError naming the request', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'ready' }))
+
+  await expect(client().setPrescreen(1, { verdict: 'promising', reason: 'Fits.' })).rejects.toMatchObject({
+    exitCode: 1,
+    message: 'job-app POST /api/ads/1/prescreen: 409 an ad cannot be pre-screened from ready',
+  })
+})
+
 test('an ad list that is not a list is a bad response', async () => {
   fake.failure = 'malformed'
 
