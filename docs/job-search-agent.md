@@ -76,6 +76,9 @@ For `/sdlc` Stage 1 when pointed at this file:
 A plain Node runner in a new top-level `agent/` directory is what the timer
 starts. It speaks HTTP to the job-app API as `mcp/` does and opens no database.
 
+[`in-app-agent.md`](in-app-agent.md) adds a Claude API engine for the model
+steps and runs started from the UI (streams 049–052).
+
 | Step | Done by | Model involved |
 |---|---|---|
 | Collect alerts, fetch public ad pages | runner + connectors | no |

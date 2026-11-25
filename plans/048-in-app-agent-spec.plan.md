@@ -138,6 +138,20 @@ one line in §1 pointing to `docs/in-app-agent.md`.
    files shows the fallback is kept until 052.
 5. Commit on `048-in-app-agent-spec` with the noreply author and committer.
 
+## Departures found while building
+
+- `collect.ts` doesn't take `run.lock` today (only `run.ts` does), so
+  decision 1's "the lock stops overlap" didn't hold for Check mail. The spec
+  (§1) and brief 051 make `collect.ts` take the lock.
+- Decision 6's "per-model prices in config" became the key `api.prices`,
+  with a missing price for a configured model exiting 2. The repo carries no
+  prices.
+- The API step caps tool rounds at 8 (`bad_output` past it) and bounds the
+  call by the step's existing `timeoutMs`. The spawn env is an allowlist
+  plus `NODE_EXTRA_CA_CERTS`, and the server closes orphaned `agent_runs`
+  rows at start. The spec records these details. The decisions didn't name
+  them.
+
 ## Parallel streams
 
 None in flight: the overlap check found no unmerged branch with a plan. 049
