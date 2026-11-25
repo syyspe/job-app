@@ -31,7 +31,7 @@ pipeline (§1), permissions (§2), private configuration (§3) and daily run
 
 | Stream | Brief | State | Needs |
 |---|---|---|---|
-| `048-in-app-agent-spec` | committed | in progress | — |
+| `048-in-app-agent-spec` | committed | done | — |
 | `049-api-steps` | committed | open | — |
 | `050-spend-caps` | committed | open | 049 |
 | `051-run-from-ui` | committed | open | — |

@@ -73,6 +73,9 @@ Order in `docs/in-app-agent.md` §8: first, alongside 051. Needs: nothing.
 
 - Whether the system prompt and the tool definitions share one cache
   breakpoint or take two. The plan decides against the SDK's caching rules.
+- Whether a refusal falls back server-side (the `fallbacks` parameter on the
+  Sonnet and Opus steps) before it counts as `bad_output`. The plan decides,
+  and records it in `docs/in-app-agent.md` §4's failure table.
 
 ---
 
