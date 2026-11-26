@@ -398,6 +398,8 @@ on the server. Any other same-state request is 409.
 The evaluation step's categories are `timeout`, `cli_failed` (a non-zero exit
 or `is_error`, a usage limit included), `bad_output` (stdout is not the JSON
 result envelope) and `invalid_result` (the runner's own schema check failed).
+Under `engine: "api"`, [`in-app-agent.md`](in-app-agent.md) §4 maps the API
+outcomes onto the same categories.
 
 Retrying from `failed` must target the ad's mode, otherwise 409, and resets
 `attempts`, `last_error` and `evaluation`.

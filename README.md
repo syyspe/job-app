@@ -293,8 +293,10 @@ Rebuild after adding, changing or removing corpus files, or after changing
 
 `agent:evaluate` screens new ads in the inbox by title and evaluates the
 ready ones against your criteria, each ad in its own sandboxed `claude -p`
-process whose only tool is `search_profile`. It needs the profile corpus set
-up as above, the job-app env file, and a logged-in `claude` CLI on `PATH`.
+process whose only tool is `search_profile`, or, under `engine: "api"`, its
+own Claude API call (see "Engine" below). It needs the profile corpus set up
+as above, the job-app env file, and, under the default `engine: "cli"`, a
+logged-in `claude` CLI on `PATH`.
 
 ### Setup
 
@@ -386,6 +388,10 @@ since they share the engine. Once the month reaches `monthlyUsd`, no new
 step starts in any command, and the command prints `stopped: API monthly cap
 reached: $30.00 of $30.00` until the next month begins. A ledger that
 isn't valid JSON of that shape exits 2 naming the file: fix or delete it.
+
+Under `"api"`, a step whose API call fails (any 4xx, or a 5xx or overload
+after the SDK's retries) records `cli_failed`, the same category a failed
+`claude -p` records; the name stays until the CLI engine is retired.
 
 Whenever a daily run made an API call, its summary ends with
 `Claude API: $0.42 this run, $4.12 this month of $30.00` before the job-app
