@@ -165,8 +165,15 @@ function modelLines(report: DailyReport): string[] {
   ]
 }
 
+// Last on stdout: the run panel reads the figures from this line.
+function spendLines({ apiSpend }: DailyReport): string[] {
+  if (!apiSpend) return []
+  return [`api: $${apiSpend.runUsd.toFixed(2)} run, $${apiSpend.monthUsd.toFixed(2)} month`]
+}
+
 function printReport(report: DailyReport): void {
-  for (const line of [...earlyLines(report), ...modelLines(report), summaryLine(report)]) console.log(line)
+  const lines = [...earlyLines(report), ...modelLines(report), summaryLine(report), ...spendLines(report)]
+  for (const line of lines) console.log(line)
   for (const { step, message } of report.failures) console.error(`${step} failed: ${message}`)
 }
 

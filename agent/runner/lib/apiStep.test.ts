@@ -3,6 +3,7 @@ import { APIConnectionError, APIConnectionTimeoutError } from '@anthropic-ai/sdk
 import { beforeEach, expect, test } from 'vitest'
 import { apiError, fakeAnthropic, message, text, thinking, toolUse, USAGE } from '../../test/fakeAnthropic.ts'
 import type { FakeReply } from '../../test/fakeAnthropic.ts'
+import { memoryLedger } from '../../test/memoryLedger.ts'
 import { CliError } from '../../lib/cliError.ts'
 import type { SearchRequest, SearchResult } from '../../profile/lib/search.ts'
 import { createRunBudget } from './apiBudget.ts'
@@ -18,7 +19,7 @@ let searches: SearchRequest[]
 let search: (request: SearchRequest) => Promise<SearchResult[]>
 
 beforeEach(() => {
-  budget = createRunBudget({ perRunUsd: 1_000_000, prices: { 'claude-test': price } })
+  budget = createRunBudget({ perRunUsd: 1_000_000, monthlyUsd: 1_000_000, prices: { 'claude-test': price }, ledger: memoryLedger() })
   searches = []
   search = async () => [result]
 })
@@ -190,7 +191,12 @@ test('an error from outside the SDK is rethrown', async () => {
 
 test('every response is charged to the budget', async () => {
   // 100 input tokens at $1 each per response: two responses reach a $200 cap.
-  budget = createRunBudget({ perRunUsd: 2 * USAGE.input_tokens, prices: { 'claude-test': price } })
+  budget = createRunBudget({
+    perRunUsd: 2 * USAGE.input_tokens,
+    monthlyUsd: 1_000_000,
+    prices: { 'claude-test': price },
+    ledger: memoryLedger(),
+  })
   const { run } = step([message('tool_use', [toolUse('t', { query: 'x' })]), done])
 
   await run('{}')

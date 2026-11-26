@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState } from 'react'
-import { RUN_KIND_LABELS, RUN_OUTCOME_LABELS, runOutcome } from '../lib/agentRuns.ts'
+import { RUN_KIND_LABELS, RUN_OUTCOME_LABELS, runOutcome, runSpend } from '../lib/agentRuns.ts'
 import { listAgentRuns, startAgentRun } from '../lib/api.ts'
 import { useApiAction } from '../lib/apiAction.ts'
 import { formatTimestamp } from '../lib/dates.ts'
@@ -62,12 +62,14 @@ function CurrentRun({ run }: { run: AgentRun }) {
 
 function RecentRun({ run, open }: { run: AgentRun; open: boolean }) {
   const outcome = runOutcome(run)
+  const spend = runSpend(run.output)
   return (
     <li className="run-item" data-outcome={outcome}>
       <p className="run-item-head">
         <span className="run-kind">{RUN_KIND_LABELS[run.kind]}</span>
         <span className="run-time">{formatTimestamp(run.startedAt)}</span>
         <span className="run-outcome">{RUN_OUTCOME_LABELS[outcome]}</span>
+        {spend && <span className="run-spend">{`API $${spend.run} run, $${spend.month} month`}</span>}
       </p>
       <details open={open}>
         <summary>Output</summary>

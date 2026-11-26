@@ -21,6 +21,19 @@ test('nothing to report composes the empty summary', () => {
   })
 })
 
+test('API spend adds its line just before the link', () => {
+  const apiSpend = { runUsd: 0.4234, monthUsd: 4.1, monthlyUsd: 30 }
+  const summary = composeSummary({ ads: [], ...none, sourceFailures: [], problems: [], apiSpend, appUrl })
+
+  expect(summary.text).toBe(`Claude API: $0.42 this run, $4.10 this month of $30.00\n\nOpen job-app: ${appUrl}\n`)
+})
+
+test('no API spend adds no line', () => {
+  const summary = composeSummary({ ads: [], ...none, sourceFailures: [], problems: [], apiSpend: null, appUrl })
+
+  expect(summary.text).not.toContain('Claude API')
+})
+
 test('a lanUrl adds a second link directly under the first', () => {
   const lanUrl = 'https://192.0.2.1:3001'
   const summary = composeSummary({ ads: [], ...none, sourceFailures: [], problems: [], appUrl, lanUrl })

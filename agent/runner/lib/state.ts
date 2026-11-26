@@ -51,7 +51,7 @@ function parseJson(text: string): unknown {
   }
 }
 
-function readState<T>(path: string, schema: z.ZodType<T>, missing: T): T {
+export function readState<T>(path: string, schema: z.ZodType<T>, missing: T): T {
   let text: string
   try {
     text = readFileSync(path, 'utf8')
@@ -65,7 +65,7 @@ function readState<T>(path: string, schema: z.ZodType<T>, missing: T): T {
 }
 
 // A temp file and a rename, so a crash never leaves a half-written file.
-function writeState(path: string, value: unknown): void {
+export function writeState(path: string, value: unknown): void {
   mkdirSync(join(path, '..'), { recursive: true })
   writeFileSync(`${path}.tmp`, `${JSON.stringify(value, null, 2)}\n`)
   renameSync(`${path}.tmp`, path)

@@ -132,6 +132,22 @@ test('a finished run shows its outcome, the newest with its output open', async 
   expect(items[1].querySelector('details')).not.toHaveAttribute('open')
 })
 
+test('a run whose output ends with the api line shows its spend, a collect run shows none', async () => {
+  const daily = sampleRun({
+    id: 3,
+    kind: 'run',
+    finishedAt: '2026-11-26T09:00:00.000Z',
+    exitCode: 0,
+    output: 'summary: sent\napi: $0.42 run, $4.12 month\n',
+  })
+  stubRuns([{ current: null, recent: [daily, finished] }])
+  renderPanel()
+
+  const items = await within(screen.getByRole('list', { name: 'Recent runs' })).findAllByRole('listitem')
+  expect(within(items[0]).getByText('API $0.42 run, $4.12 month')).toBeVisible()
+  expect(items[1]).not.toHaveTextContent('API $')
+})
+
 test('a run already in progress shows the error toast', async () => {
   const user = userEvent.setup()
   stubRuns([{ current: null, recent: [] }], () => json({ error: 'a run is already in progress' }, 409))

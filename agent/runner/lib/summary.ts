@@ -1,3 +1,4 @@
+import type { ApiSpend } from './apiBudget.ts'
 import type { AdSummary } from './jobApp.ts'
 import type { SourceFailure } from './state.ts'
 
@@ -21,6 +22,8 @@ export interface SummaryInput {
   tally: PrescreenTally
   sourceFailures: SourceFailure[]
   problems: Problem[]
+  // Set whenever the run made a Claude API call.
+  apiSpend?: ApiSpend | null
   appUrl: string
   lanUrl?: string
 }
@@ -79,6 +82,12 @@ function tallyLines({ promising, notPromising }: PrescreenTally): string[] {
   return [`Pre-screen vs. Fetch, last ${TALLY_DAYS} days: ${counts}`, '']
 }
 
+function spendLines(spend: ApiSpend | null | undefined): string[] {
+  if (!spend) return []
+  const { runUsd, monthUsd, monthlyUsd } = spend
+  return [`Claude API: $${runUsd.toFixed(2)} this run, $${monthUsd.toFixed(2)} this month of $${monthlyUsd.toFixed(2)}`, '']
+}
+
 function subjectOf(input: SummaryInput): string {
   const { ads, sourceFailures, problems } = input
   return [
@@ -90,7 +99,8 @@ function subjectOf(input: SummaryInput): string {
   ].join(', ')
 }
 
-function bodyOf({ ads, prescreened, tally, sourceFailures, problems, appUrl, lanUrl }: SummaryInput): string {
+function bodyOf(input: SummaryInput): string {
+  const { ads, prescreened, tally, sourceFailures, problems, apiSpend, appUrl, lanUrl } = input
   return [
     ...section('Drafts', inState(ads, 'drafted').map((ad) => `${ad.title}, ${ad.company} (application ${ad.applicationId})`)),
     ...section('Pre-screened', prescreened.map(prescreenLine)),
@@ -102,6 +112,7 @@ function bodyOf({ ads, prescreened, tally, sourceFailures, problems, appUrl, lan
     ...section('Failed', inState(ads, 'failed').map((ad) => `${ad.title}, ${ad.source}: ${ad.lastError}`)),
     ...section('Source failures', sourceFailures.map(({ source, date, kind }) => `${source} ${date} ${kind}`)),
     ...section('Problems', problems.map(({ step, message }) => `${step}: ${message}`)),
+    ...spendLines(apiSpend),
     `Open job-app: ${appUrl}`,
     ...(lanUrl ? [`Open job-app (LAN): ${lanUrl}`] : []),
     '',

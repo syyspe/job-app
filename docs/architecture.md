@@ -50,7 +50,8 @@ Presentational components, each with a test beside it. By surface:
   over `AdList`, `AdRow` and `AdHandoverForm`. `AdRow` offers Fetch on a
   waiting hand-over ad and shows its pre-screen verdict. Above the filter,
   for admins only, `AgentRunPanel`: Run now and Check mail, the current
-  run's output (polled every 3 s while it runs) and the last ten runs; a
+  run's output (polled every 3 s while it runs) and the last ten runs, each
+  with its Claude API spend when its output ends with the `api:` line; a
   run finishing refreshes the inbox.
 - **Frame** — `NavBar`, which switches between the views and shows the Admin
   control to admins only; `ToastProvider` and `ToastHost`.
@@ -64,7 +65,8 @@ Presentational components, each with a test beside it. By surface:
   data hooks share: it shows the success toast, and on `UnauthorizedError`
   shows the session-expired toast and calls `onUnauthorized`.
 - `agentRuns.ts` — `RUN_KIND_LABELS`, `runOutcome` (exit 0 succeeded,
-  non-zero failed, none interrupted) and `RUN_OUTCOME_LABELS`.
+  non-zero failed, none interrupted), `RUN_OUTCOME_LABELS`, and `runSpend`,
+  which reads the last `api: $x run, $y month` line from a run's output.
 - `adStates.ts` — `AD_STATE_LABELS`, the filter's display order, and which
   actions each ad state offers.
 - `paging.ts` — `paginate`, the pure one-page-at-a-time slice. The page size
@@ -346,7 +348,7 @@ criteria that follow it. `prompts/draft.framing.md` and
   connector present (missing means disabled) and the exit-2 refusals;
   `loadDailyRunConfig(path)`: `handoverWaitDays` and `summary.recipient`,
   read only by `agent:run`; `loadEngineConfig(path)`: `engine` and `api`
-  (models, effort, `perRunUsd`, prices), refusing an unpriced model under
+  (models, effort, `perRunUsd`, `monthlyUsd`, prices), refusing an unpriced model under
   `"api"`.
 - `mapLimit.ts` — `mapLimit(items, {limit, canStart}, fn)`, order-keeping
   bounded concurrency for the runs; once `canStart` is false no further item
@@ -354,15 +356,22 @@ criteria that follow it. `prompts/draft.framing.md` and
 - `engine.ts` — `createEngine(config, deps)` and `loadEngine(env, profile)`:
   `stepFor(spec)` gives a step's `RunStep`, a sandboxed `claude -p` under
   `"cli"` (with the `UNLIMITED` budget) or the API step under `"api"` (with a
-  run budget). It builds objects only, with no network.
+  run budget charging `<stateDir>/api-spend.json`). It builds objects only,
+  with no network or file I/O.
 - `apiStep.ts` — `createApiStep(options)`: one Messages conversation per
   call, `search_profile` its only tool and answered in-process, at most 8
   tool rounds, the whole call under one `timeoutMs` signal, and the SDK's
   errors mapped onto the failure categories (a 401 or 403 also stops the
   budget). `MessagesApi` is the narrow client a fake satisfies.
 - `apiBudget.ts` — `responseCost(price, usage)`, the `StepBudget` interface,
-  `UNLIMITED`, and `createRunBudget`, which stops new steps at `perRunUsd`
-  or on `stop(reason)`.
+  `UNLIMITED`, and `createRunBudget`, which charges each response to the run
+  and the month's ledger and stops new steps on `stop(reason)`, at
+  `perRunUsd`, or once the month reaches `monthlyUsd`, in that order.
+  `spend()` gives the run's and the month's figures once a call was made.
+- `apiSpend.ts` — `createSpendLedger(path, now)`: `monthTotal()` and
+  `add(usd)` over `api-spend.json` (`{ months: { "YYYY-MM": usd } }`, local
+  months), re-read on every call and written through `state.ts`'s
+  `writeState`, keeping only the current and previous month.
 - `prompts.ts` — `buildSystemPrompt(framing, rules)`: the fixed framing
   first, then the private rules.
 - `titleRules.ts` — `matchesReject(title, phrases)` (whole-word,
@@ -376,7 +385,8 @@ criteria that follow it. `prompts/draft.framing.md` and
 - `state.ts` — `createRunnerState(stateDir)`: the mail watermark, the daily
   source counters and the source failure list (`removeFailures` drops the
   ones a sent summary covered), each a JSON file written through a temp file
-  and a rename; `localDate(now)`.
+  and a rename; `localDate(now)`, and the `readState`/`writeState` helpers
+  the spend ledger reuses.
 - `lock.ts` — `acquireRunLock(stateDir)` → `release`: `run.lock` created
   exclusively with the pid; a holder whose `/proc/<pid>/cmdline` still names
   `agent/runner/commands/run.ts` or `collect.ts` is `CliError(1, …)`; any other holder (gone,
@@ -394,13 +404,14 @@ criteria that follow it. `prompts/draft.framing.md` and
   command refused with its code.
 - `summary.ts` — `composeSummary(input)`: subject and plain-text body from
   the unreported ads, the run's pre-screens with `prescreenTally`'s 14-day
-  verdict-vs-click count, source failures and problems; `isEmpty` says when
+  verdict-vs-click count, source failures and problems, and a `Claude API:`
+  spend line when the run made an API call; `isEmpty` says when
   there is nothing to send. Ad text has control characters and line breaks replaced.
 - `dailyRun.ts` — `runDaily(options)`, every dependency injected: collect,
   expire, one health check and the gate (`ensureSandboxVerified`, or `null`
   under `"api"`), then sync, pre-screen, hand-over fetch, evaluation and
   drafting under the budget's `canStart`, then the summary, which names the
-  budget's stop reason. A `CliError` in a step is
+  budget's stop reason and its `spend()` (on `report.apiSpend`). A `CliError` in a step is
   recorded as a failure and the run goes on; anything else propagates.
 - `politeHttp.ts` — `createPoliteHttp(options)`: the only network path a
   connector has. It checks scheme and host on the URL and every redirect,
@@ -476,6 +487,10 @@ criteria that follow it. `prompts/draft.framing.md` and
   `(source, externalId)`, record attempts, fail an ad on the third and draft
   only a suitable ad, as the server does.
 - `fakeMailbox.ts` — an in-memory `Mailbox` that records the UIDs read after.
+- `memoryLedger.ts` — `memoryLedger(monthUsd)`, an in-memory `SpendLedger`.
+- `dailyRunFixture.ts` — `startDailyRun()`: a fake job-app, runner state, a
+  mailbox, and `options(overrides)` for `runDaily` recording each step and
+  sent summary; shared by `dailyRun.test.ts` and `dailyRun.budget.test.ts`.
 - `fakeSmtp.ts` — a plain-TCP SMTP stand-in: records every command and the
   decoded message, and can refuse a chosen verb with a code, drop the
   connection or never greet.

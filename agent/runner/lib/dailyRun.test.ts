@@ -1,133 +1,37 @@
 // @vitest-environment node
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { CliError } from '../../lib/cliError.ts'
-import { startFakeJobApp } from '../../test/fakeJobApp.ts'
+import { startDailyRun } from '../../test/dailyRunFixture.ts'
+import type { DailyRunFixture, Overrides } from '../../test/dailyRunFixture.ts'
 import type { FakeJobApp } from '../../test/fakeJobApp.ts'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
-import { fakeMailbox } from '../../test/fakeMailbox.ts'
 import type { FakeMailbox } from '../../test/fakeMailbox.ts'
-import { makeTempDir } from '../../test/tempDir.ts'
-import type { TempDir } from '../../test/tempDir.ts'
-import type { HealthResult } from '../../profile/lib/ollama.ts'
-import { createRunBudget } from './apiBudget.ts'
 import { runDaily } from './dailyRun.ts'
-import type { DailyRunOptions } from './dailyRun.ts'
-import type { DraftOutcome } from './draft.ts'
 import type { EvaluationOutcome } from './evaluate.ts'
-import { createJobAppClient } from './jobApp.ts'
-import type { PrescreenOutcome } from './prescreen.ts'
 import type { MailMessage } from './smtp.ts'
-import type { SourceConnector } from './sources/types.ts'
-import { createRunnerState } from './state.ts'
 import type { RunnerState } from './state.ts'
 
+let fixture: DailyRunFixture
 let fake: FakeJobApp
-let dir: TempDir
 let state: RunnerState
 let mailbox: FakeMailbox
 let sent: MailMessage[]
 let steps: string[]
 
 beforeEach(async () => {
-  fake = await startFakeJobApp()
-  dir = makeTempDir()
-  state = createRunnerState(dir.root)
-  mailbox = fakeMailbox([])
-  sent = []
-  steps = []
+  fixture = await startDailyRun()
+  fake = fixture.fake
+  state = fixture.state
+  mailbox = fixture.mailbox
+  sent = fixture.sent
+  steps = fixture.steps
 })
 
 afterEach(async () => {
-  dir.remove()
-  await fake.close()
+  await fixture.close()
 })
 
-const suitable: EvaluationOutcome = {
-  kind: 'evaluated',
-  transition: { to: 'suitable', evaluation: { verdict: 'suitable', fitSummary: 'Fits.', reasons: [] } },
-}
-
-const written: DraftOutcome = {
-  kind: 'written',
-  output: {
-    language: 'en',
-    applicationType: 'portal',
-    company: '',
-    role: '',
-    applyTo: '',
-    fitSummary: 'Fits.',
-    coverLetter: 'Letter.',
-    cv: 'CV',
-    questions: [],
-  },
-}
-
-const NOW = new Date(2026, 10, 20, 20, 0)
-
-const promising: PrescreenOutcome = { kind: 'screened', prescreen: { verdict: 'promising', reason: 'Test work.' } }
-
-// A hand-over source that fetches: every page holds the same ad text.
-const fetching: SourceConnector = {
-  id: 'fetching',
-  mode: 'handover',
-  fetchHosts: ['fetching.example'],
-  matches: () => false,
-  parseAlert: () => [],
-  fetchAd: async () => (steps.push('fetch'), { kind: 'ok', text: 'The fetched ad.' }),
-}
-
-const FETCHING_ON = { enabled: true, termsCheckedOn: '2026-11-23', dailyOpenCap: 20, minDelayMs: 1000, fetch: 'requested' as const }
-
-interface Overrides {
-  health?: HealthResult
-  gate?: DailyRunOptions['gate']
-  budget?: DailyRunOptions['budget']
-  send?: DailyRunOptions['send']
-  openMailbox?: DailyRunOptions['openMailbox']
-  evaluate?: () => Promise<EvaluationOutcome>
-  alwaysSend?: boolean
-  lanUrl?: string
-}
-
-function options(overrides: Overrides = {}): DailyRunOptions {
-  const jobApp = createJobAppClient({ baseUrl: fake.url, username: fake.username, password: fake.password, envPath: 'env' })
-  const evaluation = { concurrency: 1, perRunCap: 1, timeoutMs: 1000 }
-  const drafting = { concurrency: 1, perRunCap: 1, timeoutMs: 1000, filePrefix: 'T', cvTemplates: { fi: '/fi', en: '/en' } }
-  return {
-    jobApp,
-    state,
-    openMailbox: overrides.openMailbox ?? (async () => (steps.push('collect'), mailbox)),
-    collect: { connectors: [], sources: {}, titleRules: [], today: '2026-11-20', httpFor: () => { throw new Error('no fetch') } },
-    handoverWaitDays: 7,
-    checkHealth: async () => (steps.push('health'), overrides.health ?? { ok: true }),
-    gate: overrides.gate ?? (async () => (steps.push('gate'), { version: '9.9.9', reverified: false })),
-    budget: overrides.budget,
-    sync: null,
-    prescreen: {
-      config: { concurrency: 1, perRunCap: 10, timeoutMs: 1000 },
-      prescreen: async () => (steps.push('prescreen'), promising),
-    },
-    handoverFetch: {
-      connectors: [fetching],
-      sources: { fetching: FETCHING_ON },
-      today: '2026-11-20',
-      httpFor: () => ({ dayEnded: false, get: async () => ({ kind: 'gone' }) }),
-    },
-    evaluation: {
-      config: { titleRules: { reject: [] }, evaluation },
-      evaluate: overrides.evaluate ?? (async () => (steps.push('evaluate'), suitable)),
-    },
-    drafting: { config: drafting, write: async () => (steps.push('draft'), written), today: '2026-11-20' },
-    summary: {
-      recipient: 'me@mail.example',
-      alwaysSend: overrides.alwaysSend ?? false,
-      appUrl: 'https://jobs.lan.example',
-      lanUrl: overrides.lanUrl,
-    },
-    send: overrides.send ?? (async (message) => void (steps.push('send'), sent.push(message))),
-    now: () => NOW,
-  }
-}
+const options = (overrides: Overrides = {}) => fixture.options(overrides)
 
 test('steps run in order and the drafted ad is reported once', async () => {
   fake.ads.push(fakeAd({ id: 1, state: 'ready', firstSeenAt: '2026-11-20 08:00:00' }))
@@ -345,29 +249,4 @@ test('a gate resolving null runs the model steps with no sandbox recorded', asyn
   expect(steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'draft', 'send'])
   expect(report.sandbox).toBeNull()
   expect(report.stopped).toBeNull()
-})
-
-test('a budget stopping mid-evaluation starts no further step and the summary names it', async () => {
-  fake.ads.push(
-    fakeAd({ id: 1, state: 'ready', firstSeenAt: '2026-11-20 08:00:00' }),
-    fakeAd({ id: 2, state: 'ready', firstSeenAt: '2026-11-20 09:00:00' }),
-  )
-  const budget = createRunBudget({ perRunUsd: 3, prices: {} })
-  const evaluate = async () => {
-    steps.push('evaluate')
-    budget.stop('API run cap reached at $3.00')
-    return suitable
-  }
-  const opts = options({ budget, evaluate })
-  opts.evaluation.config.evaluation.perRunCap = 2
-
-  const report = await runDaily(opts)
-
-  expect(steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'send'])
-  expect(report.evaluation?.queued).toBe(1)
-  expect(report.drafting?.queued).toBe(1)
-  expect(report.stopped).toEqual({ step: 'model steps', message: 'API run cap reached at $3.00' })
-  expect(report.failures).toEqual([])
-  expect(fake.ads.map((ad) => [ad.state, ad.attempts])).toEqual([['suitable', 0], ['ready', 0]])
-  expect(sent[0].text).toContain('- model steps: API run cap reached at $3.00')
 })

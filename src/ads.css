@@ -239,6 +239,11 @@
   color: var(--ink-muted);
 }
 
+/* Spend is information, not something needing the user. */
+.run-spend {
+  color: var(--ink-muted);
+}
+
 .run-item[data-outcome='succeeded'] .run-kind,
 .run-item[data-outcome='interrupted'] .run-kind,
 .run-item[data-outcome='succeeded'] .run-outcome,
