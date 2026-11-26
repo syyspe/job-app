@@ -314,9 +314,9 @@ INBOX only, read-only: nothing is flagged, moved or deleted. State files in
   for the local date, reset when the date changes.
 - `source-failures.json`: `[{ source, date, kind }]`, `kind` being `blocked`
   or `empty_alert`. `038` appends; `039-daily-run` reports and clears.
-- `run.lock`: the pid of the `agent:run` holding it, created exclusively. A
-  lock whose pid is no longer running `agent:run` (exited, or reused after a
-  reboot by another process) is stale and taken over.
+- `run.lock`: the pid of the `agent:run` or `agent:collect` holding it,
+  created exclusively. A lock whose pid is no longer running either (exited,
+  or reused after a reboot by another process) is stale and taken over.
 - `logs/`: `run-YYYY-MM-DD.log`, everything a day's `daily-run.sh` printed,
   and `server.log`, from a job-app it started.
 

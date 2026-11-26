@@ -52,10 +52,10 @@ function stubAds(ads: AdSummary[]) {
   return stubFetch(() => new Response(JSON.stringify(ads), { status: 200 }))
 }
 
-function renderView(onUnauthorized = vi.fn()) {
+function renderView(onUnauthorized = vi.fn(), isAdmin = false) {
   render(
     <ToastProvider>
-      <AdsView onUnauthorized={onUnauthorized} />
+      <AdsView onUnauthorized={onUnauthorized} isAdmin={isAdmin} />
     </ToastProvider>,
   )
 }
@@ -74,6 +74,28 @@ test('opens on the ads waiting for a hand-over', async () => {
     'aria-pressed',
     'true',
   )
+})
+
+test('a basic user sees no run panel', async () => {
+  stubAds([waiting])
+  renderView()
+  await screen.findByText('Waiting ad')
+
+  expect(screen.queryByRole('region', { name: 'Runs' })).not.toBeInTheDocument()
+})
+
+test('an admin sees the run panel above the filter', async () => {
+  stubFetch((url) =>
+    url === '/api/agent/runs'
+      ? new Response(JSON.stringify({ current: null, recent: [] }), { status: 200 })
+      : new Response(JSON.stringify([waiting]), { status: 200 }),
+  )
+  renderView(vi.fn(), true)
+
+  const panel = await screen.findByRole('region', { name: 'Runs' })
+  expect(within(panel).getByRole('button', { name: 'Check mail' })).toBeVisible()
+  const filter = screen.getByRole('group', { name: 'Filter ads by state' })
+  expect(panel.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
 test('orders the state filters by urgency', async () => {

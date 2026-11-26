@@ -3,6 +3,7 @@ import type { Application as ExpressApp } from 'express'
 import type Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { createAdsRouter } from './routes/ads.ts'
+import { createAgentRunsRouter } from './routes/agentRuns.ts'
 import { createApplicationsRouter } from './routes/applications.ts'
 import { createAttachmentsRouter } from './routes/attachments.ts'
 import { createAuthRouter } from './routes/auth.ts'
@@ -13,6 +14,7 @@ import { requireAdmin, requireSession } from './middleware/auth.ts'
 import { requireParsableBody } from './middleware/contentType.ts'
 import { jsonErrorHandler } from './middleware/errors.ts'
 import { requestLogging } from './middleware/requestLogging.ts'
+import type { RunnerSpawner } from './lib/agentRunner.ts'
 import { DEFAULT_PAGE_SIZE } from './lib/config.ts'
 import { createLogger } from './lib/logger.ts'
 import type { Logger } from './lib/logger.ts'
@@ -22,6 +24,15 @@ type CreateAppOptions = {
   pageSize?: number
   logger?: Logger
   secureCookies?: boolean
+  // Without one the app has no run routes.
+  runner?: RunnerSpawner
+}
+
+// Runs spawn the runner with its credentials and spend, so they are admin-only.
+function mountAgentRuns(app: ExpressApp, db: Database.Database, runner: RunnerSpawner | undefined): void {
+  if (!runner) return
+  app.use('/api/agent', requireAdmin(db))
+  app.use('/api', createAgentRunsRouter(db, runner))
 }
 
 export function createApp(
@@ -32,6 +43,7 @@ export function createApp(
     pageSize = DEFAULT_PAGE_SIZE,
     logger = createLogger('silent'),
     secureCookies = false,
+    runner,
   }: CreateAppOptions = {},
 ): ExpressApp {
   const app = express()
@@ -45,6 +57,7 @@ export function createApp(
   app.use('/api', createAttachmentsRouter(db, uploadsDir))
   app.use('/api', createQuestionsRouter(db, uploadsDir))
   app.use('/api', createAdsRouter(db, uploadsDir))
+  mountAgentRuns(app, db, runner)
   app.use('/api/users', requireAdmin(db))
   app.use('/api', createUsersRouter(db, uploadsDir))
   if (staticDir) {

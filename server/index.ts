@@ -1,7 +1,10 @@
+import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import { createServer } from 'node:https'
 import { openDatabase } from './db/index.ts'
 import { createApp } from './app.ts'
+import { createRunnerSpawner, REPO_ROOT } from './lib/agentRunner.ts'
+import { closeInterruptedRuns } from './lib/agentRuns.ts'
 import { parseLogLevel, parsePageSize, parseTls } from './lib/config.ts'
 import { createLogger } from './lib/logger.ts'
 
@@ -30,11 +33,17 @@ const staticDir = join(import.meta.dirname, '../dist')
 const port = process.env.PORT === undefined ? 3001 : Number(process.env.PORT)
 
 const db = openDatabase(dbPath)
+const interrupted = closeInterruptedRuns(db)
+if (interrupted > 0) logger.info('interrupted agent runs closed', { count: interrupted })
+
+// AGENT_RUNNER_ROOT is for tests: e2e points it at stub commands.
+const runner = createRunnerSpawner(spawn, process.env.AGENT_RUNNER_ROOT || REPO_ROOT, process.env)
 const app = createApp(db, uploadsDir, {
   staticDir,
   pageSize,
   logger,
   secureCookies: tls !== undefined,
+  runner,
 })
 
 function onListening() {

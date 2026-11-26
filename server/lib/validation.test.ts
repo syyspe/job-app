@@ -5,6 +5,7 @@ import {
   validateInput,
   validatePassword,
   validateRole,
+  validateRunKind,
   validateUserInput,
 } from './validation.ts'
 
@@ -27,7 +28,7 @@ function rejectionOf(validate: () => unknown): HttpError {
 }
 
 test.each([undefined, null, 'text', 42, []])('%o is not a JSON object', (body) => {
-  for (const validate of [validateInput, validateUserInput, validateRole, validatePassword]) {
+  for (const validate of [validateInput, validateUserInput, validateRole, validatePassword, validateRunKind]) {
     const error = rejectionOf(() => validate(body))
     expect(error).toBeInstanceOf(HttpError)
     expect(error.status).toBe(400)
@@ -77,4 +78,14 @@ test('a role or a password on its own is checked the same way', () => {
   expect(rejectionOf(() => validatePassword({ password: 42 })).message).toBe(
     'password is required',
   )
+})
+
+test.each([{}, { kind: 'deploy' }, { kind: 1 }])('%o has no valid run kind', (body) => {
+  const error = rejectionOf(() => validateRunKind(body))
+  expect(error.status).toBe(400)
+  expect(error.message).toBe('kind must be one of: run, collect')
+})
+
+test('a known run kind is returned', () => {
+  expect(validateRunKind({ kind: 'collect' })).toBe('collect')
 })

@@ -8,6 +8,24 @@ export interface User {
   role: Role
 }
 
+export const AGENT_RUN_KINDS = ['run', 'collect'] as const
+
+export type AgentRunKind = (typeof AGENT_RUN_KINDS)[number]
+
+export interface AgentRun {
+  id: number
+  kind: AgentRunKind
+  startedAt: string
+  finishedAt: string | null
+  exitCode: number | null
+  output: string
+}
+
+export interface AgentRuns {
+  current: AgentRun | null
+  recent: AgentRun[]
+}
+
 export interface AppConfig {
   pageSize: number
 }

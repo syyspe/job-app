@@ -1,5 +1,5 @@
-import { ROLES, STATUSES } from '../types.ts'
-import type { Role } from '../types.ts'
+import { AGENT_RUN_KINDS, ROLES, STATUSES } from '../types.ts'
+import type { AgentRunKind, Role } from '../types.ts'
 import { HttpError } from './httpError.ts'
 
 export interface ApplicationInput {
@@ -83,4 +83,16 @@ export function validateRole(body: unknown): Role {
 
 export function validatePassword(body: unknown): string {
   return passwordOf(fieldsOf(body))
+}
+
+function isRunKind(value: unknown): value is AgentRunKind {
+  return AGENT_RUN_KINDS.includes(value as AgentRunKind)
+}
+
+export function validateRunKind(body: unknown): AgentRunKind {
+  const { kind } = fieldsOf(body)
+  if (!isRunKind(kind)) {
+    throw new HttpError(400, `kind must be one of: ${AGENT_RUN_KINDS.join(', ')}`)
+  }
+  return kind
 }
