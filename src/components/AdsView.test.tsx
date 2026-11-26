@@ -52,10 +52,10 @@ function stubAds(ads: AdSummary[]) {
   return stubFetch(() => new Response(JSON.stringify(ads), { status: 200 }))
 }
 
-function renderView(onUnauthorized = vi.fn(), isAdmin = false) {
+function renderView(onUnauthorized = vi.fn(), canRunAgent = false) {
   render(
     <ToastProvider>
-      <AdsView onUnauthorized={onUnauthorized} isAdmin={isAdmin} />
+      <AdsView onUnauthorized={onUnauthorized} canRunAgent={canRunAgent} />
     </ToastProvider>,
   )
 }
@@ -76,7 +76,7 @@ test('opens on the ads waiting for a hand-over', async () => {
   )
 })
 
-test('a basic user sees no run panel', async () => {
+test('a user without agent access sees no run panel', async () => {
   stubAds([waiting])
   renderView()
   await screen.findByText('Waiting ad')
@@ -84,7 +84,7 @@ test('a basic user sees no run panel', async () => {
   expect(screen.queryByRole('region', { name: 'Runs' })).not.toBeInTheDocument()
 })
 
-test('an admin sees the run panel above the filter', async () => {
+test('a user with agent access sees the run panel above the filter', async () => {
   stubFetch((url) =>
     url === '/api/agent/runs'
       ? new Response(JSON.stringify({ current: null, recent: [] }), { status: 200 })

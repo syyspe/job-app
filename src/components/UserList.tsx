@@ -13,11 +13,13 @@ function EmptyState() {
 interface UserListProps {
   users: User[]
   onSetRole: (id: number, role: Role) => void
+  onSetAgentAccess: (id: number, agentAccess: boolean) => void
   onResetPassword: (id: number, password: string) => void
   onDelete: (id: number) => void
 }
 
-export function UserList({ users, onSetRole, onResetPassword, onDelete }: UserListProps) {
+export function UserList(props: UserListProps) {
+  const { users, onSetRole, onSetAgentAccess, onResetPassword, onDelete } = props
   if (users.length === 0) {
     return <EmptyState />
   }
@@ -29,6 +31,7 @@ export function UserList({ users, onSetRole, onResetPassword, onDelete }: UserLi
           key={user.id}
           user={user}
           onSetRole={(role) => onSetRole(user.id, role)}
+          onSetAgentAccess={(agentAccess) => onSetAgentAccess(user.id, agentAccess)}
           onResetPassword={(password) => onResetPassword(user.id, password)}
           onDelete={() => onDelete(user.id)}
         />

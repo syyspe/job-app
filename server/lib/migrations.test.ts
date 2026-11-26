@@ -11,6 +11,7 @@ import {
   migrateAttachmentEditedFrom,
   migrateAttachmentProfileSync,
   migrateAttachmentUploadedAt,
+  migrateUserAgentAccess,
   migrateUserRole,
 } from './migrations.ts'
 
@@ -140,6 +141,38 @@ test('migrating the user role twice is a no-op the second time', () => {
   expect(() => migrateUserRole(db)).not.toThrow()
   const user = db.prepare('SELECT role FROM users WHERE id = 1').get() as { role: string }
   expect(user.role).toBe('admin')
+})
+
+test('migrating a legacy database grants agent access to admins and not to basic users', () => {
+  migrateUserRole(db)
+  db.prepare(`UPDATE users SET role = 'admin' WHERE id = 1`).run()
+  db.prepare(
+    `INSERT INTO users (id, username, password_hash) VALUES (2, 'basicuser', 'hash')`,
+  ).run()
+
+  migrateUserAgentAccess(db)
+
+  const rows = db.prepare('SELECT id, agent_access FROM users ORDER BY id').all() as {
+    id: number
+    agent_access: number
+  }[]
+  expect(rows).toEqual([
+    { id: 1, agent_access: 1 },
+    { id: 2, agent_access: 0 },
+  ])
+})
+
+test('migrating agent access twice is a no-op the second time', () => {
+  migrateUserRole(db)
+  db.prepare(`UPDATE users SET role = 'admin' WHERE id = 1`).run()
+  migrateUserAgentAccess(db)
+  db.prepare('UPDATE users SET agent_access = 0 WHERE id = 1').run()
+
+  expect(() => migrateUserAgentAccess(db)).not.toThrow()
+  const user = db.prepare('SELECT agent_access FROM users WHERE id = 1').get() as {
+    agent_access: number
+  }
+  expect(user.agent_access).toBe(0)
 })
 
 test('migrating a legacy database gives existing attachments an empty uploaded_at', () => {

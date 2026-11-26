@@ -5,8 +5,8 @@ import App from './App'
 import { ToastProvider } from './components/ToastProvider'
 import type { Application, User } from './types'
 
-const sampleUser: User = { id: 1, username: 'testuser', role: 'admin' }
-const basicUser: User = { id: 2, username: 'basic-user', role: 'basic' }
+const sampleUser: User = { id: 1, username: 'testuser', role: 'admin', agentAccess: true }
+const basicUser: User = { id: 2, username: 'basic-user', role: 'basic', agentAccess: false }
 
 const sampleApplications: Application[] = [
   {

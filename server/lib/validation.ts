@@ -85,6 +85,12 @@ export function validatePassword(body: unknown): string {
   return passwordOf(fieldsOf(body))
 }
 
+export function validateAgentAccess(body: unknown): boolean {
+  const { agentAccess } = fieldsOf(body)
+  if (typeof agentAccess !== 'boolean') throw new HttpError(400, 'agentAccess must be a boolean')
+  return agentAccess
+}
+
 function isRunKind(value: unknown): value is AgentRunKind {
   return AGENT_RUN_KINDS.includes(value as AgentRunKind)
 }

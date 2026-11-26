@@ -2,6 +2,7 @@
 import { expect, test } from 'vitest'
 import { HttpError } from './httpError.ts'
 import {
+  validateAgentAccess,
   validateInput,
   validatePassword,
   validateRole,
@@ -28,7 +29,15 @@ function rejectionOf(validate: () => unknown): HttpError {
 }
 
 test.each([undefined, null, 'text', 42, []])('%o is not a JSON object', (body) => {
-  for (const validate of [validateInput, validateUserInput, validateRole, validatePassword, validateRunKind]) {
+  const validators = [
+    validateInput,
+    validateUserInput,
+    validateRole,
+    validatePassword,
+    validateRunKind,
+    validateAgentAccess,
+  ]
+  for (const validate of validators) {
     const error = rejectionOf(() => validate(body))
     expect(error).toBeInstanceOf(HttpError)
     expect(error.status).toBe(400)
@@ -88,4 +97,14 @@ test.each([{}, { kind: 'deploy' }, { kind: 1 }])('%o has no valid run kind', (bo
 
 test('a known run kind is returned', () => {
   expect(validateRunKind({ kind: 'collect' })).toBe('collect')
+})
+
+test.each([true, false])('agentAccess %o is returned', (agentAccess) => {
+  expect(validateAgentAccess({ agentAccess })).toBe(agentAccess)
+})
+
+test.each([{ agentAccess: 'true' }, { agentAccess: 1 }, {}])('%o has no boolean agentAccess', (body) => {
+  const error = rejectionOf(() => validateAgentAccess(body))
+  expect(error.status).toBe(400)
+  expect(error.message).toBe('agentAccess must be a boolean')
 })

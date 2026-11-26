@@ -6,8 +6,8 @@ import { ToastProvider } from './ToastProvider'
 import type { User } from '../types'
 
 const users: User[] = [
-  { id: 1, username: 'admin-user', role: 'admin' },
-  { id: 2, username: 'basic-user', role: 'basic' },
+  { id: 1, username: 'admin-user', role: 'admin', agentAccess: true },
+  { id: 2, username: 'basic-user', role: 'basic', agentAccess: false },
 ]
 
 function stubFetch(handler: (url: string, init?: RequestInit) => Response) {
@@ -94,6 +94,26 @@ test('deleting a user calls the API and reloads', async () => {
   await waitFor(() => {
     expect(screen.queryByText('basic-user')).not.toBeInTheDocument()
   })
+})
+
+test('toggling agent access PUTs it and shows the toast', async () => {
+  const user = userEvent.setup()
+  const fetchMock = stubFetch((_url, init) => {
+    if (init?.method === 'PUT') {
+      return new Response(JSON.stringify({ ...users[1], agentAccess: true }), { status: 200 })
+    }
+    return new Response(JSON.stringify(users), { status: 200 })
+  })
+  renderView()
+  await screen.findByText('basic-user')
+
+  await user.click(screen.getByRole('checkbox', { name: 'Agent access for basic-user' }))
+
+  expect(await screen.findByText('Agent access granted')).toBeVisible()
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/users/2/agent-access',
+    expect.objectContaining({ method: 'PUT', body: JSON.stringify({ agentAccess: true }) }),
+  )
 })
 
 test('an expired session calls onUnauthorized', async () => {

@@ -29,6 +29,19 @@ export function migrateUserRole(db: Database.Database): void {
   db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'basic'`)
 }
 
+// Existing admins keep the agent runs they had when only admins could start them.
+export function migrateUserAgentAccess(db: Database.Database): void {
+  const columns = db.pragma('table_info(users)') as { name: string }[]
+  if (columns.some((column) => column.name === 'agent_access')) return
+
+  db.transaction(() => {
+    db.exec(`
+      ALTER TABLE users ADD COLUMN agent_access INTEGER NOT NULL DEFAULT 0;
+      UPDATE users SET agent_access = 1 WHERE role = 'admin';
+    `)
+  })()
+}
+
 export function migrateAttachmentUploadedAt(db: Database.Database): void {
   const columns = db.pragma('table_info(attachments)') as { name: string }[]
   if (columns.some((column) => column.name === 'uploaded_at')) return
@@ -70,6 +83,7 @@ export function migrate(db: Database.Database): void {
   migrateApplicationDates(db)
   migrateApplicationArchived(db)
   migrateUserRole(db)
+  migrateUserAgentAccess(db)
   migrateAttachmentUploadedAt(db)
   migrateAttachmentProfileSync(db)
   migrateAttachmentEditedFrom(db)

@@ -4,13 +4,14 @@ import { expect, test, vi } from 'vitest'
 import { UserRow } from './UserRow'
 import type { User } from '../types'
 
-const testUser: User = { id: 1, username: 'testuser', role: 'basic' }
+const testUser: User = { id: 1, username: 'testuser', role: 'basic', agentAccess: false }
 
 function renderRow(props: Partial<Parameters<typeof UserRow>[0]> = {}) {
   render(
     <UserRow
       user={testUser}
       onSetRole={vi.fn()}
+      onSetAgentAccess={vi.fn()}
       onResetPassword={vi.fn()}
       onDelete={vi.fn()}
       {...props}
@@ -36,6 +37,22 @@ test('changing the role calls onSetRole', async () => {
   )
 
   expect(onSetRole).toHaveBeenCalledWith('admin')
+})
+
+test('the agent access checkbox reflects the user', () => {
+  renderRow({ user: { ...testUser, agentAccess: true } })
+
+  expect(screen.getByRole('checkbox', { name: 'Agent access for testuser' })).toBeChecked()
+})
+
+test('clicking agent access calls onSetAgentAccess with the toggled value', async () => {
+  const user = userEvent.setup()
+  const onSetAgentAccess = vi.fn()
+  renderRow({ onSetAgentAccess })
+
+  await user.click(screen.getByRole('checkbox', { name: 'Agent access for testuser' }))
+
+  expect(onSetAgentAccess).toHaveBeenCalledWith(true)
 })
 
 test('deleting takes two clicks', async () => {

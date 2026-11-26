@@ -6,6 +6,7 @@ import {
   deleteUser,
   listUsers,
   resetUserPassword,
+  setUserAgentAccess,
   setUserRole,
 } from '../lib/api.ts'
 import { useApiAction } from '../lib/apiAction.ts'
@@ -41,6 +42,11 @@ function useUsers(onUnauthorized: () => void) {
     handleCreate: (input: UserInput) => change(() => createUser(input), 'User added'),
     handleSetRole: (id: number, role: Role) =>
       change(() => setUserRole(id, role), 'Role changed'),
+    handleSetAgentAccess: (id: number, agentAccess: boolean) =>
+      change(
+        () => setUserAgentAccess(id, agentAccess),
+        agentAccess ? 'Agent access granted' : 'Agent access removed',
+      ),
     handleResetPassword,
     handleDelete: (id: number) => change(() => deleteUser(id), 'User deleted'),
   }
@@ -51,8 +57,14 @@ interface AdminViewProps {
 }
 
 export function AdminView({ onUnauthorized }: AdminViewProps) {
-  const { users, handleCreate, handleSetRole, handleResetPassword, handleDelete } =
-    useUsers(onUnauthorized)
+  const {
+    users,
+    handleCreate,
+    handleSetRole,
+    handleSetAgentAccess,
+    handleResetPassword,
+    handleDelete,
+  } = useUsers(onUnauthorized)
 
   return (
     <div className="layout">
@@ -64,6 +76,7 @@ export function AdminView({ onUnauthorized }: AdminViewProps) {
         <UserList
           users={users}
           onSetRole={handleSetRole}
+          onSetAgentAccess={handleSetAgentAccess}
           onResetPassword={handleResetPassword}
           onDelete={handleDelete}
         />

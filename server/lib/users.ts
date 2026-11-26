@@ -5,6 +5,14 @@ export function setUserRole(db: Database.Database, userId: number, role: Role): 
   db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, userId)
 }
 
+export function setUserAgentAccess(
+  db: Database.Database,
+  userId: number,
+  agentAccess: boolean,
+): void {
+  db.prepare('UPDATE users SET agent_access = ? WHERE id = ?').run(agentAccess ? 1 : 0, userId)
+}
+
 export function adminCount(db: Database.Database): number {
   const row = db
     .prepare(`SELECT COUNT(*) AS n FROM users WHERE role = 'admin'`)

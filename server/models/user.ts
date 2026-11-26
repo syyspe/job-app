@@ -5,6 +5,7 @@ export interface UserRow {
   username: string
   password_hash: string
   role: Role
+  agent_access: number
   created_at: string
 }
 
@@ -13,5 +14,6 @@ export function toUser(row: UserRow): User {
     id: row.id,
     username: row.username,
     role: row.role,
+    agentAccess: row.agent_access === 1,
   }
 }

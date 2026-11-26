@@ -127,3 +127,24 @@ test('re-seeding an existing user promotes it to admin', () => {
   }
   expect(user.role).toBe('admin')
 })
+
+test('seeding a fresh user grants it agent access', () => {
+  const userId = seedUser(db, 'testuser', 'test-password')
+
+  const user = db.prepare('SELECT agent_access FROM users WHERE id = ?').get(userId) as {
+    agent_access: number
+  }
+  expect(user.agent_access).toBe(1)
+})
+
+test('re-seeding an existing user grants it agent access again', () => {
+  const userId = seedUser(db, 'testuser', 'test-password')
+  db.prepare('UPDATE users SET agent_access = 0 WHERE id = ?').run(userId)
+
+  seedUser(db, 'testuser', 'test-password')
+
+  const user = db.prepare('SELECT agent_access FROM users WHERE id = ?').get(userId) as {
+    agent_access: number
+  }
+  expect(user.agent_access).toBe(1)
+})

@@ -78,17 +78,17 @@ function AdStateFilter({ ads, selected, onSelect }: AdStateFilterProps) {
 
 interface AdsViewProps {
   onUnauthorized: () => void
-  isAdmin: boolean
+  canRunAgent: boolean
 }
 
-export function AdsView({ onUnauthorized, isAdmin }: AdsViewProps) {
+export function AdsView({ onUnauthorized, canRunAgent }: AdsViewProps) {
   const { ads, actions, refresh } = useAds(onUnauthorized)
   const [selected, setSelected] = useState<AdState>('awaiting_handover')
 
   return (
     <div className="ads-view">
       <h2>Ad inbox</h2>
-      {isAdmin && <AgentRunPanel onUnauthorized={onUnauthorized} onRunFinished={refresh} />}
+      {canRunAgent && <AgentRunPanel onUnauthorized={onUnauthorized} onRunFinished={refresh} />}
       <AdStateFilter ads={ads} selected={selected} onSelect={setSelected} />
       <AdList
         ads={ads.filter((ad) => ad.state === selected)}

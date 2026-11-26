@@ -4,12 +4,17 @@ import type Database from 'better-sqlite3'
 import { join } from 'node:path'
 import { toUser } from '../models/user.ts'
 import type { UserRow } from '../models/user.ts'
-import { validatePassword, validateRole, validateUserInput } from '../lib/validation.ts'
+import {
+  validateAgentAccess,
+  validatePassword,
+  validateRole,
+  validateUserInput,
+} from '../lib/validation.ts'
 import { HttpError } from '../lib/httpError.ts'
 import { unlinkIfExists } from '../lib/files.ts'
 import { hashPassword } from '../lib/passwords.ts'
 import { createUser } from '../lib/seed.ts'
-import { adminCount, setUserRole } from '../lib/users.ts'
+import { adminCount, setUserAgentAccess, setUserRole } from '../lib/users.ts'
 
 type StoredNamesForUser = Database.Statement<[number], { stored_name: string }>
 
@@ -53,6 +58,18 @@ function roleHandler(db: Database.Database) {
     }
 
     setUserRole(db, id, role)
+    res.json(toUser(findUser(db, id) as UserRow))
+  }
+}
+
+// No self-guard: an admin who removes their own access can grant it back.
+function agentAccessHandler(db: Database.Database) {
+  return (req: Request, res: Response) => {
+    const id = Number(req.params.id)
+    const agentAccess = validateAgentAccess(req.body)
+    if (!findUser(db, id)) throw new HttpError(404, 'not found')
+
+    setUserAgentAccess(db, id, agentAccess)
     res.json(toUser(findUser(db, id) as UserRow))
   }
 }
@@ -111,6 +128,7 @@ export function createUsersRouter(db: Database.Database, uploadsDir: string): Ro
   router.get('/users', listHandler(db))
   router.post('/users', createHandler(db))
   router.put('/users/:id/role', roleHandler(db))
+  router.put('/users/:id/agent-access', agentAccessHandler(db))
   router.put('/users/:id/password', passwordHandler(db))
   router.delete('/users/:id', deleteHandler(db, uploadsDir, storedNames))
 

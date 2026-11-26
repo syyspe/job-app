@@ -11,6 +11,7 @@ import { createApp } from '../app.ts'
 import { createRunnerSpawner } from '../lib/agentRunner.ts'
 import type { RunnerSpawner, SpawnFn } from '../lib/agentRunner.ts'
 import { createUser, seedUser } from '../lib/seed.ts'
+import { setUserAgentAccess } from '../lib/users.ts'
 import { fakeChild } from '../test/fakeChild.ts'
 import type { FakeChild } from '../test/fakeChild.ts'
 import { loginAs } from '../test/auth.ts'
@@ -83,10 +84,28 @@ test.each(ROUTES)('$method without a session is 401', async ({ method, headers, 
   expect(res.status).toBe(401)
 })
 
-test.each(ROUTES)('$method as a basic user is 403', async ({ method, headers, body }) => {
+test.each(ROUTES)('$method as a user without agent access is 403', async ({ method, headers, body }) => {
   const res = await fetch(`${baseUrl}/api/agent/runs`, { method, headers: { ...headers, Cookie: basicCookie }, body })
   expect(res.status).toBe(403)
   expect(started).toEqual([])
+})
+
+test.each(ROUTES)('$method as an admin without agent access is 403', async ({ method, headers, body }) => {
+  setUserAgentAccess(db, 1, false)
+
+  const res = await fetch(`${baseUrl}/api/agent/runs`, { method, headers: { ...headers, Cookie: adminCookie }, body })
+  expect(res.status).toBe(403)
+  expect(started).toEqual([])
+})
+
+test('a basic user with agent access can start and list runs', async () => {
+  setUserAgentAccess(db, 2, true)
+
+  const created = await post('{"kind":"collect"}', basicCookie)
+  expect(created.status).toBe(201)
+  const listed = await fetch(`${baseUrl}/api/agent/runs`, { headers: { Cookie: basicCookie } })
+  expect(listed.status).toBe(200)
+  expect(started).toEqual(['collect'])
 })
 
 test.each([
