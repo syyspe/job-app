@@ -1,4 +1,6 @@
 import { CliError } from '../../lib/cliError.ts'
+import { UNLIMITED } from './apiBudget.ts'
+import type { StepBudget } from './apiBudget.ts'
 import type { HealthResult } from '../../profile/lib/ollama.ts'
 import { runCollect } from './collectRun.ts'
 import type { CollectReport, CollectRunOptions } from './collectRun.ts'
@@ -27,8 +29,11 @@ export interface DailyRunOptions {
   collect: Omit<CollectRunOptions, 'mailbox' | 'jobApp' | 'state'>
   handoverWaitDays: number
   checkHealth: () => Promise<HealthResult>
-  // Throws CliError when the sandbox can't be verified for the installed CLI.
-  gate: () => Promise<{ version: string; reverified: boolean }>
+  // Throws CliError when the sandbox can't be verified for the installed CLI;
+  // null under engine "api", which needs no sandbox.
+  gate: () => Promise<{ version: string; reverified: boolean } | null>
+  // Asked before each model step starts; unlimited when left out.
+  budget?: StepBudget
   // Null when config has no syncFolder.
   sync: Omit<SyncOptions, 'jobApp'> | null
   prescreen: Omit<PrescreenRunOptions, 'jobApp'>
@@ -53,6 +58,8 @@ export interface DailyReport {
   // Why the model steps (sync to drafting) were skipped: reported,
   // but not a failure of the run.
   skipped: Problem | null
+  // Why the budget stopped new model steps part-way: reported like a skip.
+  stopped: Problem | null
   // Steps that failed with a CliError; any of them fails the run.
   failures: Problem[]
   sent: boolean
@@ -107,15 +114,19 @@ async function modelSteps(run: Run): Promise<void> {
   }
   if (!(await passGate(run))) return
   const { jobApp, sync, state } = options
+  const budget = options.budget ?? UNLIMITED
+  const canStart = () => budget.canStart()
   if (sync) report.sync = await guarded(run, 'sync', () => syncProfile({ ...sync, jobApp }))
-  report.prescreen = await guarded(run, 'pre-screen', () => runPrescreen({ ...options.prescreen, jobApp }))
+  report.prescreen = await guarded(run, 'pre-screen', () => runPrescreen({ ...options.prescreen, jobApp, canStart }))
   // Here rather than in collect: text is fetched only in a run that can
   // evaluate it the same day.
   const fetchOptions = { ...options.handoverFetch, jobApp, state }
   report.handoverFetch = await guarded(run, 'hand-over fetch', () => runHandoverFetch(fetchOptions))
-  const checkHealth = async () => health
-  report.evaluation = await guarded(run, 'evaluate', () => runEvaluation({ ...options.evaluation, jobApp, checkHealth }))
-  report.drafting = await guarded(run, 'draft', () => runDrafting({ ...options.drafting, jobApp, checkHealth }))
+  const steps = { jobApp, checkHealth: async () => health, canStart }
+  report.evaluation = await guarded(run, 'evaluate', () => runEvaluation({ ...options.evaluation, ...steps }))
+  report.drafting = await guarded(run, 'draft', () => runDrafting({ ...options.drafting, ...steps }))
+  const reason = budget.stopReason()
+  if (reason) report.stopped = { step: 'model steps', message: reason }
 }
 
 // Nothing is marked reported, and no source failure cleared, until the mail
@@ -126,7 +137,8 @@ async function sendSummary({ options, report }: Run): Promise<void> {
   const ads = listed.flat().filter((ad) => ad.reportedAt === null)
   const prescreened = report.prescreen?.ads ?? []
   const sourceFailures = state.readFailures()
-  const problems = [...(report.skipped ? [report.skipped] : []), ...report.failures]
+  const notices = [report.skipped, report.stopped].filter((problem) => problem !== null)
+  const problems = [...notices, ...report.failures]
   if (isEmpty({ ads, prescreened, sourceFailures, problems }) && !options.summary.alwaysSend) return
   const { appUrl, lanUrl } = options.summary
   const tally = prescreenTally(await jobApp.listAllAds(), options.now())
@@ -148,6 +160,7 @@ export async function runDaily(options: DailyRunOptions): Promise<DailyReport> {
     evaluation: null,
     drafting: null,
     skipped: null,
+    stopped: null,
     failures: [],
     sent: false,
   }

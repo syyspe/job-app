@@ -86,7 +86,9 @@ the engine, and the default `"cli"` leaves today's behaviour unchanged.
     - `thinking: {type: 'adaptive'}`.
     - `output_config: {effort, format: {type: 'json_schema', schema}}`.
     - `tools: [search_profile]`, whose `input_schema` comes from
-      `z.toJSONSchema(z.object(searchRequestShape))` without `$schema`.
+      `z.toJSONSchema(z.object(searchRequestShape), {io: 'input'})` without
+      `$schema`. *Built as:* `io: 'input'`, since the output view marks the
+      defaulted `limit` required.
       `tool_choice` is left out, so it defaults to `auto`.
     - The user turn is `` `${prompt}\n\n${input}` ``.
   - Loop:
@@ -127,9 +129,17 @@ the engine, and the default `"cli"` leaves today's behaviour unchanged.
       step's model and effort from `config.api`.
   - It only constructs objects, with no network, so the commands can call
     it before taking the lock.
-- `agent/runner/lib/mapLimit.ts`: an optional `canStart = () => true`. A
-  worker stops taking items once it returns false. The result is only the
-  items that started, in input order (`results.slice(0, next)`).
+  - *Built as:* also `loadEngine(env, profile)`, which reads the config and
+    builds `searchProfile` from `searchIndexFile`. The three commands share
+    it rather than repeat that wiring. `sandbox.ts`'s `stepSchema` now
+    returns `Record<string, unknown>`, which is what `output_config.format`
+    accepts.
+- `agent/runner/lib/mapLimit.ts`: an optional `canStart`. A worker stops
+  taking items once it returns false. The result is only the items that
+  started, in input order (`results.slice(0, next)`). *Built as:* the second
+  parameter becomes `{limit, canStart?}`, because a fourth parameter breaks
+  the 3-parameter limit. The three call sites and one line of the existing
+  `mapLimit` test change with it.
 - `agent/runner/lib/prescreenRun.ts`, `evaluationRun.ts`, `draftRun.ts`:
   - Each options type gains an optional `canStart?: () => boolean`, passed
     to `mapLimit`.

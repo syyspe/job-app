@@ -29,6 +29,7 @@ interface RunOverrides {
   evaluate?: (ad: Ad) => Promise<EvaluationOutcome>
   perRunCap?: number
   concurrency?: number
+  canStart?: () => boolean
 }
 
 function run(overrides: RunOverrides = {}) {
@@ -41,6 +42,7 @@ function run(overrides: RunOverrides = {}) {
     jobApp,
     config,
     checkHealth: () => Promise.resolve(overrides.health ?? { ok: true }),
+    canStart: overrides.canStart,
     evaluate: overrides.evaluate ?? (() => Promise.resolve(suitable)),
   })
 }
@@ -125,4 +127,20 @@ test('the evaluated ad carries its body', async () => {
   await run({ evaluate: (ad) => (bodies.push(ad.body), Promise.resolve(suitable)) })
 
   expect(bodies).toEqual(['Full ad text'])
+})
+
+test('once canStart turns false no further ad is evaluated, and the rest stay queued with no attempt', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'ready' }), fakeAd({ id: 2, state: 'ready' }), fakeAd({ id: 3, state: 'ready' }))
+  const seen: number[] = []
+
+  const report = await run({
+    concurrency: 1,
+    canStart: () => seen.length < 1,
+    evaluate: async (ad) => (seen.push(ad.id), suitable),
+  })
+
+  expect(seen).toEqual([1])
+  expect(report.evaluated).toEqual({ suitable: 1, unsuitable: 0, retrying: 0, failed: 0 })
+  expect(report.queued).toBe(2)
+  expect(fake.ads.map((ad) => [ad.state, ad.attempts])).toEqual([['suitable', 0], ['ready', 0], ['ready', 0]])
 })

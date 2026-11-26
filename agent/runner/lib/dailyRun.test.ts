@@ -9,6 +9,7 @@ import type { FakeMailbox } from '../../test/fakeMailbox.ts'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
 import type { HealthResult } from '../../profile/lib/ollama.ts'
+import { createRunBudget } from './apiBudget.ts'
 import { runDaily } from './dailyRun.ts'
 import type { DailyRunOptions } from './dailyRun.ts'
 import type { DraftOutcome } from './draft.ts'
@@ -80,6 +81,7 @@ const FETCHING_ON = { enabled: true, termsCheckedOn: '2026-11-23', dailyOpenCap:
 interface Overrides {
   health?: HealthResult
   gate?: DailyRunOptions['gate']
+  budget?: DailyRunOptions['budget']
   send?: DailyRunOptions['send']
   openMailbox?: DailyRunOptions['openMailbox']
   evaluate?: () => Promise<EvaluationOutcome>
@@ -99,6 +101,7 @@ function options(overrides: Overrides = {}): DailyRunOptions {
     handoverWaitDays: 7,
     checkHealth: async () => (steps.push('health'), overrides.health ?? { ok: true }),
     gate: overrides.gate ?? (async () => (steps.push('gate'), { version: '9.9.9', reverified: false })),
+    budget: overrides.budget,
     sync: null,
     prescreen: {
       config: { concurrency: 1, perRunCap: 10, timeoutMs: 1000 },
@@ -332,4 +335,39 @@ test('an error that is not a CliError propagates', async () => {
   }
 
   await expect(runDaily(options({ evaluate }))).rejects.toThrow('bug')
+})
+
+test('a gate resolving null runs the model steps with no sandbox recorded', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'ready', firstSeenAt: '2026-11-20 08:00:00' }))
+
+  const report = await runDaily(options({ gate: async () => (steps.push('gate'), null) }))
+
+  expect(steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'draft', 'send'])
+  expect(report.sandbox).toBeNull()
+  expect(report.stopped).toBeNull()
+})
+
+test('a budget stopping mid-evaluation starts no further step and the summary names it', async () => {
+  fake.ads.push(
+    fakeAd({ id: 1, state: 'ready', firstSeenAt: '2026-11-20 08:00:00' }),
+    fakeAd({ id: 2, state: 'ready', firstSeenAt: '2026-11-20 09:00:00' }),
+  )
+  const budget = createRunBudget({ perRunUsd: 3, prices: {} })
+  const evaluate = async () => {
+    steps.push('evaluate')
+    budget.stop('API run cap reached at $3.00')
+    return suitable
+  }
+  const opts = options({ budget, evaluate })
+  opts.evaluation.config.evaluation.perRunCap = 2
+
+  const report = await runDaily(opts)
+
+  expect(steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'send'])
+  expect(report.evaluation?.queued).toBe(1)
+  expect(report.drafting?.queued).toBe(1)
+  expect(report.stopped).toEqual({ step: 'model steps', message: 'API run cap reached at $3.00' })
+  expect(report.failures).toEqual([])
+  expect(fake.ads.map((ad) => [ad.state, ad.attempts])).toEqual([['suitable', 0], ['ready', 0]])
+  expect(sent[0].text).toContain('- model steps: API run cap reached at $3.00')
 })

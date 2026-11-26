@@ -39,6 +39,7 @@ interface RunOverrides {
   write?: (ad: Ad) => Promise<DraftOutcome>
   perRunCap?: number
   concurrency?: number
+  canStart?: () => boolean
 }
 
 function run(overrides: RunOverrides = {}) {
@@ -54,6 +55,7 @@ function run(overrides: RunOverrides = {}) {
     jobApp,
     config,
     checkHealth: () => Promise.resolve(overrides.health ?? { ok: true }),
+    canStart: overrides.canStart,
     write: overrides.write ?? (() => Promise.resolve(written)),
     today: '2026-11-19',
   })
@@ -141,4 +143,16 @@ test('no request ever touches the applications routes', async () => {
   await run({ write })
 
   expect(fake.requests.filter((request) => request.includes('/api/applications'))).toEqual([])
+})
+
+test('once canStart turns false no further ad is drafted, and the rest stay queued with no attempt', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'suitable' }), fakeAd({ id: 2, state: 'suitable' }))
+  const seen: number[] = []
+
+  const report = await run({ canStart: () => seen.length < 1, write: async (ad) => (seen.push(ad.id), written) })
+
+  expect(seen).toEqual([1])
+  expect(report.counts).toEqual({ drafted: 1, retrying: 0, failed: 0 })
+  expect(report.queued).toBe(1)
+  expect(fake.ads.map((ad) => [ad.state, ad.attempts])).toEqual([['drafted', 0], ['suitable', 0]])
 })

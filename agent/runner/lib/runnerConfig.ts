@@ -94,3 +94,53 @@ export function loadSourcesConfig(path: string, connectors: Pick<SourceConnector
   }
   return config
 }
+
+const STEPS = ['prescreen', 'evaluation', 'drafting'] as const
+const effort = z.enum(['low', 'medium', 'high'])
+
+const priceSchema = z.object({
+  inputPerMTok: z.number().min(0),
+  outputPerMTok: z.number().min(0),
+  cacheWritePerMTok: z.number().min(0),
+  cacheReadPerMTok: z.number().min(0),
+})
+
+const DEFAULT_MODELS = { prescreen: 'claude-haiku-5-5', evaluation: 'claude-sonnet-5-5', drafting: 'claude-opus-5-5' }
+const DEFAULT_EFFORT = { prescreen: 'low', evaluation: 'medium', drafting: 'high' } as const
+
+const engineConfigSchema = z.object({
+  engine: z.enum(['cli', 'api']).default('cli'),
+  api: z
+    .object({
+      models: z
+        .object({
+          prescreen: z.string().min(1).default(DEFAULT_MODELS.prescreen),
+          evaluation: z.string().min(1).default(DEFAULT_MODELS.evaluation),
+          drafting: z.string().min(1).default(DEFAULT_MODELS.drafting),
+        })
+        .default(DEFAULT_MODELS),
+      effort: z
+        .object({
+          prescreen: effort.default(DEFAULT_EFFORT.prescreen),
+          evaluation: effort.default(DEFAULT_EFFORT.evaluation),
+          drafting: effort.default(DEFAULT_EFFORT.drafting),
+        })
+        .default(DEFAULT_EFFORT),
+      perRunUsd: z.number().positive().default(3),
+      prices: z.record(z.string(), priceSchema).default({}),
+    })
+    .default({ models: DEFAULT_MODELS, effort: DEFAULT_EFFORT, perRunUsd: 3, prices: {} }),
+})
+
+export type EngineConfig = z.infer<typeof engineConfigSchema>
+export type ApiConfig = EngineConfig['api']
+export type ModelPrice = z.infer<typeof priceSchema>
+
+// Under "api" every model in use needs a price, so the run cap never runs blind.
+export function loadEngineConfig(path: string): EngineConfig {
+  const config = parseConfigFile(path, engineConfigSchema)
+  if (config.engine !== 'api') return config
+  const unpriced = STEPS.map((step) => config.api.models[step]).find((model) => !config.api.prices[model])
+  if (unpriced) throw new CliError(2, `${path}: api.prices.${unpriced}: no price for a model api.models names`)
+  return config
+}

@@ -10,7 +10,7 @@ const outputSchema = z.object({
 })
 
 export const EVALUATION_SCHEMA = stepSchema(outputSchema)
-export const EVALUATION_PROMPT = 'Evaluate the job ad given on standard input.'
+export const EVALUATION_PROMPT = 'Evaluate the job ad given as JSON.'
 export const UNSURE_REASON = 'Evaluation was unsure: the points below are open questions.'
 
 export const EVALUATION_FRAMING = new URL('../prompts/evaluate.framing.md', import.meta.url)

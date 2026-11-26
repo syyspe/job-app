@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
-import { loadJobAppEnv, loadMailEnv, loadSmtpEnv } from './env.ts'
+import { loadApiKey, loadJobAppEnv, loadMailEnv, loadSmtpEnv } from './env.ts'
 
 let dir: TempDir
 
@@ -71,5 +71,20 @@ test('a missing SMTP host is an exit-2 error naming it', () => {
 
   expect(() => loadSmtpEnv(path)).toThrow(
     expect.objectContaining({ exitCode: 2, message: `${path}: MAIL_SMTP_HOST is not set` }),
+  )
+})
+
+test('reads the API key without touching process.env', () => {
+  const path = dir.write('env', `${complete}ANTHROPIC_API_KEY=sk-test\n`)
+
+  expect(loadApiKey(path)).toBe('sk-test')
+  expect(process.env.ANTHROPIC_API_KEY).toBeUndefined()
+})
+
+test('a missing API key is an exit-2 error naming it', () => {
+  const path = dir.write('env', complete)
+
+  expect(() => loadApiKey(path)).toThrow(
+    expect.objectContaining({ exitCode: 2, message: `${path}: ANTHROPIC_API_KEY is not set` }),
   )
 })

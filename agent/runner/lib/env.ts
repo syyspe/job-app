@@ -43,3 +43,8 @@ export function loadSmtpEnv(path: string): MailEnv {
   const required = readEnvFile(path)
   return { host: required('MAIL_SMTP_HOST'), username: required('MAIL_USERNAME'), password: required('MAIL_PASSWORD') }
 }
+
+// Required only under engine "api"; never read from process.env.
+export function loadApiKey(path: string): string {
+  return readEnvFile(path)('ANTHROPIC_API_KEY')
+}

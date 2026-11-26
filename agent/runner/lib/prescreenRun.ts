@@ -7,6 +7,8 @@ export interface PrescreenRunOptions {
   jobApp: JobAppClient
   config: RunnerConfig['prescreen']
   prescreen: (ad: AdSummary) => Promise<PrescreenOutcome>
+  // Asked before each ad; an ad that doesn't start stays unscreened.
+  canStart?: () => boolean
 }
 
 export interface PrescreenReport {
@@ -33,13 +35,14 @@ export async function runPrescreen(options: PrescreenRunOptions): Promise<Prescr
   const waiting = (await jobApp.listAds('awaiting_handover')).toReversed()
   const unscreened = waiting.filter((ad) => ad.sourceMode === 'handover' && ad.prescreen === null)
   const batch = unscreened.slice(0, config.perRunCap)
-  const results = await mapLimit(batch, config.concurrency, (ad) => prescreenOne(options, ad))
+  const limits = { limit: config.concurrency, canStart: options.canStart }
+  const results = await mapLimit(batch, limits, (ad) => prescreenOne(options, ad))
   const screened = results.filter((ad) => ad !== null)
   const count = (verdict: string) => screened.filter((ad) => ad.prescreen?.verdict === verdict).length
   return {
     screened: { promising: count('promising'), notPromising: count('not_promising') },
     failed: results.length - screened.length,
-    queued: unscreened.length - batch.length,
+    queued: unscreened.length - results.length,
     ads: screened,
   }
 }

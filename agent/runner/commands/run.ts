@@ -17,6 +17,7 @@ import { runDaily } from '../lib/dailyRun.ts'
 import type { DailyReport, DailyRunOptions } from '../lib/dailyRun.ts'
 import { DRAFT_FRAMING, DRAFT_PROMPT, DRAFT_SCHEMA, writeDraft } from '../lib/draft.ts'
 import { formatDraftReport } from '../lib/draftRun.ts'
+import { loadEngine } from '../lib/engine.ts'
 import { loadJobAppEnv, loadMailEnv, loadSmtpEnv } from '../lib/env.ts'
 import { EVALUATION_FRAMING, EVALUATION_PROMPT, EVALUATION_SCHEMA, evaluateAd } from '../lib/evaluate.ts'
 import { formatEvaluationReport } from '../lib/evaluationRun.ts'
@@ -29,7 +30,6 @@ import { PRESCREEN_FRAMING, PRESCREEN_PROMPT, PRESCREEN_SCHEMA, prescreenAd } fr
 import { formatPrescreenReport } from '../lib/prescreenRun.ts'
 import { buildSystemPrompt } from '../lib/prompts.ts'
 import { loadDailyRunConfig, loadDraftConfig, loadRunnerConfig, loadSourcesConfig } from '../lib/runnerConfig.ts'
-import { runSandboxed } from '../lib/sandbox.ts'
 import { ensureSandboxVerified } from '../lib/sandboxCheck.ts'
 import { runProbes } from '../lib/sandboxProbes.ts'
 import { sendMail } from '../lib/smtp.ts'
@@ -46,8 +46,10 @@ function loadSetup(env: Env) {
   const prompts = promptsDir(env)
   const drafting = loadDraftConfig(path)
   const envFile = envPath(env)
+  const profile = loadProfileConfig(path)
   return {
-    profile: loadProfileConfig(path),
+    profile,
+    engine: loadEngine(env, profile),
     runner: loadRunnerConfig(path),
     drafting,
     sources: loadSourcesConfig(path, CONNECTORS),
@@ -77,24 +79,34 @@ function fetchOptions(setup: Setup, today: string): DailyRunOptions['handoverFet
 }
 
 function prescreenOptions(setup: Setup): DailyRunOptions['prescreen'] {
-  const step = { claudeBin: CLAUDE_BIN, prompt: PRESCREEN_PROMPT, systemPrompt: setup.prescreenPrompt, schema: PRESCREEN_SCHEMA }
-  const { timeoutMs } = setup.runner.prescreen
-  const runStep = (input: string) => runSandboxed({ ...step, input, timeoutMs, env: process.env })
+  const runStep = setup.engine.stepFor({
+    step: 'prescreen',
+    prompt: PRESCREEN_PROMPT,
+    systemPrompt: setup.prescreenPrompt,
+    schema: PRESCREEN_SCHEMA,
+    timeoutMs: setup.runner.prescreen.timeoutMs,
+  })
   return { config: setup.runner.prescreen, prescreen: (ad) => prescreenAd(ad, runStep) }
 }
 
-function modelOptions(setup: Setup, today: string): Pick<DailyRunOptions, 'evaluation' | 'drafting' | 'gate'> {
-  const evaluateStep = { claudeBin: CLAUDE_BIN, prompt: EVALUATION_PROMPT, systemPrompt: setup.evaluatePrompt, schema: EVALUATION_SCHEMA }
-  const evaluateTimeout = setup.runner.evaluation.timeoutMs
-  const runEvaluateStep = (input: string) => runSandboxed({ ...evaluateStep, input, timeoutMs: evaluateTimeout, env: process.env })
-  const draftStep = { claudeBin: CLAUDE_BIN, prompt: DRAFT_PROMPT, systemPrompt: setup.draftPrompt, schema: DRAFT_SCHEMA }
-  const draftTimeout = setup.drafting.timeoutMs
-  const runDraftStep = (input: string) => runSandboxed({ ...draftStep, input, timeoutMs: draftTimeout, env: process.env })
+// Under "api" no sandbox is involved, so there is nothing to verify.
+function gate(setup: Setup): DailyRunOptions['gate'] {
+  if (setup.engine.kind === 'api') return async () => null
   const probes = () => runProbes({ claudeBin: CLAUDE_BIN, env: process.env, timeoutMs: 180000 })
+  return () => ensureSandboxVerified({ claudeBin: CLAUDE_BIN, stateDir: setup.stateDir, runProbes: probes, now: () => new Date() })
+}
+
+function modelOptions(setup: Setup, today: string): Pick<DailyRunOptions, 'evaluation' | 'drafting' | 'gate' | 'budget'> {
+  const { engine } = setup
+  const evaluate = { prompt: EVALUATION_PROMPT, systemPrompt: setup.evaluatePrompt, schema: EVALUATION_SCHEMA }
+  const runEvaluateStep = engine.stepFor({ step: 'evaluation', ...evaluate, timeoutMs: setup.runner.evaluation.timeoutMs })
+  const draft = { prompt: DRAFT_PROMPT, systemPrompt: setup.draftPrompt, schema: DRAFT_SCHEMA }
+  const runDraftStep = engine.stepFor({ step: 'drafting', ...draft, timeoutMs: setup.drafting.timeoutMs })
   return {
     evaluation: { config: setup.runner, evaluate: (ad) => evaluateAd(ad, runEvaluateStep) },
     drafting: { config: setup.drafting, write: (ad) => writeDraft(ad, setup.cvTemplates, runDraftStep), today },
-    gate: () => ensureSandboxVerified({ claudeBin: CLAUDE_BIN, stateDir: setup.stateDir, runProbes: probes, now: () => new Date() }),
+    gate: gate(setup),
+    budget: engine.budget,
   }
 }
 
@@ -149,6 +161,7 @@ function modelLines(report: DailyReport): string[] {
     ...(report.handoverFetch ? formatHandoverFetchReport(report.handoverFetch) : []),
     ...(report.evaluation ? formatEvaluationReport(report.evaluation) : []),
     ...(report.drafting ? formatDraftReport(report.drafting) : []),
+    ...(report.stopped ? [`model steps stopped: ${report.stopped.message}`] : []),
   ]
 }
 
