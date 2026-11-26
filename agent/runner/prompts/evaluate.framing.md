@@ -20,7 +20,7 @@ Answer only with the JSON object the schema asks for:
 - `reasons`: the points behind the verdict, at most ten. For `unsure`, each
   reason is an open question the person can answer.
 
-When in doubt, answer `unsure`, never `unsuitable`. An ad is `unsuitable` only
+When in doubt, answer `unsure`. An ad is `unsuitable` only
 when the criteria below clearly rule it out.
 
 The person's criteria follow.

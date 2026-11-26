@@ -17,7 +17,6 @@ Answer only with the JSON object the schema asks for:
 - `reason`: one or two sentences, at most 300 characters, on why.
 
 When in doubt, answer `unsure`, never `not_promising`. An ad is
-`not_promising` only when the criteria below clearly rule it out from these
-four fields.
+`not_promising` when the criteria below clearly rule it out.
 
 The person's criteria follow.
