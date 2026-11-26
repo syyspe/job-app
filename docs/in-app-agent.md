@@ -33,7 +33,7 @@ pipeline (§1), permissions (§2), private configuration (§3) and daily run
 |---|---|---|---|
 | `048-in-app-agent-spec` | committed | done | — |
 | `049-api-steps` | committed | done | — |
-| `050-spend-caps` | committed | open | 049 |
+| `050-spend-caps` | committed | done | 049 |
 | `051-run-from-ui` | committed | done | — |
 | `052-retire-claude-p` | committed | open | 049, 050, 051 |
 

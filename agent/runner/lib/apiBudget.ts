@@ -1,3 +1,4 @@
+import type { SpendLedger } from './apiSpend.ts'
 import type { ModelPrice } from './runnerConfig.ts'
 
 export interface TokenUsage {
@@ -7,11 +8,20 @@ export interface TokenUsage {
   cache_read_input_tokens: number | null
 }
 
+// What a run spent on the Claude API, and the month's total so far.
+export interface ApiSpend {
+  runUsd: number
+  monthUsd: number
+  monthlyUsd: number
+}
+
 // What a run's model steps ask before each new step starts.
 export interface StepBudget {
   canStart(): boolean
   // Why no new step may start, or null while they may.
   stopReason(): string | null
+  // Null unless the run made an API call.
+  spend(): ApiSpend | null
 }
 
 export interface RunBudget extends StepBudget {
@@ -19,7 +29,14 @@ export interface RunBudget extends StepBudget {
   stop(reason: string): void
 }
 
-export const UNLIMITED: StepBudget = { canStart: () => true, stopReason: () => null }
+export interface RunBudgetOptions {
+  perRunUsd: number
+  monthlyUsd: number
+  prices: Record<string, ModelPrice>
+  ledger: SpendLedger
+}
+
+export const UNLIMITED: StepBudget = { canStart: () => true, stopReason: () => null, spend: () => null }
 
 export function responseCost(price: ModelPrice, usage: TokenUsage): number {
   const dollars =
@@ -31,19 +48,27 @@ export function responseCost(price: ModelPrice, usage: TokenUsage): number {
 }
 
 // Config guarantees a price for every model a step uses.
-export function createRunBudget(options: { perRunUsd: number; prices: Record<string, ModelPrice> }): RunBudget {
+export function createRunBudget(options: RunBudgetOptions): RunBudget {
+  const { perRunUsd, monthlyUsd, prices, ledger } = options
   let spent = 0
+  let calls = 0
   let stopped: string | null = null
   const stopReason = () => {
     if (stopped) return stopped
-    if (spent >= options.perRunUsd) return `API run cap reached at $${options.perRunUsd.toFixed(2)}`
+    if (spent >= perRunUsd) return `API run cap reached at $${perRunUsd.toFixed(2)}`
+    const month = ledger.monthTotal()
+    if (month >= monthlyUsd) return `API monthly cap reached: $${month.toFixed(2)} of $${monthlyUsd.toFixed(2)}`
     return null
   }
   return {
     canStart: () => stopReason() === null,
     stopReason,
+    spend: () => (calls === 0 ? null : { runUsd: spent, monthUsd: ledger.monthTotal(), monthlyUsd }),
     charge: (model, usage) => {
-      spent += responseCost(options.prices[model], usage)
+      const cost = responseCost(prices[model], usage)
+      spent += cost
+      calls += 1
+      ledger.add(cost)
     },
     stop: (reason) => {
       stopped ??= reason

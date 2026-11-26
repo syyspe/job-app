@@ -127,9 +127,10 @@ const engineConfigSchema = z.object({
         })
         .default(DEFAULT_EFFORT),
       perRunUsd: z.number().positive().default(3),
+      monthlyUsd: z.number().positive().default(30),
       prices: z.record(z.string(), priceSchema).default({}),
     })
-    .default({ models: DEFAULT_MODELS, effort: DEFAULT_EFFORT, perRunUsd: 3, prices: {} }),
+    .default({ models: DEFAULT_MODELS, effort: DEFAULT_EFFORT, perRunUsd: 3, monthlyUsd: 30, prices: {} }),
 })
 
 export type EngineConfig = z.infer<typeof engineConfigSchema>

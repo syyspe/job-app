@@ -98,7 +98,10 @@ the figures on the run panel. Contract: `docs/in-app-agent.md` §6.
 - `engine.test.ts`: api engine charges land in `<stateDir>/api-spend.json`;
   cli engine writes nothing there.
 - `summary.test.ts`: line present with `apiSpend`, absent without.
-- `dailyRun.test.ts`: report carries `apiSpend` from the budget and the sent
+- `dailyRun.budget.test.ts` (new — `dailyRun.test.ts` was already past the
+  300-line hook, so its setup moved to `agent/test/dailyRunFixture.ts` and
+  the budget tests, including 049's mid-evaluation stop, moved here; the
+  budget tests share `agent/test/memoryLedger.ts`): report carries `apiSpend` from the budget and the sent
   summary includes the line; a budget stopped by the month cap yields
   `report.stopped` and the summary problem.
 - `src/lib/agentRuns.test.ts` (new): `runSpend` finds the line, takes the

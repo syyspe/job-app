@@ -1,6 +1,6 @@
 import { CliError } from '../../lib/cliError.ts'
 import { UNLIMITED } from './apiBudget.ts'
-import type { StepBudget } from './apiBudget.ts'
+import type { ApiSpend, StepBudget } from './apiBudget.ts'
 import type { HealthResult } from '../../profile/lib/ollama.ts'
 import { runCollect } from './collectRun.ts'
 import type { CollectReport, CollectRunOptions } from './collectRun.ts'
@@ -60,6 +60,8 @@ export interface DailyReport {
   skipped: Problem | null
   // Why the budget stopped new model steps part-way: reported like a skip.
   stopped: Problem | null
+  // What the Claude API cost, whenever the run made an API call.
+  apiSpend: ApiSpend | null
   // Steps that failed with a CliError; any of them fails the run.
   failures: Problem[]
   sent: boolean
@@ -127,6 +129,7 @@ async function modelSteps(run: Run): Promise<void> {
   report.drafting = await guarded(run, 'draft', () => runDrafting({ ...options.drafting, ...steps }))
   const reason = budget.stopReason()
   if (reason) report.stopped = { step: 'model steps', message: reason }
+  report.apiSpend = budget.spend()
 }
 
 // Nothing is marked reported, and no source failure cleared, until the mail
@@ -142,7 +145,8 @@ async function sendSummary({ options, report }: Run): Promise<void> {
   if (isEmpty({ ads, prescreened, sourceFailures, problems }) && !options.summary.alwaysSend) return
   const { appUrl, lanUrl } = options.summary
   const tally = prescreenTally(await jobApp.listAllAds(), options.now())
-  const summary = composeSummary({ ads, prescreened, tally, sourceFailures, problems, appUrl, lanUrl })
+  const { apiSpend } = report
+  const summary = composeSummary({ ads, prescreened, tally, sourceFailures, problems, apiSpend, appUrl, lanUrl })
   await options.send({ to: options.summary.recipient, ...summary, date: options.now() })
   report.sent = true
   await jobApp.markReported(ads.map((ad) => ad.id))
@@ -161,6 +165,7 @@ export async function runDaily(options: DailyRunOptions): Promise<DailyReport> {
     drafting: null,
     skipped: null,
     stopped: null,
+    apiSpend: null,
     failures: [],
     sent: false,
   }

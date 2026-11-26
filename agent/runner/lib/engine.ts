@@ -1,5 +1,6 @@
+import { join } from 'node:path'
 import Anthropic from '@anthropic-ai/sdk'
-import { configPath, envPath, indexPath } from '../../lib/paths.ts'
+import { configPath, envPath, indexPath, stateDir } from '../../lib/paths.ts'
 import type { Env } from '../../lib/paths.ts'
 import type { ProfileConfig } from '../../profile/lib/config.ts'
 import { createOllama } from '../../profile/lib/ollama.ts'
@@ -7,6 +8,7 @@ import { searchIndexFile } from '../../profile/lib/search.ts'
 import type { SearchRequest, SearchResult } from '../../profile/lib/search.ts'
 import { createRunBudget, UNLIMITED } from './apiBudget.ts'
 import type { StepBudget } from './apiBudget.ts'
+import { createSpendLedger } from './apiSpend.ts'
 import { createApiStep } from './apiStep.ts'
 import type { MessagesApi } from './apiStep.ts'
 import { loadApiKey } from './env.ts'
@@ -38,6 +40,8 @@ export interface EngineDeps {
   env: Env
   // The runner's env file, holding ANTHROPIC_API_KEY under "api".
   envFile: string
+  // Where the month's API spend is kept, in api-spend.json.
+  stateDir: string
   searchProfile: (request: SearchRequest) => Promise<SearchResult[]>
   // Tests only: stands in for the SDK client.
   messages?: MessagesApi
@@ -56,7 +60,9 @@ function cliEngine(env: Env): Engine {
 function apiEngine(api: ApiConfig, deps: EngineDeps): Engine {
   const apiKey = loadApiKey(deps.envFile)
   const messages = deps.messages ?? new Anthropic({ apiKey }).messages
-  const budget = createRunBudget({ perRunUsd: api.perRunUsd, prices: api.prices })
+  const ledger = createSpendLedger(join(deps.stateDir, 'api-spend.json'), () => new Date())
+  const { perRunUsd, monthlyUsd, prices } = api
+  const budget = createRunBudget({ perRunUsd, monthlyUsd, prices, ledger })
   return {
     kind: 'api',
     budget,
@@ -81,5 +87,10 @@ export function loadEngine(env: Env, profile: ProfileConfig): Engine {
   const indexFile = indexPath(env)
   const search = { ollama: createOllama({ url: profile.ollamaUrl, model: profile.embeddingModel }), model: profile.embeddingModel }
   const searchProfile = (request: SearchRequest) => searchIndexFile(indexFile, search, request)
-  return createEngine(loadEngineConfig(configPath(env)), { env, envFile: envPath(env), searchProfile })
+  return createEngine(loadEngineConfig(configPath(env)), {
+    env,
+    envFile: envPath(env),
+    stateDir: stateDir(env),
+    searchProfile,
+  })
 }

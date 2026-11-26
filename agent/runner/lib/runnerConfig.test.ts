@@ -220,6 +220,7 @@ describe('loadEngineConfig', () => {
         models: { prescreen: 'claude-haiku-5-5', evaluation: 'claude-sonnet-5-5', drafting: 'claude-opus-5-5' },
         effort: { prescreen: 'low', evaluation: 'medium', drafting: 'high' },
         perRunUsd: 3,
+        monthlyUsd: 30,
         prices: {},
       },
     })
@@ -238,6 +239,8 @@ describe('loadEngineConfig', () => {
     ['an unknown engine', { engine: 'gpt' }, 'engine'],
     ['an effort outside low|medium|high', { api: { effort: { evaluation: 'max' } } }, 'api.effort.evaluation'],
     ['a zero run cap', { api: { perRunUsd: 0 } }, 'api.perRunUsd'],
+    ['a zero monthly cap', { api: { monthlyUsd: 0 } }, 'api.monthlyUsd'],
+    ['a negative monthly cap', { api: { monthlyUsd: -5 } }, 'api.monthlyUsd'],
     ['a negative price', { api: { prices: { m: { ...price, inputPerMTok: -1 } } } }, 'api.prices.m.inputPerMTok'],
   ])('%s is an exit-2 error naming the field', (_name, value, field) => {
     const path = writeConfig(value)

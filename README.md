@@ -361,6 +361,7 @@ To use the API engine:
        },
        "effort": { "prescreen": "low", "evaluation": "medium", "drafting": "high" },
        "perRunUsd": 3,
+       "monthlyUsd": 30,
        "prices": {
          "<model id>": { "inputPerMTok": 0, "outputPerMTok": 0, "cacheWritePerMTok": 0, "cacheReadPerMTok": 0 }
        }
@@ -373,6 +374,24 @@ To use the API engine:
    next run, and the command prints `stopped: API run cap reached at
    $3.00`. An authentication or permission error stops the run's steps the
    same way. Going back is one edit: `"engine": "cli"`.
+
+3. Set a spend limit in the Anthropic Console above `monthlyUsd`, as a
+   backstop in case the runner's own count is ever wrong.
+
+Every API response's cost is also added to a monthly ledger,
+`~/.local/state/job-agent/api-spend.json`, shaped
+`{ "months": { "YYYY-MM": <usd> } }` by local month. Only the current and
+previous months are kept. `agent:evaluate` and `agent:draft` add to it too,
+since they share the engine. Once the month reaches `monthlyUsd`, no new
+step starts in any command, and the command prints `stopped: API monthly cap
+reached: $30.00 of $30.00` until the next month begins. A ledger that
+isn't valid JSON of that shape exits 2 naming the file: fix or delete it.
+
+Whenever a daily run made an API call, its summary ends with
+`Claude API: $0.42 this run, $4.12 this month of $30.00` before the job-app
+link, and its last stdout line is `api: $0.42 run, $4.12 month`. The run
+panel shows those figures beside a finished run. The CLI engine keeps no
+ledger and prints no such line.
 
 ### Commands
 
@@ -613,7 +632,8 @@ the summary says why. Under `engine: "api"` there is no sandbox check.
   run's pre-screens and a 14-day count of verdicts against your Fetch
   clicks. If Ollama is unreachable or the sandbox check fails, the
   pre-screen, fetch, evaluation and drafting are skipped and no ad is
-  touched. Under `engine: "api"`, reaching `api.perRunUsd` or an API
+  touched. Under `engine: "api"`, reaching `api.perRunUsd` or
+  `api.monthlyUsd` (a month already at its cap starts no model step), or an API
   authentication or permission error starts no further model step: the run
   prints `model steps stopped: <reason>`, the summary lists it as a problem,
   and the remaining ads stay queued. Configuration errors exit 2
