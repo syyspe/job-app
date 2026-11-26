@@ -37,15 +37,23 @@ export interface SandboxStep {
   workRoot?: string
 }
 
-export type FailureCategory = 'timeout' | 'cli_failed' | 'bad_output'
+export type FailureCategory = 'timeout' | 'model_failed' | 'bad_output'
 
-export type SandboxResult = { kind: 'ok'; output: unknown } | { kind: 'failed'; category: FailureCategory }
+// `detail` is the API's status and message, for this run's output only.
+export type SandboxResult =
+  | { kind: 'ok'; output: unknown }
+  | { kind: 'failed'; category: FailureCategory; detail?: string }
 
 export type RawRun = { kind: 'exited'; code: number | null; stdout: string; cwd: string } | { kind: 'timeout' }
 
 // The CLI rejects the `$schema` key z.toJSONSchema writes, so it is dropped.
+// The API rejects `maxItems`, so that goes too; the zod check still applies it.
 export function stepSchema(schema: z.ZodType): Record<string, unknown> {
-  const { $schema: _dialect, ...rest } = z.toJSONSchema(schema)
+  const { $schema: _dialect, ...rest } = z.toJSONSchema(schema, {
+    override: (ctx) => {
+      delete ctx.jsonSchema.maxItems
+    },
+  })
   return rest
 }
 
@@ -133,14 +141,14 @@ function parseEnvelope(stdout: string): z.infer<typeof envelopeSchema> | undefin
 }
 
 // A usage limit is not marked distinctly in the CLI's JSON result, so it
-// counts as cli_failed like any other failed run.
+// counts as model_failed like any other failed run.
 export async function runSandboxed(step: SandboxStep): Promise<SandboxResult> {
   const run = await spawnSandboxed(step, 'json')
   if (run.kind === 'timeout') return { kind: 'failed', category: 'timeout' }
-  if (run.code !== 0) return { kind: 'failed', category: 'cli_failed' }
+  if (run.code !== 0) return { kind: 'failed', category: 'model_failed' }
   const envelope = parseEnvelope(run.stdout)
   if (!envelope) return { kind: 'failed', category: 'bad_output' }
-  if (envelope.is_error) return { kind: 'failed', category: 'cli_failed' }
+  if (envelope.is_error) return { kind: 'failed', category: 'model_failed' }
   if (!envelope.structured_output) return { kind: 'failed', category: 'bad_output' }
   return { kind: 'ok', output: envelope.structured_output }
 }

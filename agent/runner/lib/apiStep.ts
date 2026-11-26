@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import type { APIError } from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { CliError } from '../../lib/cliError.ts'
 import type { SearchRequest, SearchResult } from '../../profile/lib/search.ts'
@@ -38,8 +39,14 @@ const SEARCH_TOOL: Anthropic.Tool = {
   input_schema: { ...searchInputSchema, type: 'object' },
 }
 
-function failed(category: FailureCategory): SandboxResult {
-  return { kind: 'failed', category }
+function failed(category: FailureCategory, detail?: string): SandboxResult {
+  return { kind: 'failed', category, detail }
+}
+
+// What the run prints for a failed call: the status and the API's own message.
+function apiErrorDetail(err: APIError): string {
+  const detail = `${err.status ?? 'no response'}: ${err.apiMessage ?? err.message}`
+  return err.requestID ? `${detail} (request ${err.requestID})` : detail
 }
 
 // The system block's breakpoint caches the tool and the system prompt, which
@@ -117,7 +124,7 @@ function failureFor(err: unknown, budget: RunBudget): SandboxResult {
   }
   if (err instanceof Anthropic.AuthenticationError) budget.stop('Claude API: authentication failed')
   if (err instanceof Anthropic.PermissionDeniedError) budget.stop('Claude API: permission denied')
-  if (err instanceof Anthropic.APIError) return failed('cli_failed')
+  if (err instanceof Anthropic.APIError) return failed('model_failed', apiErrorDetail(err))
   throw err
 }
 

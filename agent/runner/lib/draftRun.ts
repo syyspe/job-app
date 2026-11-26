@@ -4,6 +4,8 @@ import type { DraftOutcome } from './draft.ts'
 import type { Ad, AdSummary, JobAppClient } from './jobApp.ts'
 import { mapLimit } from './mapLimit.ts'
 import type { DraftConfig } from './runnerConfig.ts'
+import { failedAttempt, formatFailedAttempt } from './stepFailure.ts'
+import type { FailedAttempt } from './stepFailure.ts'
 
 export interface DraftRunOptions {
   jobApp: JobAppClient
@@ -27,22 +29,29 @@ export interface DraftReport {
   skipped: string | null
   counts: DraftCounts
   queued: number
+  // Every failed attempt this run, whether its ad retries or reached failed.
+  failedAttempts: FailedAttempt[]
 }
 
 type DraftResult = keyof DraftCounts
 
+interface Drafted {
+  result: DraftResult
+  failure: FailedAttempt | null
+}
+
 // A failure is a same-state transition carrying its category: the server adds
 // the attempt and fails the ad on the third.
-async function draftOne(options: DraftRunOptions, summary: AdSummary): Promise<DraftResult> {
+async function draftOne(options: DraftRunOptions, summary: AdSummary): Promise<Drafted> {
   const { jobApp, config, today } = options
   const ad = await jobApp.getAd(summary.id)
   const outcome = await options.write(ad)
   if (outcome.kind === 'failed') {
     const moved = await jobApp.transitionAd(ad.id, { to: 'suitable', error: outcome.category })
-    return moved.state === 'failed' ? 'failed' : 'retrying'
+    return { result: moved.state === 'failed' ? 'failed' : 'retrying', failure: failedAttempt(summary, outcome) }
   }
   await jobApp.draftAd(ad.id, buildDraft(ad, outcome.output, { filePrefix: config.filePrefix, savedOn: today }))
-  return 'drafted'
+  return { result: 'drafted', failure: null }
 }
 
 function countResults(results: DraftResult[]): DraftCounts {
@@ -54,20 +63,26 @@ function countResults(results: DraftResult[]): DraftCounts {
 export async function runDrafting(options: DraftRunOptions): Promise<DraftReport> {
   const { jobApp, config } = options
   const health = await options.checkHealth()
-  if (!health.ok) return { skipped: health.reason, counts: countResults([]), queued: 0 }
+  if (!health.ok) return { skipped: health.reason, counts: countResults([]), queued: 0, failedAttempts: [] }
   // The API lists newest first; the oldest ads are drafted first.
   const suitable = (await jobApp.listAds('suitable')).toReversed()
   const batch = suitable.slice(0, config.perRunCap)
   const limits = { limit: config.concurrency, canStart: options.canStart }
-  const results = await mapLimit(batch, limits, (ad) => draftOne(options, ad))
-  return { skipped: null, counts: countResults(results), queued: suitable.length - results.length }
+  const drafted = await mapLimit(batch, limits, (ad) => draftOne(options, ad))
+  return {
+    skipped: null,
+    counts: countResults(drafted.map((one) => one.result)),
+    queued: suitable.length - drafted.length,
+    failedAttempts: drafted.flatMap((one) => (one.failure ? [one.failure] : [])),
+  }
 }
 
-export function formatDraftReport({ skipped, counts, queued }: DraftReport): string[] {
+export function formatDraftReport({ skipped, counts, queued, failedAttempts }: DraftReport): string[] {
   if (skipped) return [`drafting skipped: ${skipped}`]
   const { drafted, retrying, failed } = counts
   return [
     `drafted: ${drafted} drafted, ${retrying} retrying, ${failed} failed`,
     `queued: ${queued} suitable ads over the per-run cap`,
+    ...failedAttempts.map((attempt) => formatFailedAttempt('drafting', attempt)),
   ]
 }

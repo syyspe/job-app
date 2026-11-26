@@ -5,6 +5,8 @@ import { mapLimit } from './mapLimit.ts'
 import type { RunnerConfig } from './runnerConfig.ts'
 import { screenNewAds } from './screen.ts'
 import type { ScreenCounts } from './screen.ts'
+import { failedAttempt, formatFailedAttempt } from './stepFailure.ts'
+import type { FailedAttempt } from './stepFailure.ts'
 
 export interface EvaluationRunOptions {
   jobApp: JobAppClient
@@ -28,14 +30,24 @@ export interface EvaluationReport {
   skipped: string | null
   evaluated: EvaluationCounts
   queued: number
+  // Every failed attempt this run, whether its ad retries or reached failed.
+  failedAttempts: FailedAttempt[]
+}
+
+interface Evaluated {
+  moved: AdSummary
+  failure: FailedAttempt | null
 }
 
 // A failure is a same-state transition carrying its category: the server adds
 // the attempt and fails the ad on the third.
-async function evaluateOne(options: EvaluationRunOptions, summary: AdSummary): Promise<AdSummary> {
+async function evaluateOne(options: EvaluationRunOptions, summary: AdSummary): Promise<Evaluated> {
   const outcome = await options.evaluate(await options.jobApp.getAd(summary.id))
-  if (outcome.kind === 'evaluated') return options.jobApp.transitionAd(summary.id, outcome.transition)
-  return options.jobApp.transitionAd(summary.id, { to: 'ready', error: outcome.category })
+  if (outcome.kind === 'evaluated') {
+    return { moved: await options.jobApp.transitionAd(summary.id, outcome.transition), failure: null }
+  }
+  const moved = await options.jobApp.transitionAd(summary.id, { to: 'ready', error: outcome.category })
+  return { moved, failure: failedAttempt(summary, outcome) }
 }
 
 function countStates(moved: AdSummary[]): EvaluationCounts {
@@ -51,16 +63,23 @@ export async function runEvaluation(options: EvaluationRunOptions): Promise<Eval
   const { jobApp, config } = options
   const screened = await screenNewAds(jobApp, config.titleRules.reject)
   const health = await options.checkHealth()
-  if (!health.ok) return { screened, skipped: health.reason, evaluated: NONE_EVALUATED, queued: 0 }
+  if (!health.ok) return { screened, skipped: health.reason, evaluated: NONE_EVALUATED, queued: 0, failedAttempts: [] }
   // The API lists newest first; the oldest ads are evaluated first.
   const ready = (await jobApp.listAds('ready')).toReversed()
   const batch = ready.slice(0, config.evaluation.perRunCap)
   const limits = { limit: config.evaluation.concurrency, canStart: options.canStart }
-  const moved = await mapLimit(batch, limits, (ad) => evaluateOne(options, ad))
-  return { screened, skipped: null, evaluated: countStates(moved), queued: ready.length - moved.length }
+  const results = await mapLimit(batch, limits, (ad) => evaluateOne(options, ad))
+  return {
+    screened,
+    skipped: null,
+    evaluated: countStates(results.map((result) => result.moved)),
+    queued: ready.length - results.length,
+    failedAttempts: results.flatMap((result) => (result.failure ? [result.failure] : [])),
+  }
 }
 
-export function formatEvaluationReport({ screened, skipped, evaluated, queued }: EvaluationReport): string[] {
+export function formatEvaluationReport(report: EvaluationReport): string[] {
+  const { screened, skipped, evaluated, queued, failedAttempts } = report
   const { titleRejected, awaitingHandover, leftNew } = screened
   const screenedLine = `screened: ${titleRejected} title_rejected, ${awaitingHandover} awaiting_handover, ${leftNew} left new`
   if (skipped) return [screenedLine, `evaluation skipped: ${skipped}`]
@@ -69,5 +88,6 @@ export function formatEvaluationReport({ screened, skipped, evaluated, queued }:
     screenedLine,
     `evaluated: ${suitable} suitable, ${unsuitable} unsuitable, ${retrying} retrying, ${failed} failed`,
     `queued: ${queued} ready ads over the per-run cap`,
+    ...failedAttempts.map((attempt) => formatFailedAttempt('evaluation', attempt)),
   ]
 }

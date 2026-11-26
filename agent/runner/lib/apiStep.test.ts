@@ -164,22 +164,29 @@ test('the SDK timeout error is a timeout', async () => {
 test.each([
   [401, 'Claude API: authentication failed'],
   [403, 'Claude API: permission denied'],
-])('a %i is cli_failed and stops the run budget', async (status, reason) => {
+])('a %i is model_failed with its detail and stops the run budget', async (status, reason) => {
   const { run } = step([apiError(status)])
 
-  expect(await run('{}')).toEqual({ kind: 'failed', category: 'cli_failed' })
+  expect(await run('{}')).toEqual({ kind: 'failed', category: 'model_failed', detail: `${status}: status ${status}` })
   expect(budget.canStart()).toBe(false)
   expect(budget.stopReason()).toBe(reason)
 })
 
-test.each([
-  ['a 400', apiError(400)],
-  ['a 500', apiError(500)],
-  ['a connection error', new APIConnectionError({ message: 'reset' })],
-])('%s is cli_failed and leaves the budget open', async (_name, error) => {
-  const { run } = step([error])
+test.each([400, 500])('a %i is model_failed with its status, message and request id', async (status) => {
+  const { run } = step([apiError(status, 'req_123')])
 
-  expect(await run('{}')).toEqual({ kind: 'failed', category: 'cli_failed' })
+  expect(await run('{}')).toEqual({
+    kind: 'failed',
+    category: 'model_failed',
+    detail: `${status}: status ${status} (request req_123)`,
+  })
+  expect(budget.canStart()).toBe(true)
+})
+
+test('a connection error is model_failed with no response and leaves the budget open', async () => {
+  const { run } = step([new APIConnectionError({ message: 'reset' })])
+
+  expect(await run('{}')).toEqual({ kind: 'failed', category: 'model_failed', detail: 'no response: reset' })
   expect(budget.canStart()).toBe(true)
 })
 

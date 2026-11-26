@@ -22,7 +22,7 @@ export interface EvaluationTransition {
 
 export type EvaluationOutcome =
   | { kind: 'evaluated'; transition: EvaluationTransition }
-  | { kind: 'failed'; category: FailureCategory | 'invalid_result' }
+  | { kind: 'failed'; category: FailureCategory | 'invalid_result'; detail?: string }
 
 export type RunStep = (input: string) => Promise<SandboxResult>
 

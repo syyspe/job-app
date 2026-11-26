@@ -7,6 +7,9 @@ import type { TempDir } from '../../test/tempDir.ts'
 import { z } from 'zod'
 import { runSandboxed, sandboxArgs, sandboxEnv, stepSchema } from './sandbox.ts'
 import type { SandboxStep } from './sandbox.ts'
+import { DRAFT_SCHEMA } from './draft.ts'
+import { EVALUATION_SCHEMA } from './evaluate.ts'
+import { PRESCREEN_SCHEMA } from './prescreen.ts'
 
 const fakeClaude = join(import.meta.dirname, '..', '..', 'test', 'fakeClaude.ts')
 let dir: TempDir
@@ -130,8 +133,8 @@ test('a hang becomes timeout and the child is killed', async () => {
 })
 
 test.each([
-  ['exit1', 'cli_failed'],
-  ['is_error', 'cli_failed'],
+  ['exit1', 'model_failed'],
+  ['is_error', 'model_failed'],
   ['garbage', 'bad_output'],
 ])('a %s run becomes %s', async (mode, category) => {
   expect(await runSandboxed(step(mode))).toEqual({ kind: 'failed', category })
@@ -161,4 +164,32 @@ test('a step schema carries no $schema key, which the CLI rejects', () => {
     required: ['summary'],
     additionalProperties: false,
   })
+})
+
+test('a step schema drops maxItems at any depth, which the API rejects, and keeps maxLength', () => {
+  const schema = z.object({ groups: z.array(z.object({ tags: z.array(z.string().max(20)).max(3) })).max(5) })
+  expect(stepSchema(schema)).toEqual({
+    type: 'object',
+    properties: {
+      groups: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: { tags: { type: 'array', items: { type: 'string', maxLength: 20 } } },
+          required: ['tags'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['groups'],
+    additionalProperties: false,
+  })
+})
+
+test.each([
+  ['pre-screen', PRESCREEN_SCHEMA],
+  ['evaluation', EVALUATION_SCHEMA],
+  ['drafting', DRAFT_SCHEMA],
+])('the %s schema sent to the model has no maxItems', (_step, schema) => {
+  expect(JSON.stringify(schema)).not.toContain('"maxItems"')
 })

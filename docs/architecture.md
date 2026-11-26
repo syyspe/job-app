@@ -364,7 +364,9 @@ criteria that follow it. `prompts/draft.framing.md` and
   call, `search_profile` its only tool and answered in-process, at most 8
   tool rounds, the whole call under one `timeoutMs` signal, and the SDK's
   errors mapped onto the failure categories (a 401 or 403 also stops the
-  budget). `MessagesApi` is the narrow client a fake satisfies.
+  budget). Every non-timeout API error is `model_failed` with a `detail`:
+  status, the API's message and the request id. `MessagesApi` is the narrow
+  client a fake satisfies.
 - `apiBudget.ts` — `responseCost(price, usage)`, the `StepBudget` interface,
   `UNLIMITED`, and `createRunBudget`, which charges each response to the run
   and the month's ledger and stops new steps on `stop(reason)`, at
@@ -408,7 +410,15 @@ criteria that follow it. `prompts/draft.framing.md` and
   the unreported ads, the run's pre-screens with `prescreenTally`'s 14-day
   verdict-vs-click count, source failures and problems, and a `Claude API:`
   spend line when the run made an API call; `isEmpty` says when
-  there is nothing to send. Ad text has control characters and line breaks replaced.
+  there is nothing to send. Ad text has control characters and line breaks
+  replaced through `oneLine`. A Failed line carries the detail of this run's
+  failed attempt on that ad, when there is one.
+- `oneLine.ts` — `oneLine(value)`: control characters and line breaks become
+  spaces, so untrusted text can't start a line of its own.
+- `stepFailure.ts` — `FailedAttempt` (ad id, title, source, category,
+  optional detail), `failedAttempt(ad, failure)` and
+  `formatFailedAttempt(step, attempt)`, the `<step> failed: …` line the
+  evaluation, drafting and pre-screen reports print per failed attempt.
 - `dailyRun.ts` — `runDaily(options)`, every dependency injected: collect,
   expire, one health check and the gate (`ensureSandboxVerified`, or `null`
   under `"api"`), then sync, pre-screen, hand-over fetch, evaluation and
@@ -443,7 +453,7 @@ criteria that follow it. `prompts/draft.framing.md` and
   first, up to `perRunCap` through `mapLimit`. A failure stores nothing.
 - `sandbox.ts` — the one way the runner starts `claude -p`: `sandboxArgs`
   (the fixed flag list), `sandboxEnv` (the allowlist), `profileMcpConfig`,
-  `stepSchema` (zod → JSON Schema without `$schema`), `spawnSandboxed` (fresh
+  `stepSchema` (zod → JSON Schema without `$schema` or `maxItems`), `spawnSandboxed` (fresh
   empty cwd, stdin, timeout) and `runSandboxed`, which parses the JSON
   envelope into `ok` or a failure category.
 - `sandboxProbes.ts` / `sandboxCanary.ts` — the gate's two real runs (benign

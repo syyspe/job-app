@@ -390,8 +390,13 @@ reached: $30.00 of $30.00` until the next month begins. A ledger that
 isn't valid JSON of that shape exits 2 naming the file: fix or delete it.
 
 Under `"api"`, a step whose API call fails (any 4xx, or a 5xx or overload
-after the SDK's retries) records `cli_failed`, the same category a failed
-`claude -p` records; the name stays until the CLI engine is retired.
+after the SDK's retries, or no response) records `model_failed`, the same
+category a failed `claude -p` records. The command also prints one line per
+failed attempt with the API's status and message, for example
+`evaluation failed: Developer, duunitori: model_failed — 400: … (request
+req_…)`, and the daily summary shows that detail beside an ad that reached
+`failed` in the same run. Only the category is stored on the ad; an older
+`cli_failed` value displays as it is.
 
 Whenever a daily run made an API call, its summary ends with
 `Claude API: $0.42 this run, $4.12 this month of $30.00` before the job-app
@@ -410,7 +415,7 @@ ledger and prints no such line.
   it evaluates the oldest `perRunCap` ready ads into `suitable` or
   `unsuitable`, and leaves the rest queued. An unsure result counts as
   `suitable`. A failed step records an attempt with a fixed category
-  (`timeout`, `cli_failed`, `bad_output`, `invalid_result`), and the third
+  (`timeout`, `model_failed`, `bad_output`, `invalid_result`), and the third
   failed attempt moves the ad to `failed`.
 
 ## Ad drafting
@@ -464,7 +469,7 @@ including the sandbox check.
   ad's source and URL. An ad that gives no company or title gets
   `Unknown company` / `Unknown role` and a fixed question asking for it. A
   failed step records an attempt with a fixed category (`timeout`,
-  `cli_failed`, `bad_output`, `invalid_result`, `ask_mismatch`), and the
+  `model_failed`, `bad_output`, `invalid_result`, `ask_mismatch`), and the
   third failed attempt moves the ad to `failed`. A draft the API refuses
   (for example a 409 because the ad was drafted in the meantime) stops the
   run with exit 1.

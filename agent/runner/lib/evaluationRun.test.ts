@@ -7,7 +7,7 @@ import type { HealthResult } from '../../profile/lib/ollama.ts'
 import type { EvaluationOutcome } from './evaluate.ts'
 import { createJobAppClient } from './jobApp.ts'
 import type { Ad } from './jobApp.ts'
-import { runEvaluation } from './evaluationRun.ts'
+import { formatEvaluationReport, runEvaluation } from './evaluationRun.ts'
 
 let fake: FakeJobApp
 
@@ -143,4 +143,36 @@ test('once canStart turns false no further ad is evaluated, and the rest stay qu
   expect(report.evaluated).toEqual({ suitable: 1, unsuitable: 0, retrying: 0, failed: 0 })
   expect(report.queued).toBe(2)
   expect(fake.ads.map((ad) => [ad.state, ad.attempts])).toEqual([['suitable', 0], ['ready', 0], ['ready', 0]])
+})
+
+const apiFailure: EvaluationOutcome = { kind: 'failed', category: 'model_failed', detail: '400: bad schema' }
+
+test('every failed attempt is reported with its ad and detail, retrying or failed', async () => {
+  fake.ads.push(
+    fakeAd({ id: 1, state: 'ready', body: 'text', title: 'Backend developer' }),
+    fakeAd({ id: 2, state: 'ready', body: 'text', attempts: 2 }),
+    fakeAd({ id: 3, state: 'ready', body: 'text' }),
+  )
+  const evaluate = (ad: Ad): Promise<EvaluationOutcome> => Promise.resolve(ad.id === 3 ? suitable : apiFailure)
+
+  const report = await run({ evaluate })
+
+  expect(report.evaluated).toMatchObject({ retrying: 1, failed: 1 })
+  expect(report.failedAttempts).toEqual([
+    { adId: 1, title: 'Backend developer', source: 'testsource', category: 'model_failed', detail: '400: bad schema' },
+    { adId: 2, title: 'Developer 2', source: 'testsource', category: 'model_failed', detail: '400: bad schema' },
+  ])
+  expect(formatEvaluationReport(report).slice(3)).toEqual([
+    'evaluation failed: Backend developer, testsource: model_failed — 400: bad schema',
+    'evaluation failed: Developer 2, testsource: model_failed — 400: bad schema',
+  ])
+})
+
+test('a run with no failure reports no failed line', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'ready', body: 'text' }))
+
+  const report = await run()
+
+  expect(report.failedAttempts).toEqual([])
+  expect(formatEvaluationReport(report)).toHaveLength(3)
 })

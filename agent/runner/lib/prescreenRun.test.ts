@@ -66,7 +66,7 @@ test('the cap leaves the newest queued', async () => {
   expect(report.queued).toBe(1)
 })
 
-test.each(['timeout', 'cli_failed', 'bad_output', 'invalid_result'] as const)(
+test.each(['timeout', 'model_failed', 'bad_output', 'invalid_result'] as const)(
   'a %s failure posts nothing and is counted',
   async (category) => {
     fake.ads.push(fakeAd({ id: 1, ...waiting }))
@@ -80,7 +80,7 @@ test.each(['timeout', 'cli_failed', 'bad_output', 'invalid_result'] as const)(
 )
 
 test('the report prints one line for verdicts and one for the queue', () => {
-  const report = { screened: { promising: 2, notPromising: 1 }, failed: 1, queued: 3, ads: [] }
+  const report = { screened: { promising: 2, notPromising: 1 }, failed: 1, queued: 3, ads: [], failedAttempts: [] }
 
   expect(formatPrescreenReport(report)).toEqual([
     'pre-screened: 2 promising, 1 not promising, 1 failed',
@@ -98,4 +98,28 @@ test('once canStart turns false no further ad is pre-screened, and the rest stay
   expect(report.failed).toBe(0)
   expect(report.queued).toBe(2)
   expect(fake.ads.map((ad) => ad.prescreen === null)).toEqual([false, true, true])
+})
+
+test('a failed pre-screen is reported with its ad and detail', async () => {
+  fake.ads.push(fakeAd({ id: 1, ...waiting }), fakeAd({ id: 2, ...waiting }))
+
+  const report = await run((ad) =>
+    ad.id === 1 ? { kind: 'failed', category: 'model_failed', detail: 'no response: reset' } : verdictFor(ad),
+  )
+
+  expect(report.failedAttempts).toEqual([
+    { adId: 1, title: 'Developer 1', source: 'testsource', category: 'model_failed', detail: 'no response: reset' },
+  ])
+  expect(formatPrescreenReport(report).slice(2)).toEqual([
+    'pre-screen failed: Developer 1, testsource: model_failed — no response: reset',
+  ])
+})
+
+test('a run with no failure reports no failed line', async () => {
+  fake.ads.push(fakeAd({ id: 1, ...waiting }))
+
+  const report = await run(verdictFor)
+
+  expect(report.failedAttempts).toEqual([])
+  expect(formatPrescreenReport(report)).toHaveLength(2)
 })
