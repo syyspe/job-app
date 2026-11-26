@@ -44,7 +44,7 @@ export type SandboxResult = { kind: 'ok'; output: unknown } | { kind: 'failed'; 
 export type RawRun = { kind: 'exited'; code: number | null; stdout: string; cwd: string } | { kind: 'timeout' }
 
 // The CLI rejects the `$schema` key z.toJSONSchema writes, so it is dropped.
-export function stepSchema(schema: z.ZodType): object {
+export function stepSchema(schema: z.ZodType): Record<string, unknown> {
   const { $schema: _dialect, ...rest } = z.toJSONSchema(schema)
   return rest
 }

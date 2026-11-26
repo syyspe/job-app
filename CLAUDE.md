@@ -38,7 +38,10 @@
 - Ad evaluation: `npm run agent:sandbox-check` runs real `claude -p` probes
   against the installed CLI and records the version that passed;
   `npm run agent:evaluate` screens new ads by title and evaluates ready ones,
-  and refuses to run until the check has passed for the installed version.
+  and under config's `engine: "cli"` (the default) refuses to run until the
+  check has passed for the installed version; `engine: "api"` runs the
+  steps on the Claude API instead and needs `ANTHROPIC_API_KEY` in
+  `~/.config/job-agent/env` — see README's "Engine" section.
   Both read `~/.config/job-agent/` and need the private prompt
   `prompts/evaluate.md` — see README's "Ad evaluation" section.
   `npm run agent:draft` turns suitable ads into draft applications under the
@@ -69,7 +72,8 @@ with no `failed` line. Playwright: `N passed`.
 - Dependency policy: no new dependencies without approval. Approved so far
   beyond the framework set: `@modelcontextprotocol/sdk` 1.30.0 and `zod`
   4.6.5, both for `mcp/` and `agent/`; `imapflow` 2.12.1 and `mailparser`
-  3.14.5 (with `@types/mailparser` 3.9.0), for `agent/runner/` only.
+  3.14.5 (with `@types/mailparser` 3.9.0), for `agent/runner/` only;
+  `@anthropic-ai/sdk` 1.14.0, for `agent/runner/` only.
 - Unit tests live beside the code they test as `src/**/*.test.tsx?`,
   `server/**/*.test.ts`, `mcp/**/*.test.ts` and `agent/**/*.test.ts`; those
   globs are what Vitest picks up. E2E specs go in `e2e/*.spec.ts`.

@@ -32,7 +32,7 @@ pipeline (§1), permissions (§2), private configuration (§3) and daily run
 | Stream | Brief | State | Needs |
 |---|---|---|---|
 | `048-in-app-agent-spec` | committed | done | — |
-| `049-api-steps` | committed | open | — |
+| `049-api-steps` | committed | done | — |
 | `050-spend-caps` | committed | open | 049 |
 | `051-run-from-ui` | committed | open | — |
 | `052-retire-claude-p` | committed | open | 049, 050, 051 |
@@ -148,6 +148,13 @@ Each step call is one Messages conversation:
   a cap of 8 tool rounds (a run past the cap is `bad_output`). The whole
   call is bounded by the step's existing `timeoutMs`.
 - **Model and thinking:** per §5.
+- **Caching:** two breakpoints. The render order is tools → system →
+  messages, so the `cache_control` on the system text block caches the
+  tool definition and the system prompt together, which every ad in a run
+  shares. A top-level `cache_control` (automatic caching) also caches the
+  growing conversation across one ad's tool rounds, which matters for
+  drafting, whose user turn carries both CV templates. A prefix under the
+  model's minimum just doesn't cache, with no error.
 
 No sandbox is needed, because the call can do only what the runner
 executes for it, and the runner executes only `searchIndexFile`.
@@ -160,10 +167,17 @@ executes for it, and the runner executes only `searchIndexFile`.
 | API outcome | Category |
 |---|---|
 | `timeoutMs` reached, or the SDK's timeout error | `timeout` |
-| `stop_reason: "refusal"`, no JSON text, the tool-round cap reached | `bad_output` |
+| `stop_reason: "refusal"`, `"max_tokens"` or `"pause_turn"`, no JSON text, the tool-round cap reached | `bad_output` |
 | JSON that fails the zod check | `invalid_result` (unchanged, from the step code) |
-| Authentication error (401), permission error (403) | `cli_failed`, and the run stops its model steps |
+| Authentication error (401) | `cli_failed`, and the run stops its model steps (`Claude API: authentication failed`) |
+| Permission error (403) | `cli_failed`, and the run stops its model steps (`Claude API: permission denied`) |
 | Any other 4xx, or a 5xx/overloaded after the SDK's retries | `cli_failed` |
+
+A refusal gets no server-side fallback to another model. A fallback would
+run on a model `api.prices` doesn't price, so the per-run cap would run
+blind (§6), and it needs the beta endpoint. A refusal on a job ad is rare:
+the ad is retried next run, and the third failed attempt moves it to
+`failed`, where the summary shows it.
 
 `cli_failed` keeps its name until 052, which renames it `step_failed` with
 the `"cli"` engine gone. When an authentication or permission error stops

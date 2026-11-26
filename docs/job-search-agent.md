@@ -193,7 +193,7 @@ synthetic.
 
 | Path | Holds |
 |---|---|
-| `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets: `JOBAPP_API_URL`, `JOBAPP_USERNAME`, `JOBAPP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_SMTP_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD` |
+| `~/.config/job-agent/env` (mode 600) | Mail and job-app secrets: `JOBAPP_API_URL`, `JOBAPP_USERNAME`, `JOBAPP_PASSWORD`, `MAIL_IMAP_HOST`, `MAIL_SMTP_HOST`, `MAIL_USERNAME`, `MAIL_PASSWORD`; `ANTHROPIC_API_KEY` (only under `engine: "api"`) |
 | `~/.config/job-agent/config.json` | Recipient, source switches, caps, `handoverWaitDays`, title rules, corpus paths, file name prefix, Ollama URL and embedding model |
 | `~/.config/job-agent/prompts/` | Headless evaluation and drafting rules adapted from the three job application skills |
 | `~/.local/state/job-agent/` | Run lock, mail watermarks, daily counters, unreported source failures, logs |

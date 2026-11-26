@@ -106,3 +106,12 @@ test('an unreachable job-app exits 1', async () => {
 
   expectOneLineError(await run(), 1, `cannot reach job-app at ${UNREACHABLE_URL}`)
 })
+
+test('engine api with no API key exits 2 naming it', async () => {
+  const price = { inputPerMTok: 1, outputPerMTok: 1, cacheWritePerMTok: 1, cacheReadPerMTok: 1 }
+  const prices = { 'claude-haiku-5-5': price, 'claude-sonnet-5-5': price, 'claude-opus-5-5': price }
+  writeConfig(fixture, { ...fixture.config, engine: 'api', api: { prices } })
+
+  expectOneLineError(await run(), 2, `${join(fixture.dir.root, '.config/job-agent/env')}: ANTHROPIC_API_KEY is not set`)
+  expect(jobApp.logins).toBe(0)
+})

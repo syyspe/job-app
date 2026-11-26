@@ -267,6 +267,8 @@ health check first), `health.ts` (`profile:health`) and `search.ts`
   `profile:sync` print.
 - `search.ts` — `searchIndex` / `searchIndexFile`: brute-force cosine, and
   the refusals (no index, no completed build, other model, other dimension).
+- `searchTool.ts` — `SEARCH_PROFILE_DESCRIPTION` and `searchRequestShape`,
+  shared by the MCP tool and the runner's API step so the two can't drift.
 
 ### `agent/runner/` — the runner
 
@@ -305,8 +307,8 @@ criteria that follow it. `prompts/draft.framing.md` and
 - `env.ts` — `loadJobAppEnv(path)`, `loadMailEnv(path)` and
   `loadSmtpEnv(path)`: `util.parseEnv` of the env file, which gives
   `{ baseUrl, username, password }` and `{ host, username, password }` (the
-  IMAP or the SMTP host, with the shared mail login). A missing file or
-  variable is exit 2.
+  IMAP or the SMTP host, with the shared mail login), and `loadApiKey(path)`
+  for `ANTHROPIC_API_KEY`. A missing file or variable is exit 2.
 - `jobApp.ts` — `createJobAppClient(config)`: `listPendingSync`,
   `downloadAttachment`, `clearProfileSync(id, storedName)` (false on 409,
   through the request's `allow` list), `listAds(state)`, `getAd(id)`,
@@ -322,9 +324,24 @@ criteria that follow it. `prompts/draft.framing.md` and
   `loadSourcesConfig(path, connectors)`: the `sources` key, with every
   connector present (missing means disabled) and the exit-2 refusals;
   `loadDailyRunConfig(path)`: `handoverWaitDays` and `summary.recipient`,
-  read only by `agent:run`.
-- `mapLimit.ts` — `mapLimit(items, limit, fn)`, order-keeping bounded
-  concurrency for both runs.
+  read only by `agent:run`; `loadEngineConfig(path)`: `engine` and `api`
+  (models, effort, `perRunUsd`, prices), refusing an unpriced model under
+  `"api"`.
+- `mapLimit.ts` — `mapLimit(items, {limit, canStart}, fn)`, order-keeping
+  bounded concurrency for the runs; once `canStart` is false no further item
+  starts, and only the started items are returned.
+- `engine.ts` — `createEngine(config, deps)` and `loadEngine(env, profile)`:
+  `stepFor(spec)` gives a step's `RunStep`, a sandboxed `claude -p` under
+  `"cli"` (with the `UNLIMITED` budget) or the API step under `"api"` (with a
+  run budget). It builds objects only, with no network.
+- `apiStep.ts` — `createApiStep(options)`: one Messages conversation per
+  call, `search_profile` its only tool and answered in-process, at most 8
+  tool rounds, the whole call under one `timeoutMs` signal, and the SDK's
+  errors mapped onto the failure categories (a 401 or 403 also stops the
+  budget). `MessagesApi` is the narrow client a fake satisfies.
+- `apiBudget.ts` — `responseCost(price, usage)`, the `StepBudget` interface,
+  `UNLIMITED`, and `createRunBudget`, which stops new steps at `perRunUsd`
+  or on `stop(reason)`.
 - `prompts.ts` — `buildSystemPrompt(framing, rules)`: the fixed framing
   first, then the private rules.
 - `titleRules.ts` — `matchesReject(title, phrases)` (whole-word,
@@ -359,8 +376,10 @@ criteria that follow it. `prompts/draft.framing.md` and
   verdict-vs-click count, source failures and problems; `isEmpty` says when
   there is nothing to send. Ad text has control characters and line breaks replaced.
 - `dailyRun.ts` — `runDaily(options)`, every dependency injected: collect,
-  expire, one health check and `ensureSandboxVerified`, then sync,
-  pre-screen, hand-over fetch, evaluation and drafting, then the summary. A `CliError` in a step is
+  expire, one health check and the gate (`ensureSandboxVerified`, or `null`
+  under `"api"`), then sync, pre-screen, hand-over fetch, evaluation and
+  drafting under the budget's `canStart`, then the summary, which names the
+  budget's stop reason. A `CliError` in a step is
   recorded as a failure and the run goes on; anything else propagates.
 - `politeHttp.ts` — `createPoliteHttp(options)`: the only network path a
   connector has. It checks scheme and host on the URL and every redirect,
@@ -441,6 +460,9 @@ criteria that follow it. `prompts/draft.framing.md` and
   connection or never greet.
 - `fakeSources.ts` — `fixture(name)`, `alert(fields)` and `fakePoliteHttp`,
   which answers every get with one result.
+- `fakeAnthropic.ts` — a scripted `MessagesApi`: each call takes the next
+  reply (a message, a real SDK error, or `hang` until the signal aborts) and
+  records the request body; builders for messages, blocks and API errors.
 - `fakeClaude.ts` — an executable stand-in for the `claude` CLI: records
   argv, env, cwd and stdin to `FAKE_CLAUDE_LOG` and acts as
   `FAKE_CLAUDE_MODE` says; `--version` prints `9.9.9`.

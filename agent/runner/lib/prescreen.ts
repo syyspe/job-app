@@ -10,7 +10,7 @@ const outputSchema = z.object({
 })
 
 export const PRESCREEN_SCHEMA = stepSchema(outputSchema)
-export const PRESCREEN_PROMPT = 'Pre-screen the job ad given on standard input.'
+export const PRESCREEN_PROMPT = 'Pre-screen the job ad given as JSON.'
 
 export const PRESCREEN_FRAMING = new URL('../prompts/prescreen.framing.md', import.meta.url)
 

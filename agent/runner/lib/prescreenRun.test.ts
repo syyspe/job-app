@@ -22,12 +22,13 @@ afterEach(async () => {
 
 const waiting = { state: 'awaiting_handover', sourceMode: 'handover' as const }
 
-function run(outcome: (ad: AdSummary) => PrescreenOutcome, perRunCap = 10) {
+function run(outcome: (ad: AdSummary) => PrescreenOutcome, perRunCap = 10, canStart?: () => boolean) {
   const jobApp = createJobAppClient({ baseUrl: fake.url, username: fake.username, password: fake.password, envPath: 'env' })
   return runPrescreen({
     jobApp,
     config: { concurrency: 2, perRunCap, timeoutMs: 1000 },
     prescreen: async (ad) => (seen.push(ad.id), outcome(ad)),
+    canStart,
   })
 }
 
@@ -85,4 +86,16 @@ test('the report prints one line for verdicts and one for the queue', () => {
     'pre-screened: 2 promising, 1 not promising, 1 failed',
     'queued: 3 ads over the pre-screen cap',
   ])
+})
+
+test('once canStart turns false no further ad is pre-screened, and the rest stay queued', async () => {
+  fake.ads.push(fakeAd({ id: 1, ...waiting }), fakeAd({ id: 2, ...waiting }), fakeAd({ id: 3, ...waiting }))
+
+  const report = await run(verdictFor, 10, () => seen.length < 1)
+
+  expect(seen).toEqual([1])
+  expect(report.screened).toEqual({ promising: 1, notPromising: 0 })
+  expect(report.failed).toBe(0)
+  expect(report.queued).toBe(2)
+  expect(fake.ads.map((ad) => ad.prescreen === null)).toEqual([false, true, true])
 })

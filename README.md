@@ -322,7 +322,57 @@ up as above, the job-app env file, and a logged-in `claude` CLI on `PATH`.
 3. Run `npm run agent:sandbox-check` once, and again **after every `claude`
    CLI update**. It runs two real `claude -p` probes and the CLI version that passed in
    `~/.local/state/job-agent/sandbox-check.json`. `agent:evaluate` refuses to
-   run on any other version.
+   run on any other version. This step applies to `engine: "cli"` only (see
+   "Engine" below).
+
+### Engine
+
+The model steps (pre-screen, evaluation, drafting) run on one of two
+engines, picked by `engine` in `config.json`:
+
+- `"cli"`, the default: each step is a sandboxed `claude -p`, as described
+  above.
+- `"api"`: each step is one Claude API conversation whose only tool is
+  `search_profile`, answered in-process from the local index. No sandbox
+  check is needed. Ollama still is, because the tool searches through it.
+
+To use the API engine:
+
+1. Add your key to `~/.config/job-agent/env`. The runner reads it from that
+   file only, never from your shell environment:
+
+   ```sh
+   ANTHROPIC_API_KEY=<your key>
+   ```
+
+2. Set the engine and the prices in `config.json`. Copy each model's
+   per-million-token prices from Anthropic's pricing page: the repo carries
+   none. Every model `api.models` names needs an entry, or the command exits
+   2. These are the defaults for the other keys:
+
+   ```json
+   {
+     "engine": "api",
+     "api": {
+       "models": {
+         "prescreen": "claude-haiku-5-5",
+         "evaluation": "claude-sonnet-5-5",
+         "drafting": "claude-opus-5-5"
+       },
+       "effort": { "prescreen": "low", "evaluation": "medium", "drafting": "high" },
+       "perRunUsd": 3,
+       "prices": {
+         "<model id>": { "inputPerMTok": 0, "outputPerMTok": 0, "cacheWritePerMTok": 0, "cacheReadPerMTok": 0 }
+       }
+     }
+   }
+   ```
+
+   `effort` is `low`, `medium` or `high`. Once a run's spend reaches
+   `perRunUsd`, no new step starts: the remaining ads stay queued for the
+   next run, and the command prints `stopped: API run cap reached at
+   $3.00`. An authentication or permission error stops the run's steps the
+   same way. Going back is one edit: `"engine": "cli"`.
 
 ### Commands
 
@@ -545,7 +595,7 @@ sources.
 
 The first run after a `claude` update re-runs the sandbox check by itself.
 If the check fails, the model steps are skipped until it passes, and
-the summary says why.
+the summary says why. Under `engine: "api"` there is no sandbox check.
 
 ### Command
 
@@ -561,7 +611,10 @@ the summary says why.
   run's pre-screens and a 14-day count of verdicts against your Fetch
   clicks. If Ollama is unreachable or the sandbox check fails, the
   pre-screen, fetch, evaluation and drafting are skipped and no ad is
-  touched. Configuration errors exit 2
+  touched. Under `engine: "api"`, reaching `api.perRunUsd` or an API
+  authentication or permission error starts no further model step: the run
+  prints `model steps stopped: <reason>`, the summary lists it as a problem,
+  and the remaining ads stay queued. Configuration errors exit 2
   before the lock is taken. A failed step or send exits 1; a skip alone
   exits 0. Nothing is marked reported until the mail server has accepted
   the summary, so a failed send is retried next run.

@@ -12,6 +12,8 @@ export interface DraftRunOptions {
   write: (ad: Ad) => Promise<DraftOutcome>
   // The run's date, YYYY-MM-DD, for the saved ad's header.
   today: string
+  // Asked before each ad; an ad that doesn't start stays suitable, untouched.
+  canStart?: () => boolean
 }
 
 export interface DraftCounts {
@@ -56,8 +58,9 @@ export async function runDrafting(options: DraftRunOptions): Promise<DraftReport
   // The API lists newest first; the oldest ads are drafted first.
   const suitable = (await jobApp.listAds('suitable')).toReversed()
   const batch = suitable.slice(0, config.perRunCap)
-  const results = await mapLimit(batch, config.concurrency, (ad) => draftOne(options, ad))
-  return { skipped: null, counts: countResults(results), queued: suitable.length - batch.length }
+  const limits = { limit: config.concurrency, canStart: options.canStart }
+  const results = await mapLimit(batch, limits, (ad) => draftOne(options, ad))
+  return { skipped: null, counts: countResults(results), queued: suitable.length - results.length }
 }
 
 export function formatDraftReport({ skipped, counts, queued }: DraftReport): string[] {

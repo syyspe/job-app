@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
-import { loadDailyRunConfig, loadDraftConfig, loadRunnerConfig, loadSourcesConfig } from './runnerConfig.ts'
+import { loadDailyRunConfig, loadDraftConfig, loadEngineConfig, loadRunnerConfig, loadSourcesConfig } from './runnerConfig.ts'
 
 let dir: TempDir
 
@@ -204,5 +204,64 @@ describe('daily run', () => {
     expect(() => loadDailyRunConfig(path)).toThrow(
       expect.objectContaining({ exitCode: 2, message: expect.stringContaining(`${path}: ${field}: `) }),
     )
+  })
+})
+
+describe('loadEngineConfig', () => {
+  const price = { inputPerMTok: 1, outputPerMTok: 5, cacheWritePerMTok: 1.25, cacheReadPerMTok: 0.1 }
+  const allPrices = { 'claude-haiku-5-5': price, 'claude-sonnet-5-5': price, 'claude-opus-5-5': price }
+
+  test('no engine key is cli, with the default models, effort and cap', () => {
+    const path = writeConfig({ corpus: [] })
+
+    expect(loadEngineConfig(path)).toEqual({
+      engine: 'cli',
+      api: {
+        models: { prescreen: 'claude-haiku-5-5', evaluation: 'claude-sonnet-5-5', drafting: 'claude-opus-5-5' },
+        effort: { prescreen: 'low', evaluation: 'medium', drafting: 'high' },
+        perRunUsd: 3,
+        prices: {},
+      },
+    })
+  })
+
+  test('api with a price for every model loads', () => {
+    const path = writeConfig({ engine: 'api', api: { prices: allPrices, effort: { drafting: 'medium' } } })
+
+    const config = loadEngineConfig(path)
+
+    expect(config.engine).toBe('api')
+    expect(config.api.effort).toEqual({ prescreen: 'low', evaluation: 'medium', drafting: 'medium' })
+  })
+
+  test.each([
+    ['an unknown engine', { engine: 'gpt' }, 'engine'],
+    ['an effort outside low|medium|high', { api: { effort: { evaluation: 'max' } } }, 'api.effort.evaluation'],
+    ['a zero run cap', { api: { perRunUsd: 0 } }, 'api.perRunUsd'],
+    ['a negative price', { api: { prices: { m: { ...price, inputPerMTok: -1 } } } }, 'api.prices.m.inputPerMTok'],
+  ])('%s is an exit-2 error naming the field', (_name, value, field) => {
+    const path = writeConfig(value)
+
+    expect(() => loadEngineConfig(path)).toThrow(
+      expect.objectContaining({ exitCode: 2, message: expect.stringContaining(`${path}: ${field}:`) }),
+    )
+  })
+
+  test('api with an unpriced model is an exit-2 error naming the model', () => {
+    const { 'claude-opus-5-5': _opus, ...prices } = allPrices
+    const path = writeConfig({ engine: 'api', api: { prices } })
+
+    expect(() => loadEngineConfig(path)).toThrow(
+      expect.objectContaining({
+        exitCode: 2,
+        message: `${path}: api.prices.claude-opus-5-5: no price for a model api.models names`,
+      }),
+    )
+  })
+
+  test('cli with no prices loads', () => {
+    const path = writeConfig({ engine: 'cli' })
+
+    expect(loadEngineConfig(path).engine).toBe('cli')
   })
 })

@@ -6,7 +6,7 @@ import { stepSchema } from './sandbox.ts'
 import type { FailureCategory } from './sandbox.ts'
 
 export const DRAFT_SCHEMA = stepSchema(draftOutputSchema)
-export const DRAFT_PROMPT = 'Draft the application for the job ad given on standard input.'
+export const DRAFT_PROMPT = 'Draft the application for the job ad given as JSON.'
 export const DRAFT_FRAMING = new URL('../prompts/draft.framing.md', import.meta.url)
 
 // The two master CV templates, whole: search chunks cannot rebuild them.

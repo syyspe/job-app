@@ -11,6 +11,8 @@ export interface EvaluationRunOptions {
   config: Pick<RunnerConfig, 'titleRules' | 'evaluation'>
   checkHealth: () => Promise<HealthResult>
   evaluate: (ad: Ad) => Promise<EvaluationOutcome>
+  // Asked before each ad; an ad that doesn't start stays ready, untouched.
+  canStart?: () => boolean
 }
 
 export interface EvaluationCounts {
@@ -53,8 +55,9 @@ export async function runEvaluation(options: EvaluationRunOptions): Promise<Eval
   // The API lists newest first; the oldest ads are evaluated first.
   const ready = (await jobApp.listAds('ready')).toReversed()
   const batch = ready.slice(0, config.evaluation.perRunCap)
-  const moved = await mapLimit(batch, config.evaluation.concurrency, (ad) => evaluateOne(options, ad))
-  return { screened, skipped: null, evaluated: countStates(moved), queued: ready.length - batch.length }
+  const limits = { limit: config.evaluation.concurrency, canStart: options.canStart }
+  const moved = await mapLimit(batch, limits, (ad) => evaluateOne(options, ad))
+  return { screened, skipped: null, evaluated: countStates(moved), queued: ready.length - moved.length }
 }
 
 export function formatEvaluationReport({ screened, skipped, evaluated, queued }: EvaluationReport): string[] {
