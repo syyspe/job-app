@@ -267,8 +267,16 @@ with one stderr line.
 
 ## 7. Runs from the UI
 
-Owned by 051. The panel is admin-only, because a run uses the runner's
-credentials and its spend.
+Owned by 051; the gate is 053's. The panel and `/api/agent` need the
+user's agent-access flag, because a run uses the runner's credentials and
+its spend. Role doesn't enter into it: an admin without the flag is refused
+too, and a basic user with it can start and list runs.
+
+**The flag** is `users.agent_access`, `User.agentAccess` in the API. Admins
+set it per user from the admin list (`PUT /api/users/:id/agent-access`
+with `{"agentAccess": true | false}`). New users start without it. The
+migration that added the column granted it to the admins of the time, and
+`npm run seed` grants it to the seeded user on every run, as it does admin.
 
 **"Run now"** starts `kind: "run"`, the full `agent:run`, including the
 summary email. **"Check mail"** starts `kind: "collect"`, `agent:collect`,
@@ -281,7 +289,7 @@ which has no model cost. Mail collection is otherwise unchanged.
 |---|---|---|
 | `id` | INTEGER PRIMARY KEY | |
 | `kind` | TEXT NOT NULL | `run` or `collect` (CHECK) |
-| `started_by` | INTEGER NOT NULL | the admin's user id |
+| `started_by` | INTEGER NOT NULL | the starting user's id |
 | `started_at` | TEXT NOT NULL | UTC ISO timestamp |
 | `finished_at` | TEXT | NULL while running |
 | `exit_code` | INTEGER | NULL while running; the child's code, or NULL with `finished_at` set if it was killed |
@@ -291,7 +299,7 @@ At server start, any row with `finished_at` NULL is closed with
 `finished_at` = now and `output` ending in `(server restarted)`, because
 its child died with the old process.
 
-**Endpoints**, mounted behind `requireAdmin` at `/api/agent`:
+**Endpoints**, mounted behind `requireAgentAccess` at `/api/agent`:
 
 - `POST /api/agent/runs` with `{"kind": "run" | "collect"}` returns `201`
   and the new run. An unknown kind is `400`. A run already in progress is

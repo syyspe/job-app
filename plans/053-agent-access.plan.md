@@ -61,7 +61,10 @@ on, just as it does for the role.
 - `src/components/UserRow.tsx`: an `AgentAccessToggle` beside
   `RoleSelect` in `.user-head`. It is a checkbox, visible label "Agent
   access", accessible name `Agent access for {username}`, which calls a new
-  `onSetAgentAccess(agentAccess: boolean)` prop.
+  `onSetAgentAccess(agentAccess: boolean)` prop. As built, the row's head
+  (name, toggle, role select) is a `UserHead` component, because the toggle
+  took `UserRow` past the 40-line limit. The toggle and select sit together
+  in a `.user-controls` wrapper.
 - `src/components/UserList.tsx` and `src/components/AdminView.tsx`: thread
   `onSetAgentAccess(id, agentAccess)` through. AdminView's handler uses the
   existing `change(...)` helper with toast `Agent access granted` or

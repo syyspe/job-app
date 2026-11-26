@@ -85,6 +85,16 @@ export async function setUserRole(id: number, role: Role): Promise<User> {
   return parseJson(response)
 }
 
+export async function setUserAgentAccess(id: number, agentAccess: boolean): Promise<User> {
+  const response = await fetch(`/api/users/${id}/agent-access`, {
+    method: 'PUT',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agentAccess }),
+  })
+  return parseJson(response)
+}
+
 export async function resetUserPassword(id: number, password: string): Promise<User> {
   const response = await fetch(`/api/users/${id}/password`, {
     method: 'PUT',

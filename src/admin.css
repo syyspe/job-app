@@ -43,6 +43,21 @@
   gap: var(--s-3);
 }
 
+.user-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-3);
+}
+
+.user-access {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+}
+
 .user-name {
   font-weight: 600;
 }

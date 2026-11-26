@@ -5,8 +5,8 @@ import { UserList } from './UserList'
 import type { User } from '../types'
 
 const users: User[] = [
-  { id: 1, username: 'admin-user', role: 'admin' },
-  { id: 2, username: 'basic-user', role: 'basic' },
+  { id: 1, username: 'admin-user', role: 'admin', agentAccess: true },
+  { id: 2, username: 'basic-user', role: 'basic', agentAccess: false },
 ]
 
 function renderList(props: Partial<Parameters<typeof UserList>[0]> = {}) {
@@ -14,6 +14,7 @@ function renderList(props: Partial<Parameters<typeof UserList>[0]> = {}) {
     <UserList
       users={users}
       onSetRole={vi.fn()}
+      onSetAgentAccess={vi.fn()}
       onResetPassword={vi.fn()}
       onDelete={vi.fn()}
       {...props}
@@ -45,4 +46,14 @@ test('passes the id of the row that acted', async () => {
   )
 
   expect(onSetRole).toHaveBeenCalledWith(2, 'admin')
+})
+
+test('passes the id of the row whose agent access changed', async () => {
+  const user = userEvent.setup()
+  const onSetAgentAccess = vi.fn()
+  renderList({ onSetAgentAccess })
+
+  await user.click(screen.getByRole('checkbox', { name: 'Agent access for admin-user' }))
+
+  expect(onSetAgentAccess).toHaveBeenCalledWith(1, false)
 })

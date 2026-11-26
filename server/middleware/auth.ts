@@ -39,3 +39,16 @@ export function requireAdmin(db: Database.Database) {
     next()
   }
 }
+
+export function requireAgentAccess(db: Database.Database) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const user = db
+      .prepare('SELECT agent_access FROM users WHERE id = ?')
+      .get(req.userId) as { agent_access: number } | undefined
+
+    if (!user) throw new HttpError(401, 'unauthorized')
+    if (user.agent_access !== 1) throw new HttpError(403, 'forbidden')
+
+    next()
+  }
+}

@@ -61,7 +61,7 @@ async function answerLogin(state: State, req: IncomingMessage, res: ServerRespon
   state.fake.logins += 1
   state.session = randomUUID()
   res.setHeader('set-cookie', `session=${state.session}; HttpOnly; Path=/`)
-  sendJson(res, 200, { id: 1, username, role: 'basic' })
+  sendJson(res, 200, { id: 1, username, role: 'basic', agentAccess: false })
 }
 
 interface FlagTarget {

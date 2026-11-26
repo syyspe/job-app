@@ -10,7 +10,7 @@ import { createAuthRouter } from './routes/auth.ts'
 import { createConfigRouter } from './routes/config.ts'
 import { createQuestionsRouter } from './routes/questions.ts'
 import { createUsersRouter } from './routes/users.ts'
-import { requireAdmin, requireSession } from './middleware/auth.ts'
+import { requireAdmin, requireAgentAccess, requireSession } from './middleware/auth.ts'
 import { requireParsableBody } from './middleware/contentType.ts'
 import { jsonErrorHandler } from './middleware/errors.ts'
 import { requestLogging } from './middleware/requestLogging.ts'
@@ -28,10 +28,11 @@ type CreateAppOptions = {
   runner?: RunnerSpawner
 }
 
-// Runs spawn the runner with its credentials and spend, so they are admin-only.
+// Runs spawn the runner with its credentials and spend, so only users an admin
+// has granted agent access may start or list them — whatever their role.
 function mountAgentRuns(app: ExpressApp, db: Database.Database, runner: RunnerSpawner | undefined): void {
   if (!runner) return
-  app.use('/api/agent', requireAdmin(db))
+  app.use('/api/agent', requireAgentAccess(db))
   app.use('/api', createAgentRunsRouter(db, runner))
 }
 

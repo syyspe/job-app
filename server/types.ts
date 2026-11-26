@@ -6,6 +6,7 @@ export interface User {
   id: number
   username: string
   role: Role
+  agentAccess: boolean
 }
 
 export const AGENT_RUN_KINDS = ['run', 'collect'] as const

@@ -27,6 +27,26 @@ function RoleSelect({ username, role, onChange }: RoleSelectProps) {
   )
 }
 
+interface AgentAccessToggleProps {
+  username: string
+  agentAccess: boolean
+  onChange: (agentAccess: boolean) => void
+}
+
+function AgentAccessToggle({ username, agentAccess, onChange }: AgentAccessToggleProps) {
+  return (
+    <label className="user-access">
+      <input
+        type="checkbox"
+        checked={agentAccess}
+        onChange={(e) => onChange(e.target.checked)}
+        aria-label={`Agent access for ${username}`}
+      />
+      Agent access
+    </label>
+  )
+}
+
 interface ResetPasswordFormProps {
   username: string
   onSubmit: (password: string) => void
@@ -82,14 +102,38 @@ function DeleteConfirm({ username, onConfirm, onCancel }: DeleteConfirmProps) {
   )
 }
 
+interface UserHeadProps {
+  user: User
+  onSetRole: (role: Role) => void
+  onSetAgentAccess: (agentAccess: boolean) => void
+}
+
+function UserHead({ user, onSetRole, onSetAgentAccess }: UserHeadProps) {
+  return (
+    <div className="user-head">
+      <span className="user-name">{user.username}</span>
+      <div className="user-controls">
+        <AgentAccessToggle
+          username={user.username}
+          agentAccess={user.agentAccess}
+          onChange={onSetAgentAccess}
+        />
+        <RoleSelect username={user.username} role={user.role} onChange={onSetRole} />
+      </div>
+    </div>
+  )
+}
+
 interface UserRowProps {
   user: User
   onSetRole: (role: Role) => void
+  onSetAgentAccess: (agentAccess: boolean) => void
   onResetPassword: (password: string) => void
   onDelete: () => void
 }
 
-export function UserRow({ user, onSetRole, onResetPassword, onDelete }: UserRowProps) {
+export function UserRow(props: UserRowProps) {
+  const { user, onSetRole, onSetAgentAccess, onResetPassword, onDelete } = props
   const [mode, setMode] = useState<Mode>('idle')
 
   function handleResetPassword(password: string) {
@@ -99,10 +143,7 @@ export function UserRow({ user, onSetRole, onResetPassword, onDelete }: UserRowP
 
   return (
     <li className="user-item" data-role={user.role}>
-      <div className="user-head">
-        <span className="user-name">{user.username}</span>
-        <RoleSelect username={user.username} role={user.role} onChange={onSetRole} />
-      </div>
+      <UserHead user={user} onSetRole={onSetRole} onSetAgentAccess={onSetAgentAccess} />
       {mode === 'idle' && (
         <div className="user-actions">
           <button type="button" className="button" onClick={() => setMode('reset')}>

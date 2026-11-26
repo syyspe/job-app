@@ -49,7 +49,7 @@ Presentational components, each with a test beside it. By surface:
 - **Ad inbox** — `AdsView` (with its local `useAds` hook and the state filter)
   over `AdList`, `AdRow` and `AdHandoverForm`. `AdRow` offers Fetch on a
   waiting hand-over ad and shows its pre-screen verdict. Above the filter,
-  for admins only, `AgentRunPanel`: Run now and Check mail, the current
+  for users with agent access only, `AgentRunPanel`: Run now and Check mail, the current
   run's output (polled every 3 s while it runs) and the last ten runs, each
   with its Claude API spend when its output ends with the `api:` line; a
   run finishing refreshes the inbox.
@@ -92,8 +92,9 @@ Presentational components, each with a test beside it. By surface:
 static files, error handler — including the mount order `auth router →
 requireSession → the rest`, which is what protects everything, and
 `requireAdmin` mounted at `/api/users` alone, which is what keeps the user
-routes to admins. `requireAdmin` is mounted at `/api/agent` too, ahead of the
-run router, which exists only when `createApp` is given a `runner` (as
+routes to admins. `requireAgentAccess` is mounted at `/api/agent`, ahead of
+the run router, so runs follow the user's agent-access flag rather than their
+role. The run router exists only when `createApp` is given a `runner` (as
 `index.ts` always does). `index.ts` also closes the runs a previous server
 process left open before it listens.
 
@@ -114,10 +115,10 @@ row no longer has is a 409 that keeps the mark; and
 `PUT /attachments/:id/text`, the raw-text save of a `.md` attachment),
 `questions.ts` (`GET /applications/:id/questions` and
 `POST /applications/:id/answers`, the draft's open questions),
-`agentRuns.ts` (`GET`/`POST /agent/runs`, admin-only: list the current and
+`agentRuns.ts` (`GET`/`POST /agent/runs`, agent access only: list the current and
 last ten runs, or start one, 409 while one is running), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
 (`/config`, the page size the client pages the list by) and `users.ts`
-(admin-only account management).
+(admin-only account management, including `PUT /users/:id/agent-access`).
 
 ### `server/models/`
 
@@ -160,15 +161,16 @@ Helpers with no Express dependency:
 - `cookies.ts` — reads the session cookie. Express 5 doesn't parse cookies,
   which is the only reason this file exists.
 - `migrations.ts` — the startup column migrations (`migrateApplicationDates`,
-  `migrateApplicationArchived`, `migrateUserRole`, `migrateAttachmentUploadedAt`,
+  `migrateApplicationArchived`, `migrateUserRole`, `migrateUserAgentAccess`,
+  `migrateAttachmentUploadedAt`,
   `migrateAttachmentProfileSync`, `migrateAttachmentEditedFrom`,
   `migrateAdFetch`) behind one `migrate`.
-- `seed.ts` — `createUser`; `seedUser`, which every run grants admin, so the
-  seeded user is how an admin comes into being; and
+- `seed.ts` — `createUser`; `seedUser`, which every run grants admin and
+  agent access, so the seeded user is how an admin comes into being; and
   `migrateApplicationsToUser`, the table rebuild that gives a pre-auth
   database a `user_id`.
-- `users.ts` — `setUserRole` and `adminCount`, needed by both the seed and
-  the users router.
+- `users.ts` — `setUserRole`, `setUserAgentAccess` and `adminCount`, needed
+  by both the seed and the users router.
 - `config.ts` — `parsePageSize`, which reads `PAGE_SIZE` at startup and
   throws on anything that isn't a whole number of at least 1; and
   `parseLogLevel`, which does the same for `LOG_LEVEL`.
@@ -190,7 +192,7 @@ Helpers with no Express dependency:
   `res.locals.log`, and one `request finished` line.
 - `errors.ts` — the error handler. It logs each failure once, through
   `res.locals.log`.
-- `auth.ts` — `requireSession`, `requireAdmin`.
+- `auth.ts` — `requireSession`, `requireAdmin`, `requireAgentAccess`.
 
 ### Everything else under `server/`
 

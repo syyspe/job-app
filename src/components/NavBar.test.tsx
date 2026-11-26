@@ -5,8 +5,8 @@ import { NavBar } from './NavBar'
 import type { View } from './NavBar'
 import type { User } from '../types'
 
-const adminUser: User = { id: 1, username: 'testuser', role: 'admin' }
-const basicUser: User = { id: 2, username: 'testuser', role: 'basic' }
+const adminUser: User = { id: 1, username: 'testuser', role: 'admin', agentAccess: true }
+const basicUser: User = { id: 2, username: 'testuser', role: 'basic', agentAccess: false }
 
 function renderNavBar(user: User | null, view: View = 'applications', props = {}) {
   render(

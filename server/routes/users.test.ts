@@ -17,6 +17,7 @@ const ROUTES = [
   { method: 'POST', path: '/api/users' },
   { method: 'PUT', path: '/api/users/1/role' },
   { method: 'PUT', path: '/api/users/1/password' },
+  { method: 'PUT', path: '/api/users/1/agent-access' },
   { method: 'DELETE', path: '/api/users/1' },
 ]
 
@@ -130,6 +131,7 @@ test('creating a user lists it with the role it was given', async () => {
     'new-admin',
   ])
   expect(users.map((user) => user.role)).toEqual(['admin', 'basic', 'admin'])
+  expect(users.map((user) => user.agentAccess)).toEqual([true, false, false])
 })
 
 test('a new user can log in with the password it was created with', async () => {
@@ -199,13 +201,40 @@ test('demoting yourself is refused even when another admin exists', async () => 
   expect(other.status).toBe(200)
 })
 
-test.each(['role', 'password'])('PUT %s with no body is a 400, not a 500', async (field) => {
+test.each(['role', 'password', 'agent-access'])('PUT %s with no body is a 400, not a 500', async (field) => {
   const res = await fetch(`${baseUrl}/api/users/${basicId}/${field}`, {
     method: 'PUT',
     headers: { Cookie: adminCookie },
   })
   expect(res.status).toBe(400)
   expect(await res.json()).toMatchObject({ error: 'request body must be a JSON object' })
+})
+
+test('agent access can be granted and removed', async () => {
+  const granted = await put(`/api/users/${basicId}/agent-access`, { agentAccess: true })
+  expect(granted.status).toBe(200)
+  expect(((await granted.json()) as User).agentAccess).toBe(true)
+
+  const removed = await put(`/api/users/${basicId}/agent-access`, { agentAccess: false })
+  expect(removed.status).toBe(200)
+  expect(((await removed.json()) as User).agentAccess).toBe(false)
+})
+
+test('a non-boolean agentAccess is refused and an unknown user is 404', async () => {
+  const notBoolean = await put(`/api/users/${basicId}/agent-access`, { agentAccess: 'yes' })
+  expect(notBoolean.status).toBe(400)
+  expect(await notBoolean.json()).toMatchObject({ error: 'agentAccess must be a boolean' })
+  const missing = await put(`/api/users/${basicId}/agent-access`, {})
+  expect(missing.status).toBe(400)
+  const unknownUser = await put('/api/users/999/agent-access', { agentAccess: true })
+  expect(unknownUser.status).toBe(404)
+})
+
+test('an admin can remove their own agent access and grant it back', async () => {
+  const removed = await put(`/api/users/${adminId}/agent-access`, { agentAccess: false })
+  expect(removed.status).toBe(200)
+  const granted = await put(`/api/users/${adminId}/agent-access`, { agentAccess: true })
+  expect(((await granted.json()) as User).agentAccess).toBe(true)
 })
 
 test('a password can be reset, and the old one stops working', async () => {
