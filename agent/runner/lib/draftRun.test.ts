@@ -5,7 +5,7 @@ import type { FakeJobApp } from '../../test/fakeJobApp.ts'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import type { HealthResult } from '../../profile/lib/ollama.ts'
 import type { DraftOutcome } from './draft.ts'
-import { runDrafting } from './draftRun.ts'
+import { formatDraftReport, runDrafting } from './draftRun.ts'
 import { createJobAppClient } from './jobApp.ts'
 import type { Ad } from './jobApp.ts'
 
@@ -138,7 +138,7 @@ test('the third failure is counted as failed', async () => {
 test('no request ever touches the applications routes', async () => {
   suitableAds(1, 2)
   const write = (ad: Ad): Promise<DraftOutcome> =>
-    Promise.resolve(ad.id === 1 ? { kind: 'failed', category: 'cli_failed' } : written)
+    Promise.resolve(ad.id === 1 ? { kind: 'failed', category: 'model_failed' } : written)
 
   await run({ write })
 
@@ -155,4 +155,33 @@ test('once canStart turns false no further ad is drafted, and the rest stay queu
   expect(report.counts).toEqual({ drafted: 1, retrying: 0, failed: 0 })
   expect(report.queued).toBe(1)
   expect(fake.ads.map((ad) => [ad.state, ad.attempts])).toEqual([['drafted', 0], ['suitable', 0]])
+})
+
+test('every failed attempt is reported with its ad and detail, retrying or failed', async () => {
+  fake.ads.push(
+    fakeAd({ id: 1, state: 'suitable', body: 'Ad text', attempts: 2 }),
+    fakeAd({ id: 2, state: 'suitable', body: 'Ad text' }),
+  )
+  const write = (ad: Ad): Promise<DraftOutcome> =>
+    Promise.resolve(ad.id === 1 ? { kind: 'failed', category: 'model_failed', detail: '500: overloaded' } : written)
+
+  const report = await run({ write })
+
+  expect(report.failedAttempts).toEqual([
+    { adId: 1, title: 'Developer 1', source: 'testsource', category: 'model_failed', detail: '500: overloaded' },
+  ])
+  expect(formatDraftReport(report)).toEqual([
+    'drafted: 1 drafted, 0 retrying, 1 failed',
+    'queued: 0 suitable ads over the per-run cap',
+    'drafting failed: Developer 1, testsource: model_failed — 500: overloaded',
+  ])
+})
+
+test('a run with no failure reports no failed line', async () => {
+  suitableAds(1)
+
+  const report = await run()
+
+  expect(report.failedAttempts).toEqual([])
+  expect(formatDraftReport(report)).toHaveLength(2)
 })

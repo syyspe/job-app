@@ -250,3 +250,17 @@ test('a gate resolving null runs the model steps with no sandbox recorded', asyn
   expect(report.sandbox).toBeNull()
   expect(report.stopped).toBeNull()
 })
+
+test("an evaluation that fails an ad into failed puts its detail on the summary's Failed line", async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'ready', title: 'Architect', attempts: 2 }))
+  const evaluate = async (): Promise<EvaluationOutcome> => ({
+    kind: 'failed',
+    category: 'model_failed',
+    detail: '400: maxItems is not supported (request req_9)',
+  })
+
+  await runDaily(options({ evaluate }))
+
+  expect(fake.ads[0]).toMatchObject({ state: 'failed', lastError: 'model_failed' })
+  expect(sent[0].text).toContain('- Architect, testsource: model_failed — 400: maxItems is not supported (request req_9)\n')
+})

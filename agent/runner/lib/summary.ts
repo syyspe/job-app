@@ -1,6 +1,8 @@
 import type { ApiSpend } from './apiBudget.ts'
 import type { AdSummary } from './jobApp.ts'
+import { oneLine } from './oneLine.ts'
 import type { SourceFailure } from './state.ts'
+import type { FailedAttempt } from './stepFailure.ts'
 
 export interface Problem {
   step: string
@@ -22,6 +24,8 @@ export interface SummaryInput {
   tally: PrescreenTally
   sourceFailures: SourceFailure[]
   problems: Problem[]
+  // This run's failed model steps, whose detail goes beside a failed ad.
+  failedAttempts: FailedAttempt[]
   // Set whenever the run made a Claude API call.
   apiSpend?: ApiSpend | null
   appUrl: string
@@ -33,19 +37,13 @@ export interface Summary {
   text: string
 }
 
-// Ad text is untrusted: control characters and line breaks become spaces, so
-// a field can never start a line of its own.
-function clean(value: string): string {
-  return value.replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, ' ')
-}
-
 function counted(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`
 }
 
 function section(heading: string, lines: string[]): string[] {
   if (lines.length === 0) return []
-  return [`${heading} (${lines.length})`, ...lines.map((line) => `- ${clean(line)}`), '']
+  return [`${heading} (${lines.length})`, ...lines.map((line) => `- ${oneLine(line)}`), '']
 }
 
 function inState(ads: AdSummary[], state: string): AdSummary[] {
@@ -76,6 +74,13 @@ function prescreenLine({ title, company, prescreen }: AdSummary): string {
   return `${title}, ${company}: ${verdict} — ${prescreen?.reason ?? ''}`
 }
 
+// An ad that failed in an earlier run has no attempt here, so only its category.
+function failedLine(ad: AdSummary, attempts: FailedAttempt[]): string {
+  const line = `${ad.title}, ${ad.source}: ${ad.lastError}`
+  const detail = attempts.find((attempt) => attempt.adId === ad.id && attempt.detail)?.detail
+  return detail ? `${line} — ${detail}` : line
+}
+
 function tallyLines({ promising, notPromising }: PrescreenTally): string[] {
   if (promising.total + notPromising.total === 0) return []
   const counts = `promising ${promising.total} (fetched ${promising.fetched}), not promising ${notPromising.total} (fetched ${notPromising.fetched})`
@@ -100,7 +105,7 @@ function subjectOf(input: SummaryInput): string {
 }
 
 function bodyOf(input: SummaryInput): string {
-  const { ads, prescreened, tally, sourceFailures, problems, apiSpend, appUrl, lanUrl } = input
+  const { ads, prescreened, tally, sourceFailures, problems, failedAttempts, apiSpend, appUrl, lanUrl } = input
   return [
     ...section('Drafts', inState(ads, 'drafted').map((ad) => `${ad.title}, ${ad.company} (application ${ad.applicationId})`)),
     ...section('Pre-screened', prescreened.map(prescreenLine)),
@@ -109,7 +114,7 @@ function bodyOf(input: SummaryInput): string {
       'Title rejected',
       inState(ads, 'title_rejected').map((ad) => `${ad.title}, ${ad.company}, ${ad.source}: ${ad.url}`),
     ),
-    ...section('Failed', inState(ads, 'failed').map((ad) => `${ad.title}, ${ad.source}: ${ad.lastError}`)),
+    ...section('Failed', inState(ads, 'failed').map((ad) => failedLine(ad, failedAttempts))),
     ...section('Source failures', sourceFailures.map(({ source, date, kind }) => `${source} ${date} ${kind}`)),
     ...section('Problems', problems.map(({ step, message }) => `${step}: ${message}`)),
     ...spendLines(apiSpend),

@@ -17,7 +17,9 @@ export interface CvTemplates {
 
 export type DraftFailure = FailureCategory | 'invalid_result' | 'ask_mismatch'
 
-export type DraftOutcome = { kind: 'written'; output: DraftOutput } | { kind: 'failed'; category: DraftFailure }
+export type DraftOutcome =
+  | { kind: 'written'; output: DraftOutput }
+  | { kind: 'failed'; category: DraftFailure; detail?: string }
 
 export function draftInput(ad: Ad, cvTemplates: CvTemplates): string {
   const { title, company, location, deadline, url, body } = ad

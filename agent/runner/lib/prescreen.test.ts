@@ -43,9 +43,9 @@ test.each([
 })
 
 test('a step failure passes its category through', async () => {
-  const { runStep } = returning({ kind: 'failed', category: 'cli_failed' })
+  const { runStep } = returning({ kind: 'failed', category: 'model_failed' })
 
-  expect(await prescreenAd(ad, runStep)).toEqual({ kind: 'failed', category: 'cli_failed' })
+  expect(await prescreenAd(ad, runStep)).toEqual({ kind: 'failed', category: 'model_failed' })
 })
 
 test('the step reads only title, company, location and deadline', async () => {

@@ -172,9 +172,9 @@ executes for it, and the runner executes only `searchIndexFile`.
 | `timeoutMs` reached, or the SDK's timeout error | `timeout` |
 | `stop_reason: "refusal"`, `"max_tokens"` or `"pause_turn"`, no JSON text, the tool-round cap reached | `bad_output` |
 | JSON that fails the zod check | `invalid_result` (unchanged, from the step code) |
-| Authentication error (401) | `cli_failed`, and the run stops its model steps (`Claude API: authentication failed`) |
-| Permission error (403) | `cli_failed`, and the run stops its model steps (`Claude API: permission denied`) |
-| Any other 4xx, or a 5xx/overloaded after the SDK's retries | `cli_failed` |
+| Authentication error (401) | `model_failed`, and the run stops its model steps (`Claude API: authentication failed`) |
+| Permission error (403) | `model_failed`, and the run stops its model steps (`Claude API: permission denied`) |
+| Any other 4xx, a 5xx/overloaded after the SDK's retries, or no response | `model_failed` |
 
 A refusal gets no server-side fallback to another model. A fallback would
 run on a model `api.prices` doesn't price, so the per-run cap would run
@@ -182,8 +182,15 @@ blind (§6), and it needs the beta endpoint. A refusal on a job ad is rare:
 the ad is retried next run, and the third failed attempt moves it to
 `failed`, where the summary shows it.
 
-`cli_failed` keeps its name until 052, which renames it `step_failed` with
-the `"cli"` engine gone. When an authentication or permission error stops
+`model_failed` is the same category a failed `claude -p` step records (054
+renamed it from `cli_failed`; stored `cli_failed` values display as they
+are). An API failure also carries a detail, the status and the API's own
+message, with the request id when there is one:
+`400: output_config.format.schema: … (request req_…)`. The detail stays
+within the run: the run prints an `evaluation failed: <title>, <source>:
+model_failed — <detail>` line (`drafting failed:`, `pre-screen failed:` for
+those steps), and the summary shows it beside an ad that reached `failed` in
+that run. The server stores only the category. When an authentication or permission error stops
 the run, it's handled like today's failed sandbox gate: the remaining ads
 stay queued and the summary names the problem (`Claude API: authentication
 failed`).
@@ -207,7 +214,7 @@ One model per step, set in config (owned by 049), with these defaults:
 
 Thinking is adaptive, with the step's effort. `effort` is `low`, `medium`
 or `high`. A model id isn't checked against a list: an unknown one fails at
-the API as a 4xx and counts as `cli_failed`.
+the API as a 4xx and counts as `model_failed`, its detail naming the model.
 
 ## 6. Key and spend
 
@@ -333,9 +340,10 @@ scope.
    the daily run for two weeks without falling back to `"cli"`. 052 removes
    the `"cli"` engine and the `engine` key, the sandbox gate, the probes and
    canary, the `search_profile` MCP wiring for steps, `fakeClaude.ts`, and
-   the README and spec sections that describe them. It renames
-   `cli_failed` to `step_failed`. The `search_profile` stdio server
-   (`npm run profile:mcp`) stays, because Claude Desktop uses it.
+   the README and spec sections that describe them. The category rename
+   is already done: 054 renamed `cli_failed` to `model_failed`. The
+   `search_profile` stdio server (`npm run profile:mcp`) stays, because
+   Claude Desktop uses it.
 
 Until 052, `claude -p` is a working fallback at every step of this order.
 

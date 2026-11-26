@@ -59,7 +59,11 @@ test('drafts and reports; the fake answers {}, so the attempt is invalid_result'
 
   expect(result.stderr).toBe('')
   expect(result.status).toBe(0)
-  expect(result.stdout).toBe('drafted: 0 drafted, 1 retrying, 0 failed\nqueued: 0 suitable ads over the per-run cap\n')
+  expect(result.stdout).toBe(
+    'drafted: 0 drafted, 1 retrying, 0 failed\n' +
+      'queued: 0 suitable ads over the per-run cap\n' +
+      'drafting failed: Developer 1, testsource: invalid_result\n',
+  )
   expect(jobApp.transitions).toEqual([{ id: 1, to: 'suitable', error: 'invalid_result' }])
 })
 

@@ -51,6 +51,8 @@ Decided with the user (the brief's open questions):
   detail?: string }` and `formatFailedAttempt(step, attempt)` →
   `` `${step} failed: ${title}, ${source}: ${category}` `` plus
   `` ` — ${detail}` `` when there is detail, passed through `oneLine`.
+  (Built: also `failedAttempt(ad, failure)`, which the three runs share to
+  build the record.)
 - `agent/runner/lib/evaluationRun.ts`: `evaluateOne` returns the moved ad and
   a `FailedAttempt | null`. `EvaluationReport` gets `failedAttempts:
   FailedAttempt[]`: every failed attempt this run, whether the ad is
@@ -105,7 +107,9 @@ Decided with the user (the brief's open questions):
    `failedAttempts`, with tests.
 6. Docs and the 052 brief, then `grep -rn cli_failed` outside `brief/`,
    `plans/` and `.git`. The only hits left are the test that a stored
-   `cli_failed` value still displays.
+   `cli_failed` value still displays, and the README and
+   `docs/in-app-agent.md` sentences that name the rename and say stored
+   `cli_failed` values display as they are.
 
 ## Tests
 
@@ -132,7 +136,9 @@ Decided with the user (the brief's open questions):
 - Updated: every test naming `cli_failed` (`sandbox.test.ts`,
   `apiStep.test.ts`, `prescreen.test.ts`, `prescreenRun.test.ts`,
   `draftRun.test.ts`) now names `model_failed`. Report fixtures gain
-  `failedAttempts: []`. `evaluate.test.ts`'s "too many reasons" case stays
+  `failedAttempts: []`. `commands/evaluate.test.ts` and
+  `commands/draft.test.ts` expect the new `… failed: …` stdout line for
+  their `invalid_result` attempt. `evaluate.test.ts`'s "too many reasons" case stays
   `invalid_result`, which is what the zod check gives today. The brief says
   `bad_output`, but the code says otherwise, and item 2 needs no change.
 - Failure cases (the API step boundary): any non-timeout `APIError` →

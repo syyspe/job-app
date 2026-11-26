@@ -76,7 +76,8 @@ export function toolUse(id: string, input: unknown): Anthropic.ToolUseBlock {
 }
 
 // The SDK's own subclass for the status, as a real failed response gives.
-export function apiError(status: number): APIError {
+export function apiError(status: number, requestId?: string): APIError {
   const body = { type: 'error', error: { type: 'api_error', message: `status ${status}` } }
-  return APIError.generate(status, body, `status ${status}`, new Headers())
+  const headers = new Headers(requestId ? { 'request-id': requestId } : {})
+  return APIError.generate(status, body, `status ${status}`, headers)
 }

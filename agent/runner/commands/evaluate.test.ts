@@ -58,7 +58,8 @@ test('screens, evaluates and reports; the fake answers {}, so the attempt is inv
   expect(result.stdout).toBe(
     'screened: 1 title_rejected, 0 awaiting_handover, 0 left new\n' +
       'evaluated: 0 suitable, 0 unsuitable, 1 retrying, 0 failed\n' +
-      'queued: 0 ready ads over the per-run cap\n',
+      'queued: 0 ready ads over the per-run cap\n' +
+      'evaluation failed: Developer 2, testsource: invalid_result\n',
   )
   expect(jobApp.transitions).toEqual([
     { id: 1, to: 'title_rejected' },

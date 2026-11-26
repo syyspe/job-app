@@ -7,7 +7,7 @@ import type { AdSummary } from './jobApp.ts'
 
 const appUrl = 'https://jobs.lan.example'
 const NO_TALLY = { promising: { total: 0, fetched: 0 }, notPromising: { total: 0, fetched: 0 } }
-const none = { prescreened: [], tally: NO_TALLY }
+const none = { prescreened: [], tally: NO_TALLY, failedAttempts: [] }
 
 function ad(fields: Partial<FakeAd> & { id: number }): AdSummary {
   const { body: _body, evaluation: _evaluation, ...summary } = fakeAd(fields)
@@ -118,7 +118,7 @@ test('pre-screened ads get a section, then the 14-day tally', () => {
   ]
   const tally = { promising: { total: 3, fetched: 2 }, notPromising: { total: 4, fetched: 1 } }
 
-  const summary = composeSummary({ ads: [], prescreened, tally, sourceFailures: [], problems: [], appUrl })
+  const summary = composeSummary({ ads: [], prescreened, tally, sourceFailures: [], problems: [], failedAttempts: [], appUrl })
 
   expect(summary.text).toBe(
     [
@@ -138,7 +138,7 @@ test('a pre-screen reason has its control characters cleaned', () => {
   const prescreen = { verdict: 'promising' as const, reason: 'Fits.\nSubject: forged' }
   const prescreened = [ad({ id: 1, state: 'awaiting_handover', title: 'Tester', company: 'Acme', prescreen })]
 
-  const summary = composeSummary({ ads: [], prescreened, tally: NO_TALLY, sourceFailures: [], problems: [], appUrl })
+  const summary = composeSummary({ ads: [], prescreened, tally: NO_TALLY, sourceFailures: [], problems: [], failedAttempts: [], appUrl })
 
   expect(summary.text.split('\n')[1]).toBe('- Tester, Acme: promising — Fits. Subject: forged')
 })
@@ -157,4 +157,27 @@ test('the tally counts hand-over ads first seen in the last 14 days, fetched mea
   ]
 
   expect(prescreenTally(ads, now)).toEqual({ promising: { total: 2, fetched: 1 }, notPromising: { total: 1, fetched: 1 } })
+})
+
+test('a failed ad with a failed attempt this run carries its detail', () => {
+  const failedAttempts = [
+    { adId: 4, title: 'Architect', source: 'nordea', category: 'model_failed', detail: '400: bad schema (request req_1)' },
+  ]
+  const ads = [
+    ad({ id: 4, state: 'failed', title: 'Architect', source: 'nordea', lastError: 'model_failed' }),
+    ad({ id: 5, state: 'failed', title: 'Tester', source: 'nordea', lastError: 'timeout' }),
+  ]
+
+  const summary = composeSummary({ ads, ...none, failedAttempts, sourceFailures: [], problems: [], appUrl })
+
+  expect(summary.text).toContain('- Architect, nordea: model_failed — 400: bad schema (request req_1)\n')
+  expect(summary.text).toContain('- Tester, nordea: timeout\n')
+})
+
+test('a stored cli_failed category still renders as it is', () => {
+  const ads = [ad({ id: 4, state: 'failed', title: 'Architect', source: 'nordea', lastError: 'cli_failed' })]
+
+  const summary = composeSummary({ ads, ...none, sourceFailures: [], problems: [], appUrl })
+
+  expect(summary.text).toContain('- Architect, nordea: cli_failed\n')
 })

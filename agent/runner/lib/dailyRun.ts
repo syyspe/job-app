@@ -149,7 +149,9 @@ async function sendSummary({ options, report }: Run): Promise<void> {
   const { appUrl, lanUrl } = options.summary
   const tally = prescreenTally(await jobApp.listAllAds(), options.now())
   const { apiSpend } = report
-  const summary = composeSummary({ ads, prescreened, tally, sourceFailures, problems, apiSpend, appUrl, lanUrl })
+  // Pre-screen failures never move an ad to failed, so they have no line to join.
+  const failedAttempts = [...(report.evaluation?.failedAttempts ?? []), ...(report.drafting?.failedAttempts ?? [])]
+  const summary = composeSummary({ ads, prescreened, tally, sourceFailures, problems, failedAttempts, apiSpend, appUrl, lanUrl })
   await options.send({ to: options.summary.recipient, ...summary, date: options.now() })
   report.sent = true
   await jobApp.markReported(ads.map((ad) => ad.id))

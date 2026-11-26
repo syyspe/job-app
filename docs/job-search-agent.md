@@ -148,7 +148,7 @@ claude -p "<step prompt>"
   `slash_commands` are empty and `output_style` is `default`.
 - A usage limit is not marked distinctly in the JSON result: only an
   `@internal` field on `stream-json` assistant messages names it. The runner
-  counts it as `cli_failed` like any other failed run.
+  counts it as `model_failed` like any other failed run.
 - Without `--strict-mcp-config`, the user's claude.ai connectors can join the
   step, but only when they connect before the `init` event. In practice that
   happens only when another MCP server slows start-up. The gate therefore
@@ -395,7 +395,7 @@ state and an `error` adds one to `attempts` and stores `last_error`. It works
 from `new`, `awaiting_handover`, `ready` and `suitable`. The third attempt moves the ad to `failed`
 on the server. Any other same-state request is 409.
 
-The evaluation step's categories are `timeout`, `cli_failed` (a non-zero exit
+The evaluation step's categories are `timeout`, `model_failed` (a non-zero exit
 or `is_error`, a usage limit included), `bad_output` (stdout is not the JSON
 result envelope) and `invalid_result` (the runner's own schema check failed).
 Under `engine: "api"`, [`in-app-agent.md`](in-app-agent.md) §4 maps the API

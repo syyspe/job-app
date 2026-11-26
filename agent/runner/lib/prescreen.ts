@@ -16,7 +16,7 @@ export const PRESCREEN_FRAMING = new URL('../prompts/prescreen.framing.md', impo
 
 export type PrescreenOutcome =
   | { kind: 'screened'; prescreen: AdPrescreen }
-  | { kind: 'failed'; category: FailureCategory | 'invalid_result' }
+  | { kind: 'failed'; category: FailureCategory | 'invalid_result'; detail?: string }
 
 // The alert carries only these four fields; there is no description to judge.
 export function prescreenInput(ad: AdSummary): string {
