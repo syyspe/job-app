@@ -71,6 +71,16 @@ const SCHEMA = `
     profile_sync   INTEGER NOT NULL DEFAULT 0,
     edited_from    INTEGER REFERENCES attachments(id) ON DELETE SET NULL
   );
+
+  CREATE TABLE IF NOT EXISTS agent_runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT NOT NULL CHECK (kind IN ('run', 'collect')),
+    started_by  INTEGER NOT NULL REFERENCES users(id),
+    started_at  TEXT NOT NULL,
+    finished_at TEXT,
+    exit_code   INTEGER,
+    output      TEXT NOT NULL DEFAULT ''
+  );
 `
 
 export function openDatabase(dbPath: string): Database.Database {

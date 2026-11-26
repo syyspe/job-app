@@ -5,11 +5,11 @@ export interface FakeRunHolder {
   stop: () => void
 }
 
-// A live process whose command line names agent:run's script, as a real
-// run holding the lock would. spawn() returns after exec, so /proc already
+// A live process whose command line names a run script (agent:run's by
+// default), as a real run holding the lock would. spawn() returns after exec, so /proc already
 // shows the new command line.
-export function startFakeRunHolder(): FakeRunHolder {
-  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)', 'agent/runner/commands/run.ts'], {
+export function startFakeRunHolder(script = 'agent/runner/commands/run.ts'): FakeRunHolder {
+  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 60000)', script], {
     stdio: 'ignore',
   })
   return { pid: child.pid as number, stop: () => child.kill() }

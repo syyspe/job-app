@@ -34,7 +34,7 @@ pipeline (§1), permissions (§2), private configuration (§3) and daily run
 | `048-in-app-agent-spec` | committed | done | — |
 | `049-api-steps` | committed | done | — |
 | `050-spend-caps` | committed | open | 049 |
-| `051-run-from-ui` | committed | open | — |
+| `051-run-from-ui` | committed | done | — |
 | `052-retire-claude-p` | committed | open | 049, 050, 051 |
 
 The rules for picking the next stream are the ones in
@@ -68,6 +68,9 @@ child process.
   picks a row.
 - cwd is the repository root, resolved from the server's own file location
   rather than `process.cwd()`.
+- `AGENT_RUNNER_ROOT` replaces that root, as a test-only override read once
+  from the server's env at startup. The e2e configs point it at stub
+  commands; the argv and env rules don't change.
 - env is an allowlist: `PATH`, `HOME`, `LANG`, `LC_ALL`, `TZ` and the three
   `XDG_*_HOME` variables when set. Nothing from the server's `.env` is
   passed (`DB_PATH`, `UPLOADS_DIR`, `SESSION_SECRET` and the rest), and

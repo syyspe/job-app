@@ -184,6 +184,30 @@ mail") from the ad inbox on a phone, and watch the output. The contract is
 11. Run `npm test -- --maxWorkers=2`, `npm run lint`, `npm run build`, then
     `npm run test:e2e` (or `:prod` if a port is taken).
 
+## Build notes
+
+Where the build departed from the work order above:
+
+- `startRun` spawns the child **before** inserting the row, not after.
+  `spawn` throws synchronously for some errnos, and a throw after the
+  insert would leave a row open until the next restart. The child's events
+  fire on a later tick, so the listeners attached afterwards miss nothing.
+- A child that never started still emits `close`, with a negative errno as
+  its code. `startRun` records exit `null` for it, as the failure case
+  below expects.
+- `app.ts` mounts the run router through a small `mountAgentRuns(app, db,
+  runner)`, which keeps `createApp` within the 40-line limit.
+- `useAds` returns `refresh`, a stable callback that wraps its `reload` in
+  the action runner, instead of `reload` itself. A fresh function on every
+  render would restart the panel's poll timer.
+- Step 9 found nothing to fix. At 360 px the inbox (with the panel and an
+  open hand-over form) and a draft's open questions and Markdown editor
+  neither overflow nor cramp a control, so no `applications.css` change.
+- Also added: `server/test/fakeChild.ts`, shared by the lib and router
+  tests; `validateRunKind` cases in `validation.test.ts`; and a
+  `collect.ts` line in the README's "Alert sources" command list saying it
+  takes `run.lock`.
+
 ## Parallel streams
 
 - `049-api-steps` (planned, building now). It shares no code file: 049

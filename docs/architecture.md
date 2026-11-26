@@ -26,7 +26,7 @@ The CSS splits by scope, and a value belongs to exactly one file:
 | `App.css` | The app frame — nav, `main`, the layout grid, panels, forms, the sort bar, toasts |
 | `applications.css` | The list surface — rows, the status spine, the chip, detail, attachments, empty state, the pager |
 | `admin.css` | The admin surface — user rows, the role spine and control, the confirm clusters |
-| `ads.css` | The ad inbox surface — the state filter, ad rows and their spine, the hand-over form |
+| `ads.css` | The ad inbox surface — the run panel and its run rows, the state filter, ad rows and their spine, the hand-over form |
 
 New rules read tokens from `index.css` rather than inventing values.
 
@@ -48,7 +48,10 @@ Presentational components, each with a test beside it. By surface:
   `UserList` and `UserRow`.
 - **Ad inbox** — `AdsView` (with its local `useAds` hook and the state filter)
   over `AdList`, `AdRow` and `AdHandoverForm`. `AdRow` offers Fetch on a
-  waiting hand-over ad and shows its pre-screen verdict.
+  waiting hand-over ad and shows its pre-screen verdict. Above the filter,
+  for admins only, `AgentRunPanel`: Run now and Check mail, the current
+  run's output (polled every 3 s while it runs) and the last ten runs; a
+  run finishing refreshes the inbox.
 - **Frame** — `NavBar`, which switches between the views and shows the Admin
   control to admins only; `ToastProvider` and `ToastHost`.
 
@@ -60,6 +63,8 @@ Presentational components, each with a test beside it. By surface:
 - `apiAction.ts` — `useApiAction(onUnauthorized)`, the `run` wrapper both
   data hooks share: it shows the success toast, and on `UnauthorizedError`
   shows the session-expired toast and calls `onUnauthorized`.
+- `agentRuns.ts` — `RUN_KIND_LABELS`, `runOutcome` (exit 0 succeeded,
+  non-zero failed, none interrupted) and `RUN_OUTCOME_LABELS`.
 - `adStates.ts` — `AD_STATE_LABELS`, the filter's display order, and which
   actions each ad state offers.
 - `paging.ts` — `paginate`, the pure one-page-at-a-time slice. The page size
@@ -85,7 +90,10 @@ Presentational components, each with a test beside it. By surface:
 static files, error handler — including the mount order `auth router →
 requireSession → the rest`, which is what protects everything, and
 `requireAdmin` mounted at `/api/users` alone, which is what keeps the user
-routes to admins.
+routes to admins. `requireAdmin` is mounted at `/api/agent` too, ahead of the
+run router, which exists only when `createApp` is given a `runner` (as
+`index.ts` always does). `index.ts` also closes the runs a previous server
+process left open before it listens.
 
 `types.ts` is the server's copy of the domain types (`src/types.ts` is the
 client's — the two are kept in step by hand). `ApplicationInput` is the
@@ -103,13 +111,16 @@ the profile-sync mark: `GET /attachments/pending-sync`,
 row no longer has is a 409 that keeps the mark; and
 `PUT /attachments/:id/text`, the raw-text save of a `.md` attachment),
 `questions.ts` (`GET /applications/:id/questions` and
-`POST /applications/:id/answers`, the draft's open questions), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
+`POST /applications/:id/answers`, the draft's open questions),
+`agentRuns.ts` (`GET`/`POST /agent/runs`, admin-only: list the current and
+last ten runs, or start one, 409 while one is running), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
 (`/config`, the page size the client pages the list by) and `users.ts`
 (admin-only account management).
 
 ### `server/models/`
 
-Sqlite row shapes and the row→domain mappers, including `user.ts`.
+Sqlite row shapes and the row→domain mappers, including `user.ts` and
+`agentRun.ts`.
 
 ### `server/lib/`
 
@@ -160,6 +171,13 @@ Helpers with no Express dependency:
   throws on anything that isn't a whole number of at least 1; and
   `parseLogLevel`, which does the same for `LOG_LEVEL`.
 - `logger.ts` — `createLogger`, the no-dependency JSON-lines logger.
+- `agentRunner.ts` — `createRunnerSpawner(spawn, root, env)`: the only place
+  the API spawns anything. `RUNNER_ARGS` is the constant argv per run kind,
+  `runnerEnv` the env allowlist, `REPO_ROOT` the default cwd.
+- `agentRuns.ts` — the `agent_runs` operations: `currentRun`, `recentRuns`,
+  `startRun` (spawns, inserts the row, appends each stdout/stderr line
+  capped to the last 64 KiB, and finishes it on `close`) and
+  `closeInterruptedRuns`, which `index.ts` calls at startup.
   `server/index.ts` builds the one instance; `child` binds fields such as the
   request ID.
 
@@ -175,12 +193,15 @@ Helpers with no Express dependency:
 ### Everything else under `server/`
 
 - `db/index.ts` — `openDatabase`: connection plus schema. `attachments.profile_sync`
-  (0/1) is the "Add to profile" mark the runner clears.
+  (0/1) is the "Add to profile" mark the runner clears. `agent_runs` holds the
+  runs started from the UI; it isn't scoped by user.
 - `seed.ts` — the `npm run seed` CLI entry point.
 - `test/auth.ts` — `loginAs`, a test helper that logs in and returns a cookie
   header string for route tests to pass by hand.
 - `test/adsApi.ts` — `withAdsApi` and the request helpers the `ads.*.test.ts`
   route tests share.
+- `test/fakeChild.ts` — `fakeChild()`, a stand-in `ChildProcess` with
+  writable stdout/stderr and a `close(code, signal)` that emits as Node does.
 
 ## `mcp/` — the stdio MCP server
 
@@ -358,7 +379,7 @@ criteria that follow it. `prompts/draft.framing.md` and
   and a rename; `localDate(now)`.
 - `lock.ts` — `acquireRunLock(stateDir)` → `release`: `run.lock` created
   exclusively with the pid; a holder whose `/proc/<pid>/cmdline` still names
-  `agent/runner/commands/run.ts` is `CliError(1, …)`; any other holder (gone,
+  `agent/runner/commands/run.ts` or `collect.ts` is `CliError(1, …)`; any other holder (gone,
   reused by an unrelated process, or unreadable) is removed and the lock
   taken once more.
 - `handoverExpiry.ts` — `handoverExpired(ad, { waitDays, now })` (UTC
@@ -470,11 +491,15 @@ criteria that follow it. `prompts/draft.framing.md` and
   vectors, a request counter and switchable failures.
 - `profileFixture.ts` — a temp `HOME` with a synthetic corpus and config, and
   `runNode`, an async spawn so the fake can answer the child process.
+- `fakeRunHolder.ts` — `startFakeRunHolder(script)`, a live process whose
+  command line names a run script, for the lock tests.
 - `tempDir.ts`, `runCommandFixture.ts`.
 
 ## The rest of the tree
 
 - `public/` — served verbatim at the site root, not processed by Vite.
 - `e2e/` — Playwright specs, configured by `playwright.config.ts`.
+  `e2e/fixtures/runner/` holds stub `agent/runner/commands/{run,collect}.ts`
+  that print two lines; both configs point `AGENT_RUNNER_ROOT` at it.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are
   generated — never edit by hand, never commit.

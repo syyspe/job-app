@@ -531,6 +531,8 @@ before you fix the connector. The tests use synthetic fixtures only.
   or a job-app failure exits 1. Its position in the mailbox is kept in
   `~/.local/state/job-agent/mail-watermark.json` and advances one message at
   a time, so a failed run reads the unfinished message again next time.
+  It takes the same `run.lock` as `agent:run`, so it refuses with exit 1
+  while a daily run, or another collect, is in progress.
 
 ## Daily run
 
@@ -623,6 +625,35 @@ the summary says why. Under `engine: "api"` there is no sandbox check.
   Its output is appended to
   `~/.local/state/job-agent/logs/run-YYYY-MM-DD.log`, and the output of a
   job-app it started to `logs/server.log` in the same folder.
+
+## Runs from the UI
+
+An admin can start a run from the top of the ad inbox, which works on a
+phone too. **Run now** starts the full `agent:run`, including its model
+steps and the summary email. **Check mail** starts `agent:collect`, which
+has no model cost. Basic users don't see the panel, and its endpoints answer
+them 403.
+
+- The server spawns the same command you would type: `node
+  agent/runner/commands/run.ts` or `collect.ts`, from the repository root,
+  with no shell. The runner still reads `~/.config/job-agent/` and its env
+  file as it does from a terminal. The server passes it only `PATH`, `HOME`,
+  `LANG`, `LC_ALL`, `TZ`, the `XDG_*_HOME` variables and
+  `NODE_EXTRA_CA_CERTS`, and none of its own `.env`.
+- Only one run at a time. While a run started here is going, both buttons
+  are disabled and a second start is refused with `409`. A run the
+  scheduler started holds `run.lock`, so a start from the panel then fails
+  with the lock's `another run is in progress` as its output.
+- The panel shows the running command's stdout and stderr, refreshed every
+  3 s, and the last ten runs with their outcome. Each run keeps the last
+  64 KiB of its output. Reloading the page keeps the progress, since it is
+  stored in the database.
+- A run still going when the server stops can't be followed any more. At
+  the next start its row is closed with `(server restarted)` and shows as
+  Interrupted.
+- `AGENT_RUNNER_ROOT`, if set, replaces the repository root as the spawn's
+  working directory. It exists for the e2e tests, which point it at stub
+  commands; leave it unset otherwise.
 
 ## The default branch is PR-only
 

@@ -1,5 +1,5 @@
-/* The ad inbox surface: the state filter and the ad rows. Colour shows what
-   needs the user. Every value is a token from index.css. */
+/* The ad inbox surface: the run panel, the state filter and the ad rows.
+   Colour shows what needs the user. Every value is a token from index.css. */
 
 .ads-view {
   display: flex;
@@ -139,4 +139,133 @@
 .ad-handover {
   padding-top: var(--s-3);
   border-top: 1px solid var(--line);
+}
+
+/* The run panel: start a run, follow it, read the last ones. Its rows use the
+   list spine — accent while running, danger when failed, and finished runs
+   that need nothing recede. */
+.run-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  padding: var(--s-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.run-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2) var(--s-3);
+}
+
+.run-panel-head h3 {
+  margin: 0;
+  font-size: var(--fs-base);
+}
+
+.run-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+}
+
+.run-empty {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+}
+
+.run-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.run-item {
+  --spine: var(--st-rejected);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+  min-width: 0;
+  padding: var(--s-3) var(--s-4) var(--s-3) var(--s-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.run-item::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--spine);
+}
+
+.run-item[data-outcome='running'] {
+  --spine: var(--accent);
+}
+
+.run-item[data-outcome='failed'] {
+  --spine: var(--danger);
+}
+
+.run-item[data-outcome='running']::before,
+.run-item[data-outcome='failed']::before {
+  width: 4px;
+}
+
+.run-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1) var(--s-3);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.run-kind {
+  font-weight: 600;
+}
+
+.run-time {
+  color: var(--ink-muted);
+}
+
+.run-item[data-outcome='succeeded'] .run-kind,
+.run-item[data-outcome='interrupted'] .run-kind,
+.run-item[data-outcome='succeeded'] .run-outcome,
+.run-item[data-outcome='interrupted'] .run-outcome {
+  color: var(--ink-muted);
+}
+
+.run-item[data-outcome='failed'] .run-outcome {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.run-item summary {
+  font-size: var(--fs-sm);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.run-output {
+  margin: var(--s-2) 0 0;
+  max-height: 20rem;
+  overflow: auto;
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface-raised);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

@@ -26,6 +26,8 @@ export default defineConfig({
       TLS_KEY: '',
       SEED_USERNAME: TEST_USERNAME,
       SEED_PASSWORD: TEST_PASSWORD,
+      // The run panel spawns these stubs instead of the real agent commands.
+      AGENT_RUNNER_ROOT: join(import.meta.dirname, 'e2e/fixtures/runner'),
     },
   },
 })

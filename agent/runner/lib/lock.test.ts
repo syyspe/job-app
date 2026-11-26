@@ -45,6 +45,19 @@ test('a lock held by a live run is refused naming its pid', () => {
   }
 })
 
+test('a lock held by a live agent:collect is refused naming its pid', () => {
+  const holder = startFakeRunHolder('agent/runner/commands/collect.ts')
+  try {
+    writeFileSync(join(dir.root, 'run.lock'), String(holder.pid))
+
+    expect(() => acquireRunLock(dir.root)).toThrow(
+      expect.objectContaining({ exitCode: 1, message: `another run is in progress (pid ${holder.pid})` }),
+    )
+  } finally {
+    holder.stop()
+  }
+})
+
 test('a lock whose pid now belongs to another process is taken over', () => {
   writeFileSync(join(dir.root, 'run.lock'), String(process.pid))
   const release = acquireRunLock(dir.root)

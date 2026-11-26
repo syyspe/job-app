@@ -61,7 +61,9 @@ function App() {
         {user && view === 'applications' && (
           <ApplicationsView onUnauthorized={() => setUser(null)} />
         )}
-        {user && view === 'ads' && <AdsView onUnauthorized={() => setUser(null)} />}
+        {user && view === 'ads' && (
+          <AdsView onUnauthorized={() => setUser(null)} isAdmin={user.role === 'admin'} />
+        )}
         {user && view === 'admin' && <AdminView onUnauthorized={() => setUser(null)} />}
       </main>
     </>

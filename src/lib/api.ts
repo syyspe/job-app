@@ -1,5 +1,8 @@
 import type {
   AdHandoverInput,
+  AgentRun,
+  AgentRunKind,
+  AgentRuns,
   AdState,
   AdSummary,
   AppConfig,
@@ -256,6 +259,21 @@ export async function requestFetch(id: number): Promise<AdSummary> {
   const response = await fetch(`/api/ads/${id}/fetch-request`, {
     method: 'POST',
     credentials: 'same-origin',
+  })
+  return parseJson(response)
+}
+
+export async function listAgentRuns(): Promise<AgentRuns> {
+  const response = await fetch('/api/agent/runs', { credentials: 'same-origin' })
+  return parseJson(response)
+}
+
+export async function startAgentRun(kind: AgentRunKind): Promise<AgentRun> {
+  const response = await fetch('/api/agent/runs', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind }),
   })
   return parseJson(response)
 }
