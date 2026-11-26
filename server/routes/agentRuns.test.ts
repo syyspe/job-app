@@ -178,3 +178,16 @@ test('an app without a runner has no run routes', async () => {
 
   expect(res.status).toBe(404)
 })
+
+test('a spawn that throws is a 500 and leaves no run open', async () => {
+  await new Promise<void>((resolve) => server.close(() => resolve()))
+  await listen(() => {
+    throw new Error('spawn EAGAIN')
+  })
+
+  const res = await post('{"kind":"collect"}')
+
+  expect(res.status).toBe(500)
+  expect(await res.json()).toMatchObject({ error: 'internal server error' })
+  expect(await list()).toEqual({ current: null, recent: [] })
+})

@@ -14,6 +14,8 @@ interface AgentRunPanelProps {
 
 function useAgentRuns({ onUnauthorized, onRunFinished }: AgentRunPanelProps) {
   const [runs, setRuns] = useState<AgentRuns>({ current: null, recent: [] })
+  // Counts finished polls, so a failed one still schedules the next.
+  const [polls, setPolls] = useState(0)
   const run = useApiAction(onUnauthorized)
 
   const reload = useCallback(async () => setRuns(await listAgentRuns()), [])
@@ -25,15 +27,16 @@ function useAgentRuns({ onUnauthorized, onRunFinished }: AgentRunPanelProps) {
   // Polled only while a run is current, so a poll that finds none saw it finish.
   useEffect(() => {
     if (!runs.current) return
-    const timer = setTimeout(() => {
-      void run(async () => {
+    const timer = setTimeout(async () => {
+      await run(async () => {
         const next = await listAgentRuns()
         setRuns(next)
         if (!next.current) onRunFinished()
       })
+      setPolls((count) => count + 1)
     }, POLL_MS)
     return () => clearTimeout(timer)
-  }, [runs, run, onRunFinished])
+  }, [runs, polls, run, onRunFinished])
 
   const start = (kind: AgentRunKind) =>
     run(async () => {

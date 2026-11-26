@@ -95,6 +95,26 @@ test('polls while a run is current, then reports it finished under recent runs',
   expect(screen.getByRole('button', { name: 'Run now' })).toBeEnabled()
 })
 
+test('a failed poll shows the error and polling carries on', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  let gets = 0
+  const replies = [
+    () => json({ current: running, recent: [] }),
+    () => json({ error: 'internal server error' }, 500),
+    () => json({ current: null, recent: [finished] }),
+  ]
+  vi.stubGlobal('fetch', vi.fn(async () => replies[Math.min(gets++, replies.length - 1)]()))
+  const onRunFinished = renderPanel()
+  await screen.findByRole('log', { name: 'Current run output' })
+
+  await act(() => vi.advanceTimersByTimeAsync(3000))
+  expect(await screen.findByText('internal server error')).toBeVisible()
+  await act(() => vi.advanceTimersByTimeAsync(3000))
+
+  expect(onRunFinished).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('button', { name: 'Run now' })).toBeEnabled()
+})
+
 test('a finished run shows its outcome, the newest with its output open', async () => {
   stubRuns([
     {
