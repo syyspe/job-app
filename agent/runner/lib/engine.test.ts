@@ -44,7 +44,7 @@ const spec = { prompt: 'Go.', systemPrompt: 'Rules.', schema: { type: 'object' }
 test('api with no key in the env file is an exit-2 error', () => {
   const envFile = dir.write('env', 'JOBAPP_USERNAME=runner\n')
 
-  expect(() => createEngine(config('api'), { env: {}, envFile, stateDir: dir.root, searchProfile: search })).toThrow(
+  expect(() => createEngine(config('api'), deps(envFile))).toThrow(
     expect.objectContaining({ exitCode: 2, message: `${envFile}: ANTHROPIC_API_KEY is not set` }),
   )
 })

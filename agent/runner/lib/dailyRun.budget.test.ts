@@ -4,6 +4,7 @@ import { startDailyRun, suitable } from '../../test/dailyRunFixture.ts'
 import type { DailyRunFixture } from '../../test/dailyRunFixture.ts'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import { memoryLedger } from '../../test/memoryLedger.ts'
+import { CliError } from '../../lib/cliError.ts'
 import { createRunBudget } from './apiBudget.ts'
 import { runDaily } from './dailyRun.ts'
 
@@ -58,6 +59,21 @@ test('the report carries the API spend and the summary shows it', async () => {
 
   expect(report.apiSpend).toEqual({ runUsd: 1, monthUsd: 5, monthlyUsd: 30 })
   expect(fixture.sent[0].text).toContain('Claude API: $1.00 this run, $5.00 this month of $30.00')
+})
+
+test('an invalid spend ledger fails the model steps but the summary still goes out', async () => {
+  fixture.fake.ads.push(fakeAd({ id: 1, state: 'ready', firstSeenAt: '2026-11-20 08:00:00' }))
+  const invalid = () => {
+    throw new CliError(2, 'api-spend.json: not a valid state file; fix or delete it')
+  }
+  const ledger = { monthTotal: invalid, add: invalid }
+  const budget = createRunBudget({ perRunUsd: 3, monthlyUsd: 30, prices: {}, ledger })
+
+  const report = await runDaily(fixture.options({ budget }))
+
+  expect(report.failures.map(({ step }) => step)).toContain('API spend')
+  expect(report.apiSpend).toBeNull()
+  expect(fixture.sent[0].text).toContain('API spend: api-spend.json: not a valid state file; fix or delete it')
 })
 
 test('a month already at its cap starts no model step and the summary names it', async () => {

@@ -127,9 +127,12 @@ async function modelSteps(run: Run): Promise<void> {
   const steps = { jobApp, checkHealth: async () => health, canStart }
   report.evaluation = await guarded(run, 'evaluate', () => runEvaluation({ ...options.evaluation, ...steps }))
   report.drafting = await guarded(run, 'draft', () => runDrafting({ ...options.drafting, ...steps }))
-  const reason = budget.stopReason()
-  if (reason) report.stopped = { step: 'model steps', message: reason }
-  report.apiSpend = budget.spend()
+  // Guarded too: the budget reads the spend ledger, which may be invalid.
+  await guarded(run, 'API spend', async () => {
+    const reason = budget.stopReason()
+    if (reason) report.stopped = { step: 'model steps', message: reason }
+    report.apiSpend = budget.spend()
+  })
 }
 
 // Nothing is marked reported, and no source failure cleared, until the mail

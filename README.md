@@ -633,8 +633,8 @@ the summary says why. Under `engine: "api"` there is no sandbox check.
   clicks. If Ollama is unreachable or the sandbox check fails, the
   pre-screen, fetch, evaluation and drafting are skipped and no ad is
   touched. Under `engine: "api"`, reaching `api.perRunUsd` or
-  `api.monthlyUsd` (a month already at its cap starts no model step), or an API
-  authentication or permission error starts no further model step: the run
+  `api.monthlyUsd` (a month already at its cap starts no model step), or an
+  API authentication or permission error starts no further model step: the run
   prints `model steps stopped: <reason>`, the summary lists it as a problem,
   and the remaining ads stay queued. Configuration errors exit 2
   before the lock is taken. A failed step or send exits 1; a skip alone
