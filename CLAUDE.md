@@ -144,9 +144,12 @@ with no `failed` line. Playwright: `N passed`.
 - `agent/` — the job search agent's own processes. `agent/profile/` holds the
   profile index commands and the `search_profile` stdio MCP server, with no
   job-app credentials and nothing in its MCP entry writing to stdout.
-  `agent/runner/` holds the job-app credentials (`profile:sync`, later the
-  daily run). It may import `agent/profile/lib/`, never the reverse. Nothing
-  in `agent/` imports `server/` or `mcp/`.
+  `agent/runner/` holds the job-app credentials (`profile:sync`, the daily
+  run). It may import `agent/profile/lib/`, never the reverse. Nothing
+  in `agent/` imports `server/` or `mcp/`. The one coupling the other way is
+  by path: `server/` spawns `agent/runner/commands/{run,collect}.ts` for runs
+  started from the UI (`server/lib/agentRunner.ts`) and imports nothing from
+  `agent/`.
 - `public/` — served verbatim at the site root, not processed by Vite.
 - `e2e/` — Playwright specs, configured by `playwright.config.ts`.
 - `dist/`, `node_modules/`, `test-results/`, `playwright-report/` are
