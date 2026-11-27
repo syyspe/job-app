@@ -1,7 +1,8 @@
 // npm run agent:run — the daily run: collect, expire hand-overs, sync the
-// profile, pre-screen and fetch hand-overs, evaluate, draft, and email one
-// summary when there is news, or every run with summary.alwaysSend. Task
-// Scheduler starts it through daily-run.sh.
+// profile, pre-screen every source's new ads, fetch the promising ones,
+// evaluate, and email one summary when there is news, or every run with
+// summary.alwaysSend. It never drafts. Task Scheduler starts it through
+// daily-run.sh.
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
@@ -12,31 +13,25 @@ import { loadProfileConfig, readConfigFile } from '../../profile/lib/config.ts'
 import { checkOllama, createOllama } from '../../profile/lib/ollama.ts'
 import { openIndex } from '../../profile/lib/store.ts'
 import type { IndexStore } from '../../profile/lib/store.ts'
-import { formatCollectReport } from '../lib/collectRun.ts'
 import { runDaily } from '../lib/dailyRun.ts'
 import type { DailyReport, DailyRunOptions } from '../lib/dailyRun.ts'
-import { DRAFT_FRAMING, DRAFT_PROMPT, DRAFT_SCHEMA, writeDraft } from '../lib/draft.ts'
-import { formatDraftReport } from '../lib/draftRun.ts'
 import { loadEngine } from '../lib/engine.ts'
 import { loadJobAppEnv, loadMailEnv, loadSmtpEnv } from '../lib/env.ts'
 import { EVALUATION_FRAMING, EVALUATION_PROMPT, EVALUATION_SCHEMA, evaluateAd } from '../lib/evaluate.ts'
-import { formatEvaluationReport } from '../lib/evaluationRun.ts'
-import { formatHandoverFetchReport } from '../lib/handoverFetchRun.ts'
 import { createJobAppClient } from '../lib/jobApp.ts'
 import { acquireRunLock } from '../lib/lock.ts'
 import { openMailbox } from '../lib/mailbox.ts'
 import { createPoliteHttp } from '../lib/politeHttp.ts'
 import { PRESCREEN_FRAMING, PRESCREEN_PROMPT, PRESCREEN_SCHEMA, prescreenAd } from '../lib/prescreen.ts'
-import { formatPrescreenReport } from '../lib/prescreenRun.ts'
 import { buildSystemPrompt } from '../lib/prompts.ts'
-import { loadDailyRunConfig, loadDraftConfig, loadRunnerConfig, loadSourcesConfig } from '../lib/runnerConfig.ts'
+import { loadDailyRunConfig, loadRunnerConfig, loadSourcesConfig } from '../lib/runnerConfig.ts'
 import { ensureSandboxVerified } from '../lib/sandboxCheck.ts'
+import { runOutputLines } from '../lib/runOutput.ts'
 import { runProbes } from '../lib/sandboxProbes.ts'
 import { sendMail } from '../lib/smtp.ts'
 import { CONNECTORS } from '../lib/sources/index.ts'
 import type { SourceConnector } from '../lib/sources/types.ts'
 import { createRunnerState, localDate } from '../lib/state.ts'
-import { formatSyncResult } from '../lib/sync.ts'
 
 const CLAUDE_BIN = 'claude'
 
@@ -44,20 +39,16 @@ const CLAUDE_BIN = 'claude'
 function loadSetup(env: Env) {
   const path = configPath(env)
   const prompts = promptsDir(env)
-  const drafting = loadDraftConfig(path)
   const envFile = envPath(env)
   const profile = loadProfileConfig(path)
   return {
     profile,
     engine: loadEngine(env, profile),
     runner: loadRunnerConfig(path),
-    drafting,
     sources: loadSourcesConfig(path, CONNECTORS),
     daily: loadDailyRunConfig(path),
     prescreenPrompt: buildSystemPrompt(PRESCREEN_FRAMING, readConfigFile(join(prompts, 'prescreen.md'))),
     evaluatePrompt: buildSystemPrompt(EVALUATION_FRAMING, readConfigFile(join(prompts, 'evaluate.md'))),
-    draftPrompt: buildSystemPrompt(DRAFT_FRAMING, readConfigFile(join(prompts, 'draft.md'))),
-    cvTemplates: { fi: readConfigFile(drafting.cvTemplates.fi), en: readConfigFile(drafting.cvTemplates.en) },
     envFile,
     jobAppEnv: loadJobAppEnv(envFile),
     mail: loadMailEnv(envFile),
@@ -68,7 +59,7 @@ function loadSetup(env: Env) {
 
 type Setup = ReturnType<typeof loadSetup>
 
-function fetchOptions(setup: Setup, today: string): DailyRunOptions['handoverFetch'] {
+function fetchOptions(setup: Setup, today: string): DailyRunOptions['fetch'] {
   const counters = createRunnerState(setup.stateDir).counters(today)
   const httpFor = (connector: SourceConnector) => {
     const { dailyOpenCap, minDelayMs } = setup.sources[connector.id]
@@ -96,15 +87,12 @@ function gate(setup: Setup): DailyRunOptions['gate'] {
   return () => ensureSandboxVerified({ claudeBin: CLAUDE_BIN, stateDir: setup.stateDir, runProbes: probes, now: () => new Date() })
 }
 
-function modelOptions(setup: Setup, today: string): Pick<DailyRunOptions, 'evaluation' | 'drafting' | 'gate' | 'budget'> {
+function modelOptions(setup: Setup): Pick<DailyRunOptions, 'evaluation' | 'gate' | 'budget'> {
   const { engine } = setup
   const evaluate = { prompt: EVALUATION_PROMPT, systemPrompt: setup.evaluatePrompt, schema: EVALUATION_SCHEMA }
   const runEvaluateStep = engine.stepFor({ step: 'evaluation', ...evaluate, timeoutMs: setup.runner.evaluation.timeoutMs })
-  const draft = { prompt: DRAFT_PROMPT, systemPrompt: setup.draftPrompt, schema: DRAFT_SCHEMA }
-  const runDraftStep = engine.stepFor({ step: 'drafting', ...draft, timeoutMs: setup.drafting.timeoutMs })
   return {
     evaluation: { config: setup.runner, evaluate: (ad) => evaluateAd(ad, runEvaluateStep) },
-    drafting: { config: setup.drafting, write: (ad) => writeDraft(ad, setup.cvTemplates, runDraftStep), today },
     gate: gate(setup),
     budget: engine.budget,
   }
@@ -115,18 +103,17 @@ function dailyOptions(setup: Setup, store: IndexStore | null): DailyRunOptions {
   const { profile, envFile } = setup
   const syncFolder = profile.syncFolder
   const ollama = createOllama({ url: profile.ollamaUrl, model: profile.embeddingModel })
-  const fetching = fetchOptions(setup, today)
   return {
     jobApp: createJobAppClient({ ...setup.jobAppEnv, envPath: envFile }),
     state: createRunnerState(setup.stateDir),
     openMailbox: () => openMailbox({ ...setup.mail, envPath: envFile }),
-    collect: { ...fetching, titleRules: setup.runner.titleRules.reject },
-    handoverFetch: fetching,
+    collect: { connectors: CONNECTORS, sources: setup.sources, today, titleRules: setup.runner.titleRules.reject },
+    fetch: fetchOptions(setup, today),
     prescreen: prescreenOptions(setup),
     handoverWaitDays: setup.daily.handoverWaitDays,
     checkHealth: () => checkOllama(profile),
     sync: syncFolder && store ? { config: { ...profile, syncFolder }, store, ollama } : null,
-    ...modelOptions(setup, today),
+    ...modelOptions(setup),
     summary: {
       recipient: setup.daily.summary.recipient,
       alwaysSend: setup.daily.summary.alwaysSend,
@@ -138,42 +125,8 @@ function dailyOptions(setup: Setup, store: IndexStore | null): DailyRunOptions {
   }
 }
 
-function summaryLine(report: DailyReport): string {
-  if (report.sent) return 'summary: sent'
-  if (report.failures.some((failure) => failure.step === 'summary')) return 'summary: not sent'
-  return 'summary: nothing to report'
-}
-
-// Steps 1–3: collection, expiry and the model-step gate.
-function earlyLines(report: DailyReport): string[] {
-  return [
-    ...(report.collect ? formatCollectReport(report.collect, CONNECTORS) : []),
-    ...(report.dismissed === null ? [] : [`expired hand-overs: ${report.dismissed} dismissed`]),
-    ...(report.sandbox?.reverified ? [`sandbox re-verified for claude ${report.sandbox.version}`] : []),
-    ...(report.skipped ? [`model steps skipped: ${report.skipped.message}`] : []),
-  ]
-}
-
-function modelLines(report: DailyReport): string[] {
-  return [
-    ...(report.sync ? formatSyncResult(report.sync) : []),
-    ...(report.prescreen ? formatPrescreenReport(report.prescreen) : []),
-    ...(report.handoverFetch ? formatHandoverFetchReport(report.handoverFetch) : []),
-    ...(report.evaluation ? formatEvaluationReport(report.evaluation) : []),
-    ...(report.drafting ? formatDraftReport(report.drafting) : []),
-    ...(report.stopped ? [`model steps stopped: ${report.stopped.message}`] : []),
-  ]
-}
-
-// Last on stdout: the run panel reads the figures from this line.
-function spendLines({ apiSpend }: DailyReport): string[] {
-  if (!apiSpend) return []
-  return [`api: $${apiSpend.runUsd.toFixed(2)} run, $${apiSpend.monthUsd.toFixed(2)} month`]
-}
-
-function printReport(report: DailyReport): void {
-  const lines = [...earlyLines(report), ...modelLines(report), summaryLine(report), ...spendLines(report)]
-  for (const line of lines) console.log(line)
+function printReport(report: DailyReport, appUrl: string): void {
+  for (const line of runOutputLines(report, appUrl)) console.log(line)
   for (const { step, message } of report.failures) console.error(`${step} failed: ${message}`)
 }
 
@@ -191,7 +144,7 @@ await runCommand(async () => {
   try {
     store = openSyncIndex(setup)
     const report = await runDaily(dailyOptions(setup, store))
-    printReport(report)
+    printReport(report, setup.jobAppEnv.baseUrl)
     if (report.failures.length > 0) process.exitCode = 1
   } finally {
     store?.close()

@@ -1,11 +1,10 @@
-import { applyFetch, noFetches, recordBlocked } from './fetchOutcome.ts'
-import type { FetchCounts } from './fetchOutcome.ts'
+import { counted } from './counted.ts'
 import type { JobAppClient } from './jobApp.ts'
 import type { Mailbox } from './mailbox.ts'
 import type { SourcesConfig } from './runnerConfig.ts'
 import { screenNewAds } from './screen.ts'
 import type { ScreenCounts } from './screen.ts'
-import type { AlertMessage, PoliteHttp, SourceConnector } from './sources/types.ts'
+import type { AlertMessage, SourceConnector } from './sources/types.ts'
 import type { RunnerState } from './state.ts'
 
 export interface CollectRunOptions {
@@ -17,7 +16,6 @@ export interface CollectRunOptions {
   state: RunnerState
   // The local date, YYYY-MM-DD, that source failures are recorded under.
   today: string
-  httpFor: (connector: SourceConnector) => PoliteHttp
 }
 
 export interface SourceReport {
@@ -25,17 +23,13 @@ export interface SourceReport {
   newAds: number
   existingAds: number
   emptyAlerts: number
-  fetched: FetchCounts
 }
 
 export interface CollectReport {
   // One entry per enabled source.
   sources: Record<string, SourceReport>
   screened: ScreenCounts
-  leftNew: number
 }
-
-type FetchingConnector = SourceConnector & Required<Pick<SourceConnector, 'fetchAd'>>
 
 interface Run {
   options: CollectRunOptions
@@ -43,7 +37,7 @@ interface Run {
 }
 
 function emptyReport(): SourceReport {
-  return { messages: 0, newAds: 0, existingAds: 0, emptyAlerts: 0, fetched: noFetches() }
+  return { messages: 0, newAds: 0, existingAds: 0, emptyAlerts: 0 }
 }
 
 async function ingestMessage({ options, reports }: Run, connector: SourceConnector, message: AlertMessage) {
@@ -75,48 +69,20 @@ async function collect(run: Run, enabled: SourceConnector[]): Promise<void> {
   }
 }
 
-// Oldest first; the API lists newest first.
-async function fetchSource({ options, reports }: Run, connector: FetchingConnector) {
-  const http = options.httpFor(connector)
-  const ads = (await options.jobApp.listAds('new')).filter((ad) => ad.source === connector.id).toReversed()
-  for (const ad of ads) {
-    if (http.dayEnded) return
-    const result = await connector.fetchAd({ externalId: ad.externalId, url: ad.url, title: ad.title }, http)
-    const outcome = await applyFetch(options.jobApp, ad, result)
-    reports[connector.id].fetched[outcome] += 1
-    if (outcome === 'blocked') recordBlocked(options.state, connector.id, options.today)
-  }
-}
-
-function fetches(connector: SourceConnector): connector is FetchingConnector {
-  return connector.mode === 'automatic' && connector.fetchAd !== undefined
-}
-
-// Collect, then screen titles, then fetch each automatic source's pages, the
-// sources in parallel and each source's ads one at a time.
+// Collect, then screen titles. Fetching waits for the pre-screen, in the daily run.
 export async function runCollect(options: CollectRunOptions): Promise<CollectReport> {
   const enabled = options.connectors.filter((connector) => options.sources[connector.id].enabled)
   const run: Run = { options, reports: Object.fromEntries(enabled.map((connector) => [connector.id, emptyReport()])) }
   await collect(run, enabled)
   const screened = await screenNewAds(options.jobApp, options.titleRules)
-  await Promise.all(enabled.filter(fetches).map((connector) => fetchSource(run, connector)))
-  const leftNew = (await options.jobApp.listAds('new')).length
-  return { sources: run.reports, screened, leftNew }
+  return { sources: run.reports, screened }
 }
 
-function sourceLine(id: string, report: SourceReport, connectors: SourceConnector[]): string {
-  const { messages, newAds, existingAds, emptyAlerts, fetched } = report
-  const collected = `${id}: ${messages} messages, ${newAds} new ads, ${existingAds} existing, ${emptyAlerts} empty alerts`
-  if (connectors.find((connector) => connector.id === id)?.mode === 'handover') return collected
-  const { ready, duplicate, gone, retrying, failed, blocked } = fetched
-  return `${collected}; fetched ${ready} ready, ${duplicate} duplicate, ${gone} gone, ${retrying} retrying, ${failed} failed, ${blocked} blocked`
+export function emailsRead({ sources }: CollectReport): number {
+  return Object.values(sources).reduce((sum, report) => sum + report.messages, 0)
 }
 
-export function formatCollectReport({ sources, screened, leftNew }: CollectReport, connectors: SourceConnector[]): string[] {
-  const { titleRejected, awaitingHandover } = screened
-  return [
-    ...Object.entries(sources).map(([id, report]) => sourceLine(id, report, connectors)),
-    `screened: ${titleRejected} title_rejected, ${awaitingHandover} awaiting_handover`,
-    `left new: ${leftNew} ads`,
-  ]
+export function formatCollectReport(report: CollectReport): string {
+  const titles = Object.values(report.sources).reduce((sum, source) => sum + source.newAds, 0)
+  return `Read ${counted(emailsRead(report), 'new email')} with ${counted(titles, 'new job title')}.`
 }

@@ -488,16 +488,20 @@ including the sandbox check.
 ## Alert sources
 
 `agent:collect` reads new job alert emails from a mailbox used for nothing
-else, turns them into ads in the inbox, screens their titles, then fetches
-the full ad pages of the automatic sources. It runs no `claude -p` step, so
-it needs no sandbox check. The sources are:
+else, turns them into ads in the inbox and screens their titles. It fetches
+no ad page: `agent:run` does that after the pre-screen. It runs no
+`claude -p` step, so it needs no sandbox check. The sources are:
 
 | Id | Site | Mode |
 |---|---|---|
-| `academicwork` | Academic Work | automatic: the ad page is fetched |
+| `academicwork` | Academic Work | automatic: the ad waits in `new` |
 | `valtiolle` | Valtiolle.fi | automatic |
 | `nordea` | Nordea careers | automatic |
-| `duunitori` | Duunitori | hand-over: the ad waits in `awaiting_handover`; `agent:run` fetches it only after you click Fetch, or with `fetch: "automatic"` also when the pre-screen calls it promising |
+| `duunitori` | Duunitori | hand-over: the ad waits in `awaiting_handover`, and can also be handed over by hand |
+
+`agent:run` pre-screens every source's new ads by title and fetches the
+promising ones (with `fetch: "automatic"`, the default), and any hand-over ad
+you clicked Fetch on.
 
 ### Setup
 
@@ -522,7 +526,7 @@ it needs no sandbox check. The sources are:
    ```json
    {
      "sources": {
-       "duunitori": { "enabled": true, "termsCheckedOn": "2026-11-23", "fetch": "requested" },
+       "duunitori": { "enabled": true, "termsCheckedOn": "2026-11-23", "fetch": "automatic" },
        "valtiolle": { "enabled": true, "termsCheckedOn": "2026-11-20" },
        "nordea": { "enabled": false },
        "academicwork": { "enabled": false }
@@ -533,10 +537,12 @@ it needs no sandbox check. The sources are:
    Each source also takes `dailyOpenCap` (pages opened per day, default 20)
    and `minDelayMs` (the pause between its requests, default 15000, at least
    1000). If a site's terms rule fetching out, switching its connector's
-   `mode` to `handover` is a one-line change. `fetch` is read only for
-   Duunitori: `"requested"` (the default) fetches an ad only after you click
-   Fetch on it, `"automatic"` also fetches every ad the pre-screen calls
-   promising. Why Duunitori is fetched at all, and the limits on it, are in
+   `mode` to `handover` is a one-line change. `fetch` is read for every
+   source with a fetcher: `"automatic"` (the default) fetches every ad the
+   pre-screen calls promising, `"requested"` fetches a hand-over ad only
+   after you click Fetch on it. Set Duunitori's to `"automatic"` as above;
+   `"requested"` is the rollback if its terms ever rule automatic fetching
+   out. Why Duunitori is fetched at all, and the limits on it, are in
    `docs/job-search-agent.md` §10.
 
 The parsers were written from real alerts and pages kept in
@@ -550,15 +556,10 @@ before you fix the connector. The tests use synthetic fixtures only.
 - `npm run agent:collect` reads the messages that arrived since its last run
   and ingests each candidate with its source and the site's ad id. A repeat
   of a known ad isn't added again. Then it screens `new` ads as
-  `agent:evaluate` does, and fetches each enabled automatic source's oldest
-  `new` ads, up to that source's daily cap. A fetched ad goes to `ready`, or
-  to `duplicate` when it matches an earlier ad or application. A page that
-  is gone moves the ad to `failed`. Any other fetch failure records an
-  attempt, and the third moves the ad to `failed`. A 401, 403, 429 or 503
-  answer stops that source for the day without counting an attempt, and is
-  recorded as a `blocked` source failure. The command prints one line per
-  enabled source, a `screened:` line and the number of ads left `new`.
-  Configuration errors exit 2. An unreachable mailbox, a rejected mail login
+  `agent:evaluate` does, and prints one line: `Read 2 new emails with 7 new
+  job titles.` An alert that parses to no ads is recorded as an
+  `empty_alert` source failure for the daily summary. Configuration errors
+  exit 2. An unreachable mailbox, a rejected mail login
   or a job-app failure exits 1. Its position in the mailbox is kept in
   `~/.local/state/job-agent/mail-watermark.json` and advances one message at
   a time, so a failed run reads the unfinished message again next time.
@@ -567,13 +568,15 @@ before you fix the connector. The tests use synthetic fixtures only.
 
 ## Daily run
 
-`agent:run` does the whole pipeline once: collect, dismiss expired
-hand-overs, sync the profile, pre-screen and fetch hand-over ads, evaluate,
-draft, and email you one summary
-when there is something new, or on every run if you set `alwaysSend`.
-Windows Task Scheduler starts it every evening. Everything above it must
-already be set up: the profile corpus, ad evaluation, ad drafting and alert
-sources.
+`agent:run` does the routine work once and leaves you one decision. It
+reads the new alert emails and applies the title rules, dismisses expired
+hand-overs, syncs the profile, pre-screens every source's new ads, fetches
+the promising ones, evaluates them and stops. It never drafts: the ads the
+evaluation keeps (`suitable`) wait for you. It emails you one summary when
+there is something new, or on every run if you set `alwaysSend`. Windows
+Task Scheduler starts it every evening. The profile corpus, ad evaluation
+and alert sources must already be set up. Drafting is not needed: no
+`drafting` key, CV templates or `prompts/draft.md`.
 
 ### Setup
 
@@ -605,7 +608,8 @@ sources.
 
    `alwaysSend` defaults to false. When it is true, the summary arrives every
    run, so it also shows that the run happened. A run with nothing new sends
-   only the job-app link.
+   its opening sentences ("Read 0 new emails. No new job titles to
+   pre-screen.") and the job-app link.
 
    When `lanUrl` is set, the summary carries a second link, to that address,
    for reading it on the phone. It must be an http or https URL.
@@ -634,21 +638,38 @@ the summary says why. Under `engine: "api"` there is no sandbox check.
 
 - `npm run agent:run` takes `~/.local/state/job-agent/run.lock` and refuses
   with exit 1 while another run holds it. A lock left by a run that no
-  longer exists is taken over. It prints one line per step and a `summary:`
-  line. A step that fails (the mailbox or job-app unreachable, say) is
-  printed to stderr and listed in the summary, and the later steps still
-  run. After the profile sync it pre-screens the waiting hand-over ads, then
-  fetches the ones you clicked Fetch on (and, with `fetch: "automatic"`, the
-  promising ones) through the same caps, delays and block handling as
-  collect, so they are evaluated in the same run. The summary lists the
-  run's pre-screens and a 14-day count of verdicts against your Fetch
-  clicks. If Ollama is unreachable or the sandbox check fails, the
-  pre-screen, fetch, evaluation and drafting are skipped and no ad is
-  touched. Under `engine: "api"`, reaching `api.perRunUsd` or
-  `api.monthlyUsd` (a month already at its cap starts no model step), or an
-  API authentication or permission error starts no further model step: the run
-  prints `model steps stopped: <reason>`, the summary lists it as a problem,
-  and the remaining ads stay queued. Configuration errors exit 2
+  longer exists is taken over. After the profile sync it pre-screens the
+  unscreened ads (hand-over ads in `awaiting_handover`, automatic ones in
+  `new`, oldest first, up to `prescreen.perRunCap`). An ad the pre-screen
+  calls not promising is dismissed at once, with its verdict kept. Then it
+  fetches the promising ones and those you clicked Fetch on, within each
+  source's daily cap and delay. A fetched ad goes to `ready`, or to
+  `duplicate` when it matches an earlier ad or application. A page that is
+  gone fails the ad, any other fetch failure records an attempt, and a 401,
+  403, 429 or 503 stops that source for the day as a `blocked` failure. The
+  fetched ads are evaluated in the same run.
+
+  It prints the same sentences the summary opens with ("Read 2 new emails.
+  Pre-screening found 4 interesting job titles and set aside 9. Evaluation
+  kept 1 of 4."), one sentence per problem, a `Kept:` line per kept ad, a
+  `summary: sent | not sent | nothing to report` line and, when the Claude
+  API was used, an `api:` line last. A step that fails (the mailbox or
+  job-app unreachable, say) is also printed to stderr, and the later steps
+  still run. If Ollama is unreachable or the sandbox check fails, the
+  pre-screen, fetch and evaluation are skipped and no ad is touched. Under
+  `engine: "api"`, reaching `api.perRunUsd` or `api.monthlyUsd` (a month
+  already at its cap starts no model step), or an API authentication or
+  permission error starts no further model step, and the remaining ads stay
+  queued.
+
+  The summary's subject is `job agent: N kept, M set aside` (or `job agent:
+  nothing new`), plus the number of problems when there are any. The body
+  lists each kept ad with its job-site link, the evaluation's summary and a
+  link that opens it in job-app's inbox (`#ad-<id>`; the link only opens the
+  page). Then come the ads the pre-screen set aside, each with its reason and
+  job-site link so a wrong call can be checked by hand, the problems (a
+  failed step, an ad that failed three times, an alert that parsed to no
+  ads, a blocked source), and the Claude API spend. Configuration errors exit 2
   before the lock is taken. A failed step or send exits 1; a skip alone
   exits 0. Nothing is marked reported until the mail server has accepted
   the summary, so a failed send is retried next run.

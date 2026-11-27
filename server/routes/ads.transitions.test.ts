@@ -90,26 +90,14 @@ describe('transitions', () => {
     ['unsuitable', { to: 'unsuitable', evaluation: evaluation('unsuitable') }],
     ['dismissed', { to: 'dismissed' }],
     ['duplicate', { to: 'duplicate' }],
-  ])('a hand-over ad blanks on entering %s', async (_state, body) => {
+  ])('a hand-over ad entering %s keeps its title and company and loses its text', async (_state, body) => {
     const ad = await readyAd({ sourceMode: 'handover' })
 
     const result = await moved(ad.id, body)
 
-    expect(result.title).toBe('')
-    expect(result.company).toBe('')
-  })
-
-  test('an automatic ad keeps its title and company', async () => {
-    const ad = await readyAd()
-    const result = await moved(ad.id, { to: 'dismissed' })
-
     expect(result.title).toBe(ad.title)
     expect(result.company).toBe(ad.company)
-  })
-
-  test('a hand-over ad keeps its title until a failure is reported', async () => {
-    const ad = await readyAd({ sourceMode: 'handover' })
-    expect((await moved(ad.id, { to: 'failed', error: 'gone' })).title).toBe(ad.title)
+    expect(result.body).toBeNull()
   })
 })
 

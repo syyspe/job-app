@@ -130,6 +130,18 @@ test('a user can switch to the ad inbox and back', async () => {
   ).toBeVisible()
 })
 
+test('a summary link to an ad opens the ad inbox', async () => {
+  window.location.hash = '#ad-7'
+  try {
+    stubFetch(200, basicUser)
+    renderApp()
+
+    expect(await screen.findByRole('heading', { name: 'Ad inbox' })).toBeVisible()
+  } finally {
+    window.location.hash = ''
+  }
+})
+
 test('a basic user gets the applications view and no admin control', async () => {
   stubFetch(200, basicUser)
   renderApp()

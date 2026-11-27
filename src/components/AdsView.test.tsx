@@ -52,16 +52,21 @@ function stubAds(ads: AdSummary[]) {
   return stubFetch(() => new Response(JSON.stringify(ads), { status: 200 }))
 }
 
-function renderView(onUnauthorized = vi.fn(), canRunAgent = false) {
+function renderView(onUnauthorized = vi.fn(), canRunAgent = false, focusAdId?: number) {
   render(
     <ToastProvider>
-      <AdsView onUnauthorized={onUnauthorized} canRunAgent={canRunAgent} />
+      <AdsView onUnauthorized={onUnauthorized} canRunAgent={canRunAgent} focusAdId={focusAdId} />
     </ToastProvider>,
   )
 }
 
+// jsdom has no layout, so no scrollIntoView; AdRow scrolls a linked ad into view.
+const scrolled = vi.fn()
+Element.prototype.scrollIntoView = scrolled
+
 afterEach(() => {
   vi.unstubAllGlobals()
+  scrolled.mockClear()
 })
 
 test('opens on the ads waiting for a hand-over', async () => {
@@ -74,6 +79,39 @@ test('opens on the ads waiting for a hand-over', async () => {
     'aria-pressed',
     'true',
   )
+})
+
+test('a linked ad selects its state and is the current, scrolled-to row', async () => {
+  const suitable = sampleAd({ id: 3, title: 'Kept ad', state: 'suitable', sourceMode: 'automatic' })
+  const other = sampleAd({ id: 4, title: 'Other kept ad', state: 'suitable', sourceMode: 'automatic' })
+  stubAds([waiting, suitable, other])
+  renderView(vi.fn(), false, 3)
+
+  const row = await screen.findByRole('listitem', { current: true })
+  expect(within(row).getByText('Kept ad')).toBeVisible()
+  expect(screen.getAllByRole('listitem')).toHaveLength(2)
+  expect(screen.getByRole('button', { name: /^Suitable/ })).toHaveAttribute('aria-pressed', 'true')
+  expect(scrolled).toHaveBeenCalledTimes(1)
+})
+
+test('the linked state is chosen once; the user can still change the filter', async () => {
+  const user = userEvent.setup()
+  stubAds([waiting, sampleAd({ id: 3, title: 'Kept ad', state: 'suitable', sourceMode: 'automatic' })])
+  renderView(vi.fn(), false, 3)
+  await screen.findByText('Kept ad')
+
+  await user.click(screen.getByRole('button', { name: 'Awaiting hand-over 1' }))
+
+  expect(await screen.findByText('Waiting ad')).toBeVisible()
+  expect(screen.queryByRole('listitem', { current: true })).not.toBeInTheDocument()
+})
+
+test('a link to an ad that is not listed leaves the default state', async () => {
+  stubAds([waiting])
+  renderView(vi.fn(), false, 99)
+
+  expect(await screen.findByText('Waiting ad')).toBeVisible()
+  expect(screen.queryByRole('listitem', { current: true })).not.toBeInTheDocument()
 })
 
 test('a user without agent access sees no run panel', async () => {

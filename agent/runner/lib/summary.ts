@@ -1,33 +1,15 @@
 import type { ApiSpend } from './apiBudget.ts'
+import { counted } from './counted.ts'
+import type { KeptAd } from './evaluationRun.ts'
 import type { AdSummary } from './jobApp.ts'
 import { oneLine } from './oneLine.ts'
-import type { SourceFailure } from './state.ts'
-import type { FailedAttempt } from './stepFailure.ts'
-
-export interface Problem {
-  step: string
-  message: string
-}
-
-// Hand-over ads pre-screened in the last 14 days, by verdict, and how many of
-// each the user clicked Fetch on.
-export interface PrescreenTally {
-  promising: { total: number; fetched: number }
-  notPromising: { total: number; fetched: number }
-}
+import { adLink, adName } from './story.ts'
+import type { Story } from './story.ts'
 
 export interface SummaryInput {
-  // The unreported drafted, title_rejected and failed ads.
-  ads: AdSummary[]
-  // The ads this run pre-screened.
-  prescreened: AdSummary[]
-  tally: PrescreenTally
-  sourceFailures: SourceFailure[]
-  problems: Problem[]
-  // This run's failed model steps, whose detail goes beside a failed ad.
-  failedAttempts: FailedAttempt[]
+  story: Story
   // Set whenever the run made a Claude API call.
-  apiSpend?: ApiSpend | null
+  apiSpend: ApiSpend | null
   appUrl: string
   lanUrl?: string
 }
@@ -37,99 +19,46 @@ export interface Summary {
   text: string
 }
 
-function counted(n: number, noun: string): string {
-  return `${n} ${noun}${n === 1 ? '' : 's'}`
+// Blank-line separated; an empty block leaves no gap.
+function block(lines: string[]): string[] {
+  return lines.length === 0 ? [] : [...lines, '']
 }
 
-function section(heading: string, lines: string[]): string[] {
-  if (lines.length === 0) return []
-  return [`${heading} (${lines.length})`, ...lines.map((line) => `- ${oneLine(line)}`), '']
+function keptBlock({ ad, fitSummary }: KeptAd, appUrl: string): string[] {
+  return [oneLine(adName(ad)), `Ad: ${oneLine(ad.url)}`, oneLine(fitSummary), `In job-app: ${adLink(appUrl, ad.id)}`, '']
 }
 
-function inState(ads: AdSummary[], state: string): AdSummary[] {
-  return ads.filter((ad) => ad.state === state)
+function setAsideLines(ads: AdSummary[]): string[] {
+  if (ads.length === 0) return []
+  const lines = ads.flatMap((ad) => [`- ${oneLine(`${adName(ad)} — ${ad.prescreen?.reason ?? ''}`)}`, `  Ad: ${oneLine(ad.url)}`])
+  return ['Set aside by the pre-screen:', ...lines]
 }
 
-const TALLY_DAYS = 14
-const DAY_MS = 24 * 60 * 60 * 1000
-const VERDICT_LABELS = { promising: 'promising', not_promising: 'not promising' }
-
-// firstSeenAt is SQLite's UTC 'YYYY-MM-DD HH:MM:SS', so it compares as text.
-function sqliteTime(time: number): string {
-  return new Date(time).toISOString().slice(0, 19).replace('T', ' ')
-}
-
-export function prescreenTally(ads: AdSummary[], now: Date): PrescreenTally {
-  const since = sqliteTime(now.getTime() - TALLY_DAYS * DAY_MS)
-  const recent = ads.filter((ad) => ad.sourceMode === 'handover' && ad.prescreen && ad.firstSeenAt >= since)
-  const count = (verdict: string) => {
-    const matching = recent.filter((ad) => ad.prescreen?.verdict === verdict)
-    return { total: matching.length, fetched: matching.filter((ad) => ad.fetchRequestedAt !== null).length }
-  }
-  return { promising: count('promising'), notPromising: count('not_promising') }
-}
-
-function prescreenLine({ title, company, prescreen }: AdSummary): string {
-  const verdict = prescreen ? VERDICT_LABELS[prescreen.verdict] : ''
-  return `${title}, ${company}: ${verdict} — ${prescreen?.reason ?? ''}`
-}
-
-// An ad that failed in an earlier run has no attempt here, so only its category.
-function failedLine(ad: AdSummary, attempts: FailedAttempt[]): string {
-  const line = `${ad.title}, ${ad.source}: ${ad.lastError}`
-  const detail = attempts.find((attempt) => attempt.adId === ad.id && attempt.detail)?.detail
-  return detail ? `${line} — ${detail}` : line
-}
-
-function tallyLines({ promising, notPromising }: PrescreenTally): string[] {
-  if (promising.total + notPromising.total === 0) return []
-  const counts = `promising ${promising.total} (fetched ${promising.fetched}), not promising ${notPromising.total} (fetched ${notPromising.fetched})`
-  return [`Pre-screen vs. Fetch, last ${TALLY_DAYS} days: ${counts}`, '']
-}
-
-function spendLines(spend: ApiSpend | null | undefined): string[] {
+function spendLines(spend: ApiSpend | null): string[] {
   if (!spend) return []
   const { runUsd, monthUsd, monthlyUsd } = spend
-  return [`Claude API: $${runUsd.toFixed(2)} this run, $${monthUsd.toFixed(2)} this month of $${monthlyUsd.toFixed(2)}`, '']
+  return [`Claude API: $${runUsd.toFixed(2)} this run, $${monthUsd.toFixed(2)} of $${monthlyUsd.toFixed(2)} this month.`]
 }
 
-function subjectOf(input: SummaryInput): string {
-  const { ads, sourceFailures, problems } = input
-  return [
-    `job agent: ${counted(inState(ads, 'drafted').length, 'draft')}`,
-    `${inState(ads, 'title_rejected').length} title rejected`,
-    `${inState(ads, 'failed').length} failed`,
-    counted(sourceFailures.length, 'source failure'),
-    counted(problems.length, 'problem'),
-  ].join(', ')
+function subjectOf({ kept, setAside, problems }: Story): string {
+  const news = kept.length + setAside.length === 0 ? 'nothing new' : `${kept.length} kept, ${setAside.length} set aside`
+  const trouble = problems.length === 0 ? '' : `, ${counted(problems.length, 'problem')}`
+  return `job agent: ${news}${trouble}`
 }
 
-function bodyOf(input: SummaryInput): string {
-  const { ads, prescreened, tally, sourceFailures, problems, failedAttempts, apiSpend, appUrl, lanUrl } = input
+function bodyOf({ story, apiSpend, appUrl, lanUrl }: SummaryInput): string {
   return [
-    ...section('Drafts', inState(ads, 'drafted').map((ad) => `${ad.title}, ${ad.company} (application ${ad.applicationId})`)),
-    ...section('Pre-screened', prescreened.map(prescreenLine)),
-    ...tallyLines(tally),
-    ...section(
-      'Title rejected',
-      inState(ads, 'title_rejected').map((ad) => `${ad.title}, ${ad.company}, ${ad.source}: ${ad.url}`),
-    ),
-    ...section('Failed', inState(ads, 'failed').map((ad) => failedLine(ad, failedAttempts))),
-    ...section('Source failures', sourceFailures.map(({ source, date, kind }) => `${source} ${date} ${kind}`)),
-    ...section('Problems', problems.map(({ step, message }) => `${step}: ${message}`)),
-    ...spendLines(apiSpend),
+    ...block(story.opening.length === 0 ? [] : [story.opening.join(' ')]),
+    ...story.kept.flatMap((kept) => keptBlock(kept, appUrl)),
+    ...block(setAsideLines(story.setAside)),
+    ...block(story.problems),
+    ...block(spendLines(apiSpend)),
     `Open job-app: ${appUrl}`,
     ...(lanUrl ? [`Open job-app (LAN): ${lanUrl}`] : []),
     '',
   ].join('\n')
 }
 
-type Reported = Pick<SummaryInput, 'ads' | 'prescreened' | 'sourceFailures' | 'problems'>
-
-export function isEmpty({ ads, prescreened, sourceFailures, problems }: Reported): boolean {
-  return ads.length + prescreened.length + sourceFailures.length + problems.length === 0
-}
-
 export function composeSummary(input: SummaryInput): Summary {
-  return { subject: subjectOf(input), text: bodyOf(input) }
+  return { subject: subjectOf(input.story), text: bodyOf(input) }
 }

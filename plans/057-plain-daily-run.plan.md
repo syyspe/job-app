@@ -170,6 +170,32 @@ Docs:
   and new files, and the blanking helpers removed. `docs/ad-inbox-review.md`
   is a dated review and stays as written.
 
+## Departures during the build
+
+- `evaluationRun`'s `kept` is `KeptAd[]` (`{ ad, fitSummary }`), not
+  `AdSummary[]`: the email needs the fit summary, and `transitionAd` answers
+  with a summary that carries no evaluation.
+- `storyOf(report, appUrl)` takes the app URL, since the failed-ad sentence
+  carries the job-app link. `Story` holds the rendered `opening` and
+  `problems` sentences plus the `promising`, `setAside` and `kept` ads, rather
+  than a separate layer of raw facts; `hasNews(story)` decides the send.
+  `adName` (title, company, or the title alone when the alert named no
+  company) is shared by the story, the summary and the run output.
+- `gatherNews` runs as the guarded step `news` ("Listing failed ads and
+  source problems failed: …" when it fails). `Problem` moved from
+  `summary.ts` to `dailyRun.ts`.
+- New `agent/runner/lib/runOutput.ts` (`runOutputLines`), with a test: a
+  command file runs on import, so the `api:`-line-last check needs the lines
+  built in `lib/`. New `agent/runner/lib/counted.ts` for the plural rule
+  collect and the story share.
+- `CollectReport` loses `leftNew` and `CollectRunOptions` loses `httpFor`, as
+  collect fetches nothing. `formatPrescreenReport` is deleted (nothing else
+  used it).
+- The fake job-app gains `transitionFailsFor`, for the failed-dismissal test,
+  and accepts a pre-screen on a `new` ad as the server does.
+- The Duunitori section of `docs/job-search-agent.md` is §10, not §9 (§9 is
+  the daily run); that is the section updated.
+
 ## Work order
 
 1. Server: `setPrescreen` accepts `new`, and title/company blanking is

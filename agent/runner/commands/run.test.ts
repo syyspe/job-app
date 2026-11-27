@@ -26,10 +26,6 @@ function config(): Record<string, unknown> {
     embeddingModel: 'test-embed',
     corpus: [{ path: join(dir.root, 'corpus'), label: 'facts' }],
     sources: { duunitori: { enabled: true, termsCheckedOn: '2026-11-23' } },
-    drafting: {
-      filePrefix: 'Tester',
-      cvTemplates: { fi: join(dir.root, 'cv-fi.md'), en: join(dir.root, 'cv-en.md') },
-    },
     summary: { recipient: 'me@mail.example' },
   }
 }
@@ -38,11 +34,8 @@ beforeEach(async () => {
   dir = makeTempDir()
   jobApp = await startFakeJobApp()
   stateDir = join(dir.root, '.local/state/job-agent')
-  dir.write('cv-fi.md', 'CV fi')
-  dir.write('cv-en.md', 'CV en')
   dir.write('.config/job-agent/prompts/prescreen.md', 'Pre-screen.')
   dir.write('.config/job-agent/prompts/evaluate.md', 'Evaluate.')
-  dir.write('.config/job-agent/prompts/draft.md', 'Draft.')
   dir.write('.config/job-agent/config.json', JSON.stringify(config()))
   const env = `JOBAPP_API_URL=${jobApp.url}\nJOBAPP_USERNAME=${jobApp.username}\nJOBAPP_PASSWORD=${jobApp.password}\n`
   dir.write('.config/job-agent/env', env + mail)
@@ -108,6 +101,7 @@ test('a lock held by a live run exits 1 and runs no step', async () => {
   }
 })
 
+// No drafting key, CV templates or draft.md: the daily run never drafts.
 test('a stale lock is taken over, every step reports, and the lock is released', async () => {
   writeLock(spawnSync('true').pid as number)
 
@@ -115,8 +109,9 @@ test('a stale lock is taken over, every step reports, and the lock is released',
 
   expect(result.stdout).toBe(
     [
-      'expired hand-overs: 0 dismissed',
-      'model steps skipped: Ollama health check failed: unreachable',
+      'Reading the alert emails failed: cannot reach mailbox at 127.0.0.1',
+      'Sending the summary failed: cannot reach mail server at 127.0.0.1',
+      'Pre-screening and evaluation were skipped: Ollama health check failed: unreachable',
       'summary: not sent',
       '',
     ].join('\n'),

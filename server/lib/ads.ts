@@ -4,14 +4,7 @@ import type { ApplicationRow } from '../models/application.ts'
 import type { AttachmentRow } from '../models/attachment.ts'
 import type { AdEvaluation, AdPrescreen, AdState } from '../types.ts'
 import { findTitleDuplicate, findUrlDuplicate } from './adDedup.ts'
-import {
-  blanksOnceReported,
-  blanksOnEntry,
-  canTransition,
-  clearsBody,
-  recordsAttempts,
-  retryTarget,
-} from './adStates.ts'
+import { canTransition, clearsBody, recordsAttempts, retryTarget } from './adStates.ts'
 import type { AdHandover, AdIngest, AdTransition } from './adValidation.ts'
 import { insertApplication, insertAttachment } from './applications.ts'
 import { HttpError } from './httpError.ts'
@@ -62,23 +55,9 @@ export function listAds(db: Database.Database, userId: number, state?: AdState):
     .all(userId, filter, filter) as AdRow[]
 }
 
-// The reason talks about the ad; the verdict stays for the verdict-vs-click
-// comparison.
-function blankedPrescreen(prescreen: string | null): string | null {
-  if (prescreen === null) return null
-  const { verdict } = JSON.parse(prescreen) as AdPrescreen
-  return JSON.stringify({ verdict, reason: '' })
-}
-
-// What a hand-over ad keeps once blanked: only the keys deduplication needs.
-function blanked(ad: AdRow): AdRow {
-  return { ...ad, title: '', company: '', prescreen: blankedPrescreen(ad.prescreen) }
-}
-
 function movedRow(ad: AdRow, move: AdMove): AdRow {
-  const blank = ad.source_mode === 'handover' && blanksOnEntry(move.to)
   return {
-    ...(blank ? blanked(ad) : ad),
+    ...ad,
     state: move.to,
     body: clearsBody(move.to) ? null : (move.body ?? ad.body),
     evaluation: move.evaluation ? JSON.stringify(move.evaluation) : ad.evaluation,
@@ -248,7 +227,9 @@ export function requestFetch(db: Database.Database, ad: AdRow): AdRow {
 }
 
 export function setPrescreen(db: Database.Database, ad: AdRow, prescreen: AdPrescreen): AdRow {
-  requireWaiting(ad, 'pre-screened')
+  if (ad.state !== 'new' && ad.state !== 'awaiting_handover') {
+    throw new HttpError(409, `an ad cannot be pre-screened from ${ad.state}`)
+  }
   db.prepare(`UPDATE ads SET prescreen = ?, updated_at = datetime('now') WHERE id = ?`).run(
     JSON.stringify(prescreen),
     ad.id,
@@ -265,18 +246,10 @@ export function draftAd(db: Database.Database, ad: AdRow, draft: AdDraft): Draft
   return { ad: moved, application, attachments }
 }
 
-function markOneReported(db: Database.Database, ad: AdRow): void {
-  const kept = ad.source_mode === 'handover' && blanksOnceReported(ad.state) ? blanked(ad) : ad
-  db.prepare(
-    `UPDATE ads SET reported_at = datetime('now'), title = ?, company = ?, prescreen = ? WHERE id = ?`,
-  ).run(kept.title, kept.company, kept.prescreen, ad.id)
-}
-
 /** Ids the user does not own are skipped. */
 export function markReported(db: Database.Database, userId: number, ids: number[]): void {
-  const owned = db.prepare('SELECT * FROM ads WHERE id = ? AND user_id = ?')
-  for (const id of ids) {
-    const ad = owned.get(id, userId) as AdRow | undefined
-    if (ad) markOneReported(db, ad)
-  }
+  const mark = db.prepare(
+    `UPDATE ads SET reported_at = datetime('now') WHERE id = ? AND user_id = ?`,
+  )
+  for (const id of ids) mark.run(id, userId)
 }

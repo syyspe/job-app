@@ -33,6 +33,8 @@ export interface FakeJobApp {
   failure: 'none' | 'status' | 'malformed' | 'reported'
   // Ingesting the ad with this external id is answered with a 500.
   ingestFailsFor: string | null
+  // Any transition of the ad with this id is answered with a 500.
+  transitionFailsFor: number | null
   // Drops the current session, so the next request is answered 401.
   expireSession: () => void
   close: () => Promise<void>
@@ -119,6 +121,7 @@ export async function startFakeJobApp(attachments: FakeAttachment[] = []): Promi
     logins: 0,
     failure: 'none',
     ingestFailsFor: null,
+    transitionFailsFor: null,
     expireSession: () => {
       state.session = null
     },

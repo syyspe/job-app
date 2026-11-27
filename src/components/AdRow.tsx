@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AdHandoverForm } from './AdHandoverForm.tsx'
 import { canDismiss, canHandOver } from '../lib/adStates.ts'
 import { formatDay } from '../lib/dates.ts'
@@ -125,18 +125,21 @@ function AdButtons({ ad, onRetry, onFetch, onModeChange }: AdButtonsProps) {
 interface AdRowProps {
   ad: AdSummary
   actions: AdActions
+  /** The ad a summary link opened: marked, and scrolled into view. */
+  current?: boolean
 }
 
-export function AdRow({ ad, actions }: AdRowProps) {
-  const [mode, setMode] = useState<Mode>('idle')
+function useScrolledIntoView(current: boolean) {
+  const ref = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    if (current) ref.current?.scrollIntoView({ block: 'center' })
+  }, [current])
+  return ref
+}
 
-  async function handleHandOver(input: AdHandoverInput) {
-    const handedOver = await actions.onHandOver(ad.id, input)
-    if (handedOver) setMode('idle')
-  }
-
+function AdDetails({ ad }: { ad: AdSummary }) {
   return (
-    <li className="ad-item" data-state={ad.state}>
+    <>
       <span className="ad-title">{displayTitle(ad)}</span>
       <AdFacts ad={ad} />
       <AdPrescreenLine ad={ad} />
@@ -144,6 +147,22 @@ export function AdRow({ ad, actions }: AdRowProps) {
       {ad.state === 'failed' && ad.lastError && (
         <p className="ad-error">Failed with {ad.lastError}</p>
       )}
+    </>
+  )
+}
+
+export function AdRow({ ad, actions, current = false }: AdRowProps) {
+  const [mode, setMode] = useState<Mode>('idle')
+  const ref = useScrolledIntoView(current)
+
+  async function handleHandOver(input: AdHandoverInput) {
+    const handedOver = await actions.onHandOver(ad.id, input)
+    if (handedOver) setMode('idle')
+  }
+
+  return (
+    <li ref={ref} className="ad-item" data-state={ad.state} aria-current={current || undefined}>
+      <AdDetails ad={ad} />
       {mode === 'idle' && (
         <AdButtons
           ad={ad}

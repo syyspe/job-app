@@ -1,12 +1,12 @@
 // @vitest-environment node
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { startFakeJobApp } from '../../test/fakeJobApp.ts'
 import type { FakeJobApp } from '../../test/fakeJobApp.ts'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import type { FakeAd } from '../../test/fakeJobAppAds.ts'
 import { makeTempDir } from '../../test/tempDir.ts'
 import type { TempDir } from '../../test/tempDir.ts'
-import { formatHandoverFetchReport, runHandoverFetch } from './handoverFetchRun.ts'
+import { runFetch } from './fetchRun.ts'
 import { createJobAppClient } from './jobApp.ts'
 import type { SourceConfig } from './runnerConfig.ts'
 import type { FetchResult, PoliteHttp, SourceConnector } from './sources/types.ts'
@@ -66,7 +66,7 @@ interface RunSetup {
 function run({ connectors, sources, http }: RunSetup) {
   const jobApp = createJobAppClient({ baseUrl: fake.url, username: fake.username, password: fake.password, envPath: 'env' })
   const httpFor = () => http ?? { dayEnded: false, get: async () => ({ kind: 'gone' as const }) }
-  return runHandoverFetch({ jobApp, connectors, sources, state, today: '2026-11-23', httpFor })
+  return runFetch({ jobApp, connectors, sources, state, today: '2026-11-23', httpFor })
 }
 
 test('requested mode fetches only the clicked ads, oldest first', async () => {
@@ -127,25 +127,42 @@ test('gone fails the ad, and another failure is a same-state attempt', async () 
   ])
 })
 
-test('a connector without fetchAd, an automatic one and a disabled one are skipped', async () => {
-  fake.ads.push(waiting(1, clicked))
+test('a connector without fetchAd and a disabled one are skipped', async () => {
+  fake.ads.push(waiting(1, clicked), waiting(2, { ...clicked, source: 'off' }))
   const { fetchAd: _fetchAd, ...pasteOnly } = connector('duuni')
-  const automatic = { ...connector('auto'), mode: 'automatic' as const }
   const disabled = connector('off')
 
   const report = await run({
-    connectors: [pasteOnly, automatic, disabled],
-    sources: { duuni: config('requested'), auto: config('requested'), off: { ...config('requested'), enabled: false } },
+    connectors: [pasteOnly, disabled],
+    sources: { duuni: config('requested'), off: { ...config('requested'), enabled: false } },
   })
 
   expect(fetched).toEqual([])
   expect(report).toEqual({})
 })
 
-test('the report prints one line per source', () => {
-  const counts = { ready: 1, duplicate: 0, gone: 2, retrying: 0, failed: 0, blocked: 1 }
+describe('an automatic source', () => {
+  const automatic = (results: FetchResult[] = []) => ({ ...connector('auto', results), mode: 'automatic' as const })
+  const fresh = (id: number, fields: Partial<FakeAd> = {}) =>
+    fakeAd({ id, source: 'auto', sourceMode: 'automatic', state: 'new', url: `https://auto.example/${id}`, ...fields })
 
-  expect(formatHandoverFetchReport({ duunitori: counts })).toEqual([
-    'duunitori hand-over fetch: 1 ready, 0 duplicate, 2 gone, 0 retrying, 0 failed, 1 blocked',
-  ])
+  test('fetches its promising new ads, and not the unscreened or not-promising ones', async () => {
+    fake.ads.push(fresh(1, promising), fresh(2), fresh(3, notPromising))
+
+    const report = await run({ connectors: [automatic()], sources: { auto: config('automatic') } })
+
+    expect(fetched).toEqual(['https://auto.example/1'])
+    expect(report.auto.ready).toBe(1)
+    expect(fake.ads.map((ad) => ad.state)).toEqual(['ready', 'new', 'new'])
+  })
+
+  test('a failure is a same-state attempt in new', async () => {
+    fake.ads.push(fresh(1, promising))
+
+    const failing = automatic([{ kind: 'failed', category: 'network' }])
+
+    await run({ connectors: [failing], sources: { auto: config('automatic') } })
+
+    expect(fake.transitions).toEqual([{ id: 1, to: 'new', error: 'network' }])
+  })
 })

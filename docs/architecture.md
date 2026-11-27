@@ -48,7 +48,10 @@ Presentational components, each with a test beside it. By surface:
   `UserList` and `UserRow`.
 - **Ad inbox** — `AdsView` (with its local `useAds` hook and the state filter)
   over `AdList`, `AdRow` and `AdHandoverForm`. `AdRow` offers Fetch on a
-  waiting hand-over ad and shows its pre-screen verdict. Above the filter,
+  waiting hand-over ad and shows its pre-screen verdict. A summary email's
+  `#ad-<id>` link opens the inbox (`App` reads the hash once, so it outlives
+  the in-page login); `AdsView`'s `focusAdId` selects that ad's state once
+  the ads load, and its row is `aria-current` and scrolled into view. Above the filter,
   for users with agent access only, `AgentRunPanel`: Run now and Check mail, the current
   run's output (polled every 3 s while it runs) and the last ten runs, each
   with its Claude API spend when its output ends with the `api:` line; a
@@ -69,6 +72,7 @@ Presentational components, each with a test beside it. By surface:
   which reads the last `api: $x run, $y month` line from a run's output.
 - `adStates.ts` — `AD_STATE_LABELS`, the filter's display order, and which
   actions each ad state offers.
+- `adLink.ts` — `adIdFromHash(hash)`: the ad id of a `#ad-<id>` hash, or null.
 - `paging.ts` — `paginate`, the pure one-page-at-a-time slice. The page size
   comes from `GET /api/config`; a null size means one page holding
   everything, which is what the list shows until that call answers.
@@ -136,15 +140,15 @@ Helpers with no Express dependency:
 - `uploads.ts` — `createUpload(uploadsDir)`, the multer disk storage both
   upload routers use (UUID file names, 10 MB limit, UTF-8 file names).
 - `adStates.ts` — the ad state tables: allowed transitions, and which states
-  clear the text or blank a hand-over ad's title and company.
+  clear the text.
 - `adDedup.ts` — `canonicalUrl`, `normaliseText` and the two duplicate lookups.
 - `adValidation.ts` — request parsing for each ad route; `parseAdDraft`
   fixes status `draft` and an empty `dateApplied` itself.
 - `ads.ts` — the ad database operations: ingest, transition, hand-over,
-  `requestFetch` and `setPrescreen` (both on `awaiting_handover` only),
-  `draftAd` (application, attachments and the move to `drafted`, run by the
-  route in one transaction), reporting. Blanking a hand-over ad empties its
-  title, company and pre-screen reason, keeping the verdict. A transition to `ready` fills an empty
+  `requestFetch` (on `awaiting_handover` only), `setPrescreen` (on `new` or
+  `awaiting_handover`), `draftAd` (application, attachments and the move to
+  `drafted`, run by the route in one transaction), and reporting, which sets
+  `reported_at` only. A transition to `ready` fills an empty
   `company` or `deadline` from the request before the dedup rules run.
 - `files.ts` — attachment storage.
 - `askMarkers.ts` — pure text rules for `[[ASK:qN]]` markers: the open ids,
@@ -312,15 +316,16 @@ gate, then `runDrafting`. `commands/collect.ts` is `npm run agent:collect`:
 the `sources` key, runner config and the mail and job-app env, then
 `openMailbox` and `runCollect`, closing the mailbox whatever happens. It runs
 no `claude -p`, so it has no version gate. `commands/run.ts` is
-`npm run agent:run`: every config key, prompt and env value (exit 2 before
-anything else), then `acquireRunLock`, the profile index only when
-`syncFolder` is set, and `runDaily` with the real dependencies; it prints
-each step's lines through the same formatters the single-step commands use.
+`npm run agent:run`: every config key, prompt and env value it needs (no
+`drafting` key, CV templates or `draft.md`; exit 2 before anything else),
+then `acquireRunLock`, the profile index only when `syncFolder` is set, and
+`runDaily` with the real dependencies; it prints `runOutputLines`, the
+summary's own sentences.
 `daily-run.sh` is what the scheduled task runs: it logs to
 `~/.local/state/job-agent/logs/`, starts job-app if it isn't answering, and
-runs `agent:run`. Each step's line formatter (`formatCollectReport`,
-`formatEvaluationReport`, `formatDraftReport`, `formatSyncResult`) lives
-beside its run in `lib/`, since a command file runs on import.
+runs `agent:run`. Each line formatter (`formatCollectReport`,
+`formatEvaluationReport`, `formatDraftReport`, `formatSyncResult`,
+`runOutputLines`) lives in `lib/`, since a command file runs on import.
 
 `prompts/evaluate.framing.md` is the fixed head of the evaluation system
 prompt; `prompts/evaluate.example.md` a synthetic example of the private
@@ -406,25 +411,36 @@ criteria that follow it. `prompts/draft.framing.md` and
   `RCPT TO`, `DATA`, `QUIT`), every reply code checked, a base64 body, a 30 s
   timeout. Failures are `CliError(1, …)`: unreachable, login refused, or the
   command refused with its code.
-- `summary.ts` — `composeSummary(input)`: subject and plain-text body from
-  the unreported ads, the run's pre-screens with `prescreenTally`'s 14-day
-  verdict-vs-click count, source failures and problems, and a `Claude API:`
-  spend line when the run made an API call; `isEmpty` says when
-  there is nothing to send. Ad text has control characters and line breaks
-  replaced through `oneLine`. A Failed line carries the detail of this run's
-  failed attempt on that ad, when there is one.
+- `story.ts` — `storyOf(report, appUrl)`: the run in plain sentences, the
+  opening ones ("Read 2 new emails. …") and one per problem (a failed or
+  skipped step, a budget stop, retries, a failed ad with this run's detail
+  and its job-app link, an empty alert, a block), plus the promising,
+  set-aside and kept ads. `storyLines` is what both outputs print,
+  `hasNews` whether there is anything to send, `adLink(appUrl, id)` the
+  `#ad-<id>` link and `adName` "title, company".
+- `summary.ts` — `composeSummary({ story, apiSpend, appUrl, lanUrl })`:
+  subject and plain-text body from the story: the opening, each kept ad with
+  both links and its fit summary, the set-aside ads with reason and job-site
+  link, the problems and a `Claude API:` spend line. Ad text goes through
+  `oneLine`.
+- `runOutput.ts` — `runOutputLines(report, appUrl)`: `agent:run`'s stdout,
+  the story's sentences, `Kept:` lines, the `summary:` line and the `api:`
+  line last.
+- `counted.ts` — `counted(n, noun)`: "1 email", "2 emails".
 - `oneLine.ts` — `oneLine(value)`: control characters and line breaks become
   spaces, so untrusted text can't start a line of its own.
 - `stepFailure.ts` — `FailedAttempt` (ad id, title, source, category,
   optional detail), `failedAttempt(ad, failure)` and
   `formatFailedAttempt(step, attempt)`, the `<step> failed: …` line the
-  evaluation, drafting and pre-screen reports print per failed attempt.
+  evaluation and drafting reports print per failed attempt.
 - `dailyRun.ts` — `runDaily(options)`, every dependency injected: collect,
   expire, one health check and the gate (`ensureSandboxVerified`, or `null`
-  under `"api"`), then sync, pre-screen, hand-over fetch, evaluation and
-  drafting under the budget's `canStart`, then the summary, which names the
-  budget's stop reason and its `spend()` (on `report.apiSpend`). A `CliError` in a step is
-  recorded as a failure and the run goes on; anything else propagates.
+  under `"api"`), then sync, pre-screen, fetch and evaluation under the
+  budget's `canStart`, the spend check (the budget's stop reason and its
+  `spend()`, on `report.apiSpend`), `gatherNews` (unreported `failed` ads and
+  source failures, on `report.news`), then the summary. It never drafts. A
+  `CliError` in a step is recorded as a failure and the run goes on;
+  anything else propagates.
 - `politeHttp.ts` — `createPoliteHttp(options)`: the only network path a
   connector has. It checks scheme and host on the URL and every redirect,
   sends fixed headers, spaces requests by `minDelayMs`, counts each open
@@ -434,23 +450,25 @@ criteria that follow it. `prompts/draft.framing.md` and
   `common.ts` the host check and the fetch-then-extract step, and
   `index.ts` the `CONNECTORS` registry. `academicWork.ts`, `valtiolle.ts` and
   `nordea.ts` are automatic, `duunitori.ts` is hand-over with a `fetchAd`
-  over the page's JSON-LD, used only by `handoverFetchRun.ts`. Each file opens with
+  over the page's JSON-LD. Every `fetchAd` is called only by `fetchRun.ts`. Each file opens with
   what identifies its alerts and where the ad id, title and text sit.
   `fixtures/` holds synthetic alert bodies and ad pages only.
 - `collectRun.ts` — `runCollect`: alerts after the watermark into ingests,
-  then `screenNewAds`, then each enabled automatic source's oldest `new` ads
-  through its connector, the sources in parallel. It returns per-source
-  counts.
+  then `screenNewAds`; it fetches no page. It returns per-source counts, and
+  `formatCollectReport` prints them as one sentence.
 - `fetchOutcome.ts` — `applyFetch` (a fetch result into a transition: a
   failure is a same-state attempt from `new` or `awaiting_handover`) and
-  `recordBlocked`, shared by collect and the hand-over fetch.
-- `handoverFetchRun.ts` — `runHandoverFetch`: each enabled hand-over source
-  with a `fetchAd`, its waiting ads with a Fetch request (plus the promising
-  ones under `fetch: "automatic"`), oldest first, until the day ends.
+  `recordBlocked`, used by the fetch.
+- `fetchRun.ts` — `runFetch`: each enabled source with a `fetchAd`, its
+  waiting ads (`awaiting_handover` for a hand-over source, `new` for an
+  automatic one) with a Fetch request or, under `fetch: "automatic"`, a
+  promising verdict, oldest first, until the day ends.
 - `prescreen.ts` / `prescreenRun.ts` — `prescreenAd(ad, runStep)`: title,
   company, location and deadline as JSON on stdin, `unsure` mapped to
-  `promising`; `runPrescreen`: the unscreened waiting hand-over ads, oldest
-  first, up to `perRunCap` through `mapLimit`. A failure stores nothing.
+  `promising`; `runPrescreen`: the unscreened hand-over ads in
+  `awaiting_handover` and automatic ads in `new`, oldest first, up to
+  `perRunCap` through `mapLimit`. A not-promising ad is dismissed at once and
+  reported under `setAside`. A failure stores nothing.
 - `sandbox.ts` — the one way the runner starts `claude -p`: `sandboxArgs`
   (the fixed flag list), `sandboxEnv` (the allowlist), `profileMcpConfig`,
   `stepSchema` (zod → JSON Schema without `$schema` or `maxItems`), `spawnSandboxed` (fresh
@@ -470,6 +488,7 @@ criteria that follow it. `prompts/draft.framing.md` and
 - `evaluationRun.ts` — `runEvaluation`: screen `new` ads, check Ollama, then
   evaluate the oldest `perRunCap` ready ads through `mapLimit` at
   `concurrency`; a failure is a same-state transition with its category.
+  `kept` lists the ads moved to `suitable` with their fit summary.
 - `draftOutput.ts` — the drafting step's zod schema and `checkDraft`, which
   answers `ask_mismatch` unless the `[[ASK:id]]` markers in the cover letter
   and CV are exactly the question ids.
@@ -492,7 +511,8 @@ criteria that follow it. `prompts/draft.framing.md` and
   uses (login, pending list, download, flag with the conditional 409, and the ad routes from
   `fakeJobAppAds.ts`), with recorded flag calls, transitions, drafts and
   every request line, a login
-  counter, session expiry and a switchable failure. `fakeHttp.ts` holds its
+  counter, session expiry, a switchable failure and a transition that fails
+  for one ad (`transitionFailsFor`). `fakeHttp.ts` holds its
   JSON helpers.
 - `fakeJobAppAds.ts` — `fakeAd(fields)` and the ad ingest, list, get,
   transition, multipart draft and `reported` handlers. They are idempotent on

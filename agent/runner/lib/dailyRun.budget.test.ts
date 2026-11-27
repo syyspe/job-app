@@ -37,11 +37,10 @@ test('a budget stopping mid-evaluation starts no further step and the summary na
 
   expect(fixture.steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'send'])
   expect(report.evaluation?.queued).toBe(1)
-  expect(report.drafting?.queued).toBe(1)
   expect(report.stopped).toEqual({ step: 'model steps', message: 'API run cap reached at $3.00' })
   expect(report.failures).toEqual([])
   expect(fixture.fake.ads.map((ad) => [ad.state, ad.attempts])).toEqual([['suitable', 0], ['ready', 0]])
-  expect(fixture.sent[0].text).toContain('- model steps: API run cap reached at $3.00')
+  expect(fixture.sent[0].text).toContain('Stopped before the remaining model steps: API run cap reached at $3.00')
 })
 
 const price = { inputPerMTok: 1, outputPerMTok: 1, cacheWritePerMTok: 1, cacheReadPerMTok: 1 }
@@ -58,7 +57,7 @@ test('the report carries the API spend and the summary shows it', async () => {
   const report = await runDaily(fixture.options({ budget, evaluate }))
 
   expect(report.apiSpend).toEqual({ runUsd: 1, monthUsd: 5, monthlyUsd: 30 })
-  expect(fixture.sent[0].text).toContain('Claude API: $1.00 this run, $5.00 this month of $30.00')
+  expect(fixture.sent[0].text).toContain('Claude API: $1.00 this run, $5.00 of $30.00 this month.')
 })
 
 test('an invalid spend ledger fails the model steps but the summary still goes out', async () => {
@@ -73,7 +72,7 @@ test('an invalid spend ledger fails the model steps but the summary still goes o
 
   expect(report.failures.map(({ step }) => step)).toContain('API spend')
   expect(report.apiSpend).toBeNull()
-  expect(fixture.sent[0].text).toContain('API spend: api-spend.json: not a valid state file; fix or delete it')
+  expect(fixture.sent[0].text).toContain('Spend check failed: api-spend.json: not a valid state file; fix or delete it')
 })
 
 test('a month already at its cap starts no model step and the summary names it', async () => {
@@ -86,5 +85,5 @@ test('a month already at its cap starts no model step and the summary names it',
   expect(report.stopped).toEqual({ step: 'model steps', message: 'API monthly cap reached: $30.00 of $30.00' })
   expect(report.apiSpend).toBeNull()
   expect(report.failures).toEqual([])
-  expect(fixture.sent[0].text).toContain('- model steps: API monthly cap reached: $30.00 of $30.00')
+  expect(fixture.sent[0].text).toContain('Stopped before the remaining model steps: API monthly cap reached: $30.00 of $30.00')
 })

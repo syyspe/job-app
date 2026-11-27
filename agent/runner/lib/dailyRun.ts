@@ -4,23 +4,26 @@ import type { ApiSpend, StepBudget } from './apiBudget.ts'
 import type { HealthResult } from '../../profile/lib/ollama.ts'
 import { runCollect } from './collectRun.ts'
 import type { CollectReport, CollectRunOptions } from './collectRun.ts'
-import { runDrafting } from './draftRun.ts'
-import type { DraftReport, DraftRunOptions } from './draftRun.ts'
 import { runEvaluation } from './evaluationRun.ts'
 import type { EvaluationReport, EvaluationRunOptions } from './evaluationRun.ts'
-import { runHandoverFetch } from './handoverFetchRun.ts'
-import type { HandoverFetchOptions, HandoverFetchReport } from './handoverFetchRun.ts'
+import { runFetch } from './fetchRun.ts'
+import type { FetchOptions, FetchReport } from './fetchRun.ts'
 import { dismissExpiredHandovers } from './handoverExpiry.ts'
-import type { JobAppClient } from './jobApp.ts'
+import type { AdSummary, JobAppClient } from './jobApp.ts'
 import type { Mailbox } from './mailbox.ts'
 import { runPrescreen } from './prescreenRun.ts'
 import type { PrescreenReport, PrescreenRunOptions } from './prescreenRun.ts'
 import type { MailMessage } from './smtp.ts'
-import type { RunnerState } from './state.ts'
-import { composeSummary, isEmpty, prescreenTally } from './summary.ts'
-import type { Problem } from './summary.ts'
+import type { RunnerState, SourceFailure } from './state.ts'
+import { hasNews, storyOf } from './story.ts'
+import { composeSummary } from './summary.ts'
 import { syncProfile } from './sync.ts'
 import type { SyncOptions, SyncResult } from './sync.ts'
+
+export interface Problem {
+  step: string
+  message: string
+}
 
 export interface DailyRunOptions {
   jobApp: JobAppClient
@@ -37,12 +40,18 @@ export interface DailyRunOptions {
   // Null when config has no syncFolder.
   sync: Omit<SyncOptions, 'jobApp'> | null
   prescreen: Omit<PrescreenRunOptions, 'jobApp'>
-  handoverFetch: Omit<HandoverFetchOptions, 'jobApp' | 'state'>
+  fetch: Omit<FetchOptions, 'jobApp' | 'state'>
   evaluation: Omit<EvaluationRunOptions, 'jobApp' | 'checkHealth'>
-  drafting: Omit<DraftRunOptions, 'jobApp' | 'checkHealth'>
   summary: { recipient: string; alwaysSend: boolean; appUrl: string; lanUrl?: string }
   send: (message: MailMessage) => Promise<void>
   now: () => Date
+}
+
+// What the summary reports beyond this run's own steps: the unreported failed
+// ads and the source failures recorded since the last summary.
+export interface News {
+  failedAds: AdSummary[]
+  sourceFailures: SourceFailure[]
 }
 
 // A step left null did not run or did not finish.
@@ -52,10 +61,10 @@ export interface DailyReport {
   sandbox: { version: string; reverified: boolean } | null
   sync: SyncResult | null
   prescreen: PrescreenReport | null
-  handoverFetch: HandoverFetchReport | null
+  fetch: FetchReport | null
   evaluation: EvaluationReport | null
-  drafting: DraftReport | null
-  // Why the model steps (sync to drafting) were skipped: reported,
+  news: News | null
+  // Why the model steps (sync to evaluation) were skipped: reported,
   // but not a failure of the run.
   skipped: Problem | null
   // Why the budget stopped new model steps part-way: reported like a skip.
@@ -71,8 +80,6 @@ interface Run {
   options: DailyRunOptions
   report: DailyReport
 }
-
-const REPORTED_STATES = ['drafted', 'title_rejected', 'failed']
 
 // One step failing the user can act on doesn't stop the others; any other
 // error is our fault and ends the run.
@@ -120,13 +127,12 @@ async function modelSteps(run: Run): Promise<void> {
   const canStart = () => budget.canStart()
   if (sync) report.sync = await guarded(run, 'sync', () => syncProfile({ ...sync, jobApp }))
   report.prescreen = await guarded(run, 'pre-screen', () => runPrescreen({ ...options.prescreen, jobApp, canStart }))
-  // Here rather than in collect: text is fetched only in a run that can
-  // evaluate it the same day.
-  const fetchOptions = { ...options.handoverFetch, jobApp, state }
-  report.handoverFetch = await guarded(run, 'hand-over fetch', () => runHandoverFetch(fetchOptions))
+  // After the pre-screen, whose verdict picks what to fetch, and only in a run
+  // that can evaluate the text the same day.
+  const fetchOptions = { ...options.fetch, jobApp, state }
+  report.fetch = await guarded(run, 'fetch', () => runFetch(fetchOptions))
   const steps = { jobApp, checkHealth: async () => health, canStart }
   report.evaluation = await guarded(run, 'evaluate', () => runEvaluation({ ...options.evaluation, ...steps }))
-  report.drafting = await guarded(run, 'draft', () => runDrafting({ ...options.drafting, ...steps }))
   // Guarded too: the budget reads the spend ledger, which may be invalid.
   await guarded(run, 'API spend', async () => {
     const reason = budget.stopReason()
@@ -135,27 +141,23 @@ async function modelSteps(run: Run): Promise<void> {
   })
 }
 
+async function gatherNews({ options }: Run): Promise<News> {
+  const failed = await options.jobApp.listAds('failed')
+  return { failedAds: failed.filter((ad) => ad.reportedAt === null), sourceFailures: options.state.readFailures() }
+}
+
 // Nothing is marked reported, and no source failure cleared, until the mail
 // server has accepted the message.
 async function sendSummary({ options, report }: Run): Promise<void> {
-  const { jobApp, state } = options
-  const listed = await Promise.all(REPORTED_STATES.map((adState) => jobApp.listAds(adState)))
-  const ads = listed.flat().filter((ad) => ad.reportedAt === null)
-  const prescreened = report.prescreen?.ads ?? []
-  const sourceFailures = state.readFailures()
-  const notices = [report.skipped, report.stopped].filter((problem) => problem !== null)
-  const problems = [...notices, ...report.failures]
-  if (isEmpty({ ads, prescreened, sourceFailures, problems }) && !options.summary.alwaysSend) return
-  const { appUrl, lanUrl } = options.summary
-  const tally = prescreenTally(await jobApp.listAllAds(), options.now())
-  const { apiSpend } = report
-  // Pre-screen failures never move an ad to failed, so they have no line to join.
-  const failedAttempts = [...(report.evaluation?.failedAttempts ?? []), ...(report.drafting?.failedAttempts ?? [])]
-  const summary = composeSummary({ ads, prescreened, tally, sourceFailures, problems, failedAttempts, apiSpend, appUrl, lanUrl })
-  await options.send({ to: options.summary.recipient, ...summary, date: options.now() })
+  const { appUrl, lanUrl, recipient, alwaysSend } = options.summary
+  const story = storyOf(report, appUrl)
+  if (!hasNews(story) && !alwaysSend) return
+  const summary = composeSummary({ story, apiSpend: report.apiSpend, appUrl, lanUrl })
+  await options.send({ to: recipient, ...summary, date: options.now() })
   report.sent = true
-  await jobApp.markReported(ads.map((ad) => ad.id))
-  state.removeFailures(sourceFailures)
+  if (!report.news) return
+  await options.jobApp.markReported(report.news.failedAds.map((ad) => ad.id))
+  options.state.removeFailures(report.news.sourceFailures)
 }
 
 export async function runDaily(options: DailyRunOptions): Promise<DailyReport> {
@@ -165,9 +167,9 @@ export async function runDaily(options: DailyRunOptions): Promise<DailyReport> {
     sandbox: null,
     sync: null,
     prescreen: null,
-    handoverFetch: null,
+    fetch: null,
     evaluation: null,
-    drafting: null,
+    news: null,
     skipped: null,
     stopped: null,
     apiSpend: null,
@@ -179,6 +181,7 @@ export async function runDaily(options: DailyRunOptions): Promise<DailyReport> {
   const expiry = { waitDays: options.handoverWaitDays, now: options.now() }
   report.dismissed = await guarded(run, 'expire hand-overs', () => dismissExpiredHandovers(options.jobApp, expiry))
   await modelSteps(run)
+  report.news = await guarded(run, 'news', () => gatherNews(run))
   await guarded(run, 'summary', () => sendSummary(run))
   return report
 }

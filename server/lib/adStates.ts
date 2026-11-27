@@ -24,10 +24,6 @@ const BODY_CLEARING: readonly AdState[] = [
   'failed',
 ]
 
-const BLANK_ON_ENTRY: readonly AdState[] = ['unsuitable', 'duplicate', 'dismissed']
-
-const BLANK_ONCE_REPORTED: readonly AdState[] = ['drafted', 'title_rejected', 'failed']
-
 const ATTEMPT_STATES: readonly AdState[] = ['new', 'awaiting_handover', 'ready', 'suitable']
 
 export function canTransition(from: AdState, to: AdState): boolean {
@@ -36,14 +32,6 @@ export function canTransition(from: AdState, to: AdState): boolean {
 
 export function clearsBody(state: AdState): boolean {
   return BODY_CLEARING.includes(state)
-}
-
-export function blanksOnEntry(state: AdState): boolean {
-  return BLANK_ON_ENTRY.includes(state)
-}
-
-export function blanksOnceReported(state: AdState): boolean {
-  return BLANK_ONCE_REPORTED.includes(state)
 }
 
 export function recordsAttempts(state: AdState): boolean {

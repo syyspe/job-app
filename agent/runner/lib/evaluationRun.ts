@@ -25,10 +25,17 @@ export interface EvaluationCounts {
   failed: number
 }
 
+// An ad this run moved to suitable, with the evaluation's one-line fit.
+export interface KeptAd {
+  ad: AdSummary
+  fitSummary: string
+}
+
 export interface EvaluationReport {
   screened: ScreenCounts
   skipped: string | null
   evaluated: EvaluationCounts
+  kept: KeptAd[]
   queued: number
   // Every failed attempt this run, whether its ad retries or reached failed.
   failedAttempts: FailedAttempt[]
@@ -36,6 +43,7 @@ export interface EvaluationReport {
 
 interface Evaluated {
   moved: AdSummary
+  fitSummary: string | null
   failure: FailedAttempt | null
 }
 
@@ -44,10 +52,11 @@ interface Evaluated {
 async function evaluateOne(options: EvaluationRunOptions, summary: AdSummary): Promise<Evaluated> {
   const outcome = await options.evaluate(await options.jobApp.getAd(summary.id))
   if (outcome.kind === 'evaluated') {
-    return { moved: await options.jobApp.transitionAd(summary.id, outcome.transition), failure: null }
+    const moved = await options.jobApp.transitionAd(summary.id, outcome.transition)
+    return { moved, fitSummary: outcome.transition.evaluation.fitSummary, failure: null }
   }
   const moved = await options.jobApp.transitionAd(summary.id, { to: 'ready', error: outcome.category })
-  return { moved, failure: failedAttempt(summary, outcome) }
+  return { moved, fitSummary: null, failure: failedAttempt(summary, outcome) }
 }
 
 function countStates(moved: AdSummary[]): EvaluationCounts {
@@ -57,13 +66,21 @@ function countStates(moved: AdSummary[]): EvaluationCounts {
 
 const NONE_EVALUATED: EvaluationCounts = { suitable: 0, unsuitable: 0, retrying: 0, failed: 0 }
 
+function keptAds(results: Evaluated[]): KeptAd[] {
+  return results.flatMap(({ moved, fitSummary }) =>
+    moved.state === 'suitable' && fitSummary !== null ? [{ ad: moved, fitSummary }] : [],
+  )
+}
+
 // Screening needs no model, so it runs even when Ollama is down; evaluation
 // is then skipped with no ad moved and no attempt counted.
 export async function runEvaluation(options: EvaluationRunOptions): Promise<EvaluationReport> {
   const { jobApp, config } = options
   const screened = await screenNewAds(jobApp, config.titleRules.reject)
   const health = await options.checkHealth()
-  if (!health.ok) return { screened, skipped: health.reason, evaluated: NONE_EVALUATED, queued: 0, failedAttempts: [] }
+  if (!health.ok) {
+    return { screened, skipped: health.reason, evaluated: NONE_EVALUATED, kept: [], queued: 0, failedAttempts: [] }
+  }
   // The API lists newest first; the oldest ads are evaluated first.
   const ready = (await jobApp.listAds('ready')).toReversed()
   const batch = ready.slice(0, config.evaluation.perRunCap)
@@ -73,6 +90,7 @@ export async function runEvaluation(options: EvaluationRunOptions): Promise<Eval
     screened,
     skipped: null,
     evaluated: countStates(results.map((result) => result.moved)),
+    kept: keptAds(results),
     queued: ready.length - results.length,
     failedAttempts: results.flatMap((result) => (result.failure ? [result.failure] : [])),
   }
