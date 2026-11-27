@@ -99,10 +99,6 @@
 }
 
 .ad-title {
-  color: var(--ink-muted);
-}
-
-.ad-title {
   font-weight: 600;
   color: var(--ink);
 }
