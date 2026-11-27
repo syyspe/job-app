@@ -1,14 +1,16 @@
 interface PaginationProps {
+  label: string
+  unit: string
   page: number
   pageCount: number
   onChange: (page: number) => void
 }
 
-export function Pagination({ page, pageCount, onChange }: PaginationProps) {
+export function Pagination({ label, unit, page, pageCount, onChange }: PaginationProps) {
   if (pageCount <= 1) return null
 
   return (
-    <nav className="pager" aria-label="Application pages">
+    <nav className="pager" aria-label={label}>
       <button
         type="button"
         className="button"
@@ -18,7 +20,7 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
         Previous
       </button>
       <span aria-live="polite">
-        Page {page} of {pageCount}
+        {unit} {page} of {pageCount}
       </span>
       <button
         type="button"

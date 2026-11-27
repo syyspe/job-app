@@ -60,8 +60,9 @@ Presentational components, each with a test beside it. By surface:
   the ads load (an ad in no group leaves Kept selected), and its row is `aria-current` and scrolled into view. Above the filter,
   for users with agent access only, `AgentRunPanel`, presentational over
   `AdsView`'s `useAgentRuns`: Run now and Check mail, the current run's
-  output and the last ten runs, each with its Claude API spend when its
-  output ends with the `api:` line.
+  output and the last ten runs one at a time through `Pagination`, the
+  current run in their place while one is in progress, each with its Claude
+  API spend when its output ends with the `api:` line.
 - **Frame** — `NavBar`, which switches between the views and shows the Admin
   control to admins only; `ToastProvider` and `ToastHost`.
 

@@ -239,7 +239,8 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
           drafting={apps.drafting}
           hiddenArchivedCount={list.hiddenArchivedCount}
         />
-        <Pagination page={list.currentPage} pageCount={list.pageCount} onChange={list.setPage} />
+        <Pagination label="Application pages" unit="Page" page={list.currentPage}
+          pageCount={list.pageCount} onChange={list.setPage} />
         <ArchivedToggle
           count={list.archivedCount}
           showArchived={list.showArchived}
