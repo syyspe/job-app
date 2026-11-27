@@ -38,7 +38,7 @@ Presentational components, each with a test beside it. By surface:
 - **Applications** — `ApplicationsView` (with its local `useApplications`
   hook for the data and `useListView` for sort, archived filter and page)
   over `ApplicationList`, `ApplicationDetail`, `ApplicationForm` and
-  `ApplicationSort`, with `OpenQuestions` (one answer field per open
+  `ApplicationSort`, with `OpenQuestions` (lists each open
   `[[ASK:qN]]` question, shown only while any is open) and `AttachmentList`
   in the detail, and `ArchivedToggle`/`Pagination` at the foot of the list.
   `AttachmentList` offers Edit on a current `.md` attachment and opens

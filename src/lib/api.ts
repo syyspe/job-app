@@ -217,19 +217,6 @@ export async function getOpenQuestions(applicationId: number): Promise<OpenQuest
   return parseJson(response)
 }
 
-export async function answerQuestions(
-  applicationId: number,
-  answers: Record<string, string>,
-): Promise<OpenQuestion[]> {
-  const response = await fetch(`/api/applications/${applicationId}/answers`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ answers }),
-  })
-  return parseJson(response)
-}
-
 export async function deleteAttachment(id: number): Promise<void> {
   await checkOk(
     await fetch(`/api/attachments/${id}`, {

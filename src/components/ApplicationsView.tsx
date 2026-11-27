@@ -5,7 +5,6 @@ import { ApplicationSort } from './ApplicationSort.tsx'
 import { ArchivedToggle } from './ArchivedToggle.tsx'
 import { Pagination } from './Pagination.tsx'
 import {
-  answerQuestions,
   createApplication,
   deleteApplication,
   deleteAttachment,
@@ -48,8 +47,6 @@ function changeHandlers(change: Change) {
       ),
     handleRemoveAttachment: (attachmentId: number) =>
       change(() => deleteAttachment(attachmentId), 'Attachment removed'),
-    handleAnswer: (applicationId: number, answers: Record<string, string>) =>
-      change(() => answerQuestions(applicationId, answers), 'Answers saved'),
   }
 }
 
@@ -81,8 +78,8 @@ interface LoadedQuestions {
   list: OpenQuestion[]
 }
 
-// Refetched on every reload (the applications dependency): an upload, edit or
-// answer can change which markers remain.
+// Refetched on every reload (the applications dependency): an upload or edit
+// can change which markers remain.
 function useOpenQuestions(run: Run, expandedId: number | null, applications: Application[]) {
   const [loaded, setLoaded] = useState<LoadedQuestions | null>(null)
 
@@ -239,7 +236,7 @@ export function ApplicationsView({ onUnauthorized }: ApplicationsViewProps) {
           onSetProfileSync={apps.handleSetProfileSync}
           onRemoveAttachment={apps.handleRemoveAttachment}
           onSetArchived={apps.handleSetArchived}
-          drafting={{ ...apps.drafting, onAnswer: apps.handleAnswer }}
+          drafting={apps.drafting}
           hiddenArchivedCount={list.hiddenArchivedCount}
         />
         <Pagination page={list.currentPage} pageCount={list.pageCount} onChange={list.setPage} />
