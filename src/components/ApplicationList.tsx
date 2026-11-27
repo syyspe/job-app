@@ -100,18 +100,9 @@ function ApplicationRow({
   )
 }
 
-/** DraftEditing with onAnswer naming the application, since the list has many. */
-export interface ListDrafting extends Omit<DraftEditing, 'onAnswer'> {
-  onAnswer: (applicationId: number, answers: Record<string, string>) => void
-}
-
 // The loaded questions are the expanded application's, so only its row gets them.
-function rowDrafting(drafting: ListDrafting, applicationId: number, expanded: boolean): DraftEditing {
-  return {
-    ...drafting,
-    questions: expanded ? drafting.questions : [],
-    onAnswer: (answers) => drafting.onAnswer(applicationId, answers),
-  }
+function rowDrafting(drafting: DraftEditing, expanded: boolean): DraftEditing {
+  return { ...drafting, questions: expanded ? drafting.questions : [] }
 }
 
 interface ApplicationListProps {
@@ -125,7 +116,7 @@ interface ApplicationListProps {
   onRemoveAttachment: (attachmentId: number) => void
   onSetArchived: (id: number, archived: boolean) => void
   hiddenArchivedCount: number
-  drafting: ListDrafting
+  drafting: DraftEditing
 }
 
 export function ApplicationList({
@@ -161,7 +152,7 @@ export function ApplicationList({
           onSetProfileSync={onSetProfileSync}
           onRemoveAttachment={onRemoveAttachment}
           onSetArchived={(archived) => onSetArchived(application.id, archived)}
-          drafting={rowDrafting(drafting, application.id, expandedId === application.id)}
+          drafting={rowDrafting(drafting, expandedId === application.id)}
         />
       ))}
     </ul>

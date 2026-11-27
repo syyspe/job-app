@@ -7,7 +7,6 @@ import type { Application, ApplicationInput, OpenQuestion } from '../types.ts'
 /** The draft-finishing props: open questions and the .md attachment editor. */
 export interface DraftEditing {
   questions: OpenQuestion[]
-  onAnswer: (answers: Record<string, string>) => void
   onLoadAttachmentText: (attachmentId: number) => Promise<string | null>
   onSaveAttachmentText: (attachmentId: number, text: string) => Promise<boolean>
 }
@@ -89,7 +88,7 @@ export function ApplicationDetail({
         <span>Created {formatTimestamp(application.createdAt)}</span>
         <span>Updated {formatTimestamp(application.updatedAt)}</span>
       </p>
-      <OpenQuestions questions={drafting.questions} onAnswer={drafting.onAnswer} />
+      <OpenQuestions questions={drafting.questions} />
       <AttachmentList
         attachments={application.attachments}
         onUpload={onUploadAttachment}

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 import { ApplicationsView } from './ApplicationsView'
@@ -332,7 +332,8 @@ const letter: Attachment = {
   editedFromId: null,
 }
 
-// Routes the draft-editing endpoints; questions stay open until answers are posted.
+// Routes the draft-editing endpoints; the question stays open until the letter's
+// text is saved, as deleting its marker in the editor would close it.
 function stubDraftApi({ letterResponse = () => new Response('Hei [[ASK:q1]]') } = {}) {
   let answered = false
   const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
@@ -341,33 +342,27 @@ function stubDraftApi({ letterResponse = () => new Response('Hei [[ASK:q1]]') } 
     if (url === '/api/applications/1/questions') {
       return Response.json(answered ? [] : [{ id: 'q1', text: 'Why Acme?' }])
     }
-    if (url === '/api/applications/1/answers') {
-      answered = true
-      return Response.json([])
-    }
     if (url === '/api/attachments/5') return letterResponse()
-    if (url === '/api/attachments/5/text') return Response.json({ ...letter, id: 6, editedFromId: 5 })
+    if (url === '/api/attachments/5/text') {
+      answered = true
+      return Response.json({ ...letter, id: 6, editedFromId: 5 })
+    }
     return Response.json([{ ...sampleApplications[0], attachments: [letter] }])
   })
   vi.stubGlobal('fetch', fetchMock)
   return fetchMock
 }
 
-test('expanding a row loads its open questions, and answering them saves and clears the block', async () => {
+test('expanding a row lists its open questions', async () => {
   const user = userEvent.setup()
   const fetchMock = stubDraftApi()
   renderView()
 
   await user.click(await screen.findByRole('button', { name: /Acme/ }))
-  await user.type(await screen.findByRole('textbox', { name: 'q1 Why Acme?' }), 'Great product')
-  await user.click(screen.getByRole('button', { name: 'Save answers' }))
 
-  expect(await screen.findByText('Answers saved')).toBeVisible()
-  expect(fetchMock).toHaveBeenCalledWith(
-    '/api/applications/1/answers',
-    expect.objectContaining({ method: 'POST', body: JSON.stringify({ answers: { q1: 'Great product' } }) }),
-  )
-  await waitFor(() => expect(screen.queryByRole('region', { name: 'Open questions' })).toBeNull())
+  const region = await screen.findByRole('region', { name: 'Open questions' })
+  expect(within(region).getByRole('listitem')).toHaveTextContent('q1 Why Acme?')
+  expect(fetchMock).not.toHaveBeenCalledWith('/api/applications/1/answers', expect.anything())
 })
 
 test('editing a .md attachment loads its text and saves it', async () => {
@@ -387,6 +382,7 @@ test('editing a .md attachment loads its text and saves it', async () => {
     '/api/attachments/5/text',
     expect.objectContaining({ method: 'PUT', body: JSON.stringify({ text: 'Hei' }) }),
   )
+  await waitFor(() => expect(screen.queryByRole('region', { name: 'Open questions' })).toBeNull())
 })
 
 test('a failed text load shows the server error and opens no editor', async () => {

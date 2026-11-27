@@ -37,7 +37,6 @@ const applications: Application[] = [
 
 const drafting = {
   questions: [],
-  onAnswer: vi.fn(),
   onLoadAttachmentText: vi.fn(),
   onSaveAttachmentText: vi.fn(),
 }

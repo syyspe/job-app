@@ -474,15 +474,16 @@ including the sandbox check.
   (for example a 409 because the ad was drafted in the meantime) stops the
   run with exit 1.
 - To finish a draft, open it in the app. **Open questions** lists every
-  `[[ASK:qN]]` marker still left in its `.md` attachments, with one answer
-  field each. Saving an answer replaces the marker in every document that
-  carries it and writes `→ <answer>` under the question in the notes. A
-  blank answer leaves the question open. Any `.md` attachment can also be
-  edited as raw text with **Edit**. Either way the original file is never
-  overwritten. The first save writes `<name> (edited).md` beside it and
-  moves the "Add to profile" mark to that copy, and later saves overwrite
-  the copy. Claude Desktop does the same through `list_open_questions` and
-  `answer_questions`.
+  `[[ASK:qN]]` marker still left in its `.md` attachments. Answer one by
+  editing the `.md` as raw text with **Edit** and replacing its marker; the
+  question drops off the list once no marker for it remains. The original
+  file is never overwritten. The first save writes `<name> (edited).md`
+  beside it and moves the "Add to profile" mark to that copy, and later
+  saves overwrite the copy. Claude Desktop lists the same questions through
+  `list_open_questions` and can answer them by id through
+  `answer_questions` (the `POST /api/applications/:id/answers` endpoint),
+  which replaces the marker in every document that carries it and writes
+  `→ <answer>` under the question in the notes.
 
 ## Alert sources
 
