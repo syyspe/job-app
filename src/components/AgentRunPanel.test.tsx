@@ -54,22 +54,55 @@ test.each([
   expect(onStart).toHaveBeenCalledWith(kind)
 })
 
-test('a finished run shows its outcome, the newest with its output open', () => {
-  renderPanel({
-    current: null,
-    recent: [sampleRun({ id: 3, kind: 'run', finishedAt: '2026-11-26T09:00:00.000Z', exitCode: 1 }), finished],
-  })
+const failedDaily = sampleRun({ id: 3, kind: 'run', finishedAt: '2026-11-26T09:00:00.000Z', exitCode: 1 })
 
-  const items = within(screen.getByRole('list', { name: 'Recent runs' })).getAllByRole('listitem')
-  expect(items.map((item) => item.getAttribute('data-outcome'))).toEqual(['failed', 'succeeded'])
+function recentItems() {
+  return within(screen.getByRole('list', { name: 'Recent runs' })).getAllByRole('listitem')
+}
+
+test('a current run replaces the recent runs and their pager', () => {
+  renderPanel({ current: running, recent: [failedDaily, finished] })
+
+  expect(screen.getByRole('log', { name: 'Current run output' })).toBeVisible()
+  expect(screen.queryByRole('list', { name: 'Recent runs' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('navigation', { name: 'Run pages' })).not.toBeInTheDocument()
+})
+
+test('a finished run shows its outcome, one run at a time with its output open', async () => {
+  const user = userEvent.setup()
+  renderPanel({ current: null, recent: [failedDaily, finished] })
+
+  let items = recentItems()
+  expect(items).toHaveLength(1)
+  expect(items[0]).toHaveAttribute('data-outcome', 'failed')
   expect(items[0]).toHaveTextContent('Daily run')
   expect(items[0]).toHaveTextContent('Failed')
   expect(items[0].querySelector('details')).toHaveAttribute('open')
-  expect(items[1].querySelector('details')).not.toHaveAttribute('open')
-  expect(within(items[1]).getByText('collected 2 ads')).toBeInTheDocument()
+  expect(screen.getByText('Run 1 of 2')).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+
+  items = recentItems()
+  expect(items).toHaveLength(1)
+  expect(items[0]).toHaveAttribute('data-outcome', 'succeeded')
+  expect(items[0].querySelector('details')).toHaveAttribute('open')
+  expect(within(items[0]).getByText('collected 2 ads')).toBeVisible()
+  expect(screen.getByText('Run 2 of 2')).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Previous' }))
+
+  expect(recentItems()[0]).toHaveAttribute('data-outcome', 'failed')
 })
 
-test('a run whose output ends with the api line shows its spend, a collect run shows none', () => {
+test('a single recent run has no pager', () => {
+  renderPanel({ current: null, recent: [finished] })
+
+  expect(recentItems()).toHaveLength(1)
+  expect(screen.queryByRole('navigation', { name: 'Run pages' })).not.toBeInTheDocument()
+})
+
+test('a run whose output ends with the api line shows its spend, a collect run shows none', async () => {
+  const user = userEvent.setup()
   const daily = sampleRun({
     id: 3,
     kind: 'run',
@@ -79,7 +112,23 @@ test('a run whose output ends with the api line shows its spend, a collect run s
   })
   renderPanel({ current: null, recent: [daily, finished] })
 
-  const items = within(screen.getByRole('list', { name: 'Recent runs' })).getAllByRole('listitem')
-  expect(within(items[0]).getByText('API $0.42 run, $4.12 month')).toBeVisible()
-  expect(items[1]).not.toHaveTextContent('API $')
+  expect(within(recentItems()[0]).getByText('API $0.42 run, $4.12 month')).toBeVisible()
+
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+
+  expect(recentItems()[0]).not.toHaveTextContent('API $')
+})
+
+test('after a run finishes the pager starts back at the newest run', async () => {
+  const user = userEvent.setup()
+  const onStart = vi.fn()
+  const { rerender } = render(<AgentRunPanel runs={{ current: null, recent: [failedDaily, finished] }} onStart={onStart} />)
+  await user.click(screen.getByRole('button', { name: 'Next' }))
+  expect(screen.getByText('Run 2 of 2')).toBeVisible()
+
+  rerender(<AgentRunPanel runs={{ current: running, recent: [failedDaily, finished] }} onStart={onStart} />)
+  rerender(<AgentRunPanel runs={{ current: null, recent: [failedDaily, finished] }} onStart={onStart} />)
+
+  expect(screen.getByText('Run 1 of 2')).toBeVisible()
+  expect(recentItems()[0]).toHaveAttribute('data-outcome', 'failed')
 })

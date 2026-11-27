@@ -272,3 +272,8 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The panel's gap spaces its pager; the list-foot margin would stack on it. */
+.run-panel .pager {
+  margin-top: 0;
+}
