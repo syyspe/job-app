@@ -19,7 +19,7 @@ import { runSandboxed } from './sandbox.ts'
 
 const CLAUDE_BIN = 'claude'
 
-export type ModelStep = 'prescreen' | 'evaluation' | 'drafting'
+export type ModelStep = 'prescreen' | 'evaluation'
 
 export interface StepSpec {
   step: ModelStep
@@ -47,14 +47,15 @@ export interface EngineDeps {
   messages?: MessagesApi
 }
 
+// A step on the sandboxed claude -p, whatever the engine key says: drafting
+// always runs here, and the "cli" engine runs every step here.
+export function cliStep(env: Env, spec: Omit<StepSpec, 'step'>): RunStep {
+  const { prompt, systemPrompt, schema, timeoutMs } = spec
+  return (input) => runSandboxed({ claudeBin: CLAUDE_BIN, prompt, systemPrompt, schema, input, timeoutMs, env })
+}
+
 function cliEngine(env: Env): Engine {
-  return {
-    kind: 'cli',
-    budget: UNLIMITED,
-    stepFor: ({ prompt, systemPrompt, schema, timeoutMs }) => {
-      return (input) => runSandboxed({ claudeBin: CLAUDE_BIN, prompt, systemPrompt, schema, input, timeoutMs, env })
-    },
-  }
+  return { kind: 'cli', budget: UNLIMITED, stepFor: (spec) => cliStep(env, spec) }
 }
 
 function apiEngine(api: ApiConfig, deps: EngineDeps): Engine {

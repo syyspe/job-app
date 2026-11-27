@@ -25,11 +25,11 @@ function config(engine: 'cli' | 'api'): EngineConfig {
   return {
     engine,
     api: {
-      models: { prescreen: 'model-p', evaluation: 'model-e', drafting: 'model-d' },
-      effort: { prescreen: 'low', evaluation: 'medium', drafting: 'high' },
+      models: { prescreen: 'model-p', evaluation: 'model-e' },
+      effort: { prescreen: 'low', evaluation: 'medium' },
       perRunUsd: 3,
       monthlyUsd: 30,
-      prices: { 'model-p': price, 'model-e': price, 'model-d': price },
+      prices: { 'model-p': price, 'model-e': price },
     },
   }
 }
@@ -52,7 +52,6 @@ test('api with no key in the env file is an exit-2 error', () => {
 test.each([
   ['prescreen', 'model-p', 'low'],
   ['evaluation', 'model-e', 'medium'],
-  ['drafting', 'model-d', 'high'],
 ] as const)('api runs the %s step on its own model and effort', async (step, model, effort) => {
   const envFile = dir.write('env', 'ANTHROPIC_API_KEY=sk-test\n')
   const fake = fakeAnthropic([message('end_turn', [text('{}')])])

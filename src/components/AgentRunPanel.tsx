@@ -1,51 +1,13 @@
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useId } from 'react'
 import { RUN_KIND_LABELS, RUN_OUTCOME_LABELS, runOutcome, runSpend } from '../lib/agentRuns.ts'
-import { listAgentRuns, startAgentRun } from '../lib/api.ts'
-import { useApiAction } from '../lib/apiAction.ts'
 import { formatTimestamp } from '../lib/dates.ts'
-import type { AgentRun, AgentRunKind, AgentRuns } from '../types.ts'
-
-const POLL_MS = 3000
+import type { AgentRun, AgentRuns } from '../types.ts'
 
 interface AgentRunPanelProps {
-  onUnauthorized: () => void
-  onRunFinished: () => void
+  runs: AgentRuns
+  onStart: (kind: 'run' | 'collect') => void
 }
 
-function useAgentRuns({ onUnauthorized, onRunFinished }: AgentRunPanelProps) {
-  const [runs, setRuns] = useState<AgentRuns>({ current: null, recent: [] })
-  // Counts finished polls, so a failed one still schedules the next.
-  const [polls, setPolls] = useState(0)
-  const run = useApiAction(onUnauthorized)
-
-  const reload = useCallback(async () => setRuns(await listAgentRuns()), [])
-
-  useEffect(() => {
-    void run(reload)
-  }, [run, reload])
-
-  // Polled only while a run is current, so a poll that finds none saw it finish.
-  useEffect(() => {
-    if (!runs.current) return
-    const timer = setTimeout(async () => {
-      await run(async () => {
-        const next = await listAgentRuns()
-        setRuns(next)
-        if (!next.current) onRunFinished()
-      })
-      setPolls((count) => count + 1)
-    }, POLL_MS)
-    return () => clearTimeout(timer)
-  }, [runs, polls, run, onRunFinished])
-
-  const start = (kind: AgentRunKind) =>
-    run(async () => {
-      const started = await startAgentRun(kind)
-      setRuns((previous) => ({ ...previous, current: started }))
-    })
-
-  return { runs, start }
-}
 
 function CurrentRun({ run }: { run: AgentRun }) {
   return (
@@ -79,8 +41,7 @@ function RecentRun({ run, open }: { run: AgentRun; open: boolean }) {
   )
 }
 
-export function AgentRunPanel(props: AgentRunPanelProps) {
-  const { runs, start } = useAgentRuns(props)
+export function AgentRunPanel({ runs, onStart }: AgentRunPanelProps) {
   const headingId = useId()
   const running = runs.current !== null
 
@@ -89,10 +50,10 @@ export function AgentRunPanel(props: AgentRunPanelProps) {
       <div className="run-panel-head">
         <h3 id={headingId}>Runs</h3>
         <div className="run-panel-actions">
-          <button type="button" className="button" disabled={running} onClick={() => start('run')}>
+          <button type="button" className="button" disabled={running} onClick={() => onStart('run')}>
             Run now
           </button>
-          <button type="button" className="button" disabled={running} onClick={() => start('collect')}>
+          <button type="button" className="button" disabled={running} onClick={() => onStart('collect')}>
             Check mail
           </button>
         </div>

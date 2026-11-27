@@ -71,10 +71,16 @@ test('bad JSON exits 2 naming the file', () => {
 describe('drafting', () => {
   const drafting = { filePrefix: 'Tester', cvTemplates: { fi: '/cv/fi.md', en: '/cv/en.md' } }
 
+  test('an old config with concurrency and perRunCap still loads, without them', () => {
+    const path = writeConfig({ drafting: { ...drafting, concurrency: 2, perRunCap: 5 } })
+
+    expect(loadDraftConfig(path)).toEqual({ timeoutMs: 600000, ...drafting })
+  })
+
   test('missing keys take their defaults', () => {
     const path = writeConfig({ drafting })
 
-    expect(loadDraftConfig(path)).toEqual({ concurrency: 1, perRunCap: 3, timeoutMs: 600000, ...drafting })
+    expect(loadDraftConfig(path)).toEqual({ timeoutMs: 600000, ...drafting })
   })
 
   test('agent:evaluate does not need the drafting key', () => {
@@ -85,7 +91,7 @@ describe('drafting', () => {
     ['a missing filePrefix', { cvTemplates: drafting.cvTemplates }, 'drafting.filePrefix'],
     ['missing cvTemplates', { filePrefix: 'Tester' }, 'drafting.cvTemplates'],
     ['a relative template path', { ...drafting, cvTemplates: { fi: 'cv/fi.md', en: '/cv/en.md' } }, 'drafting.cvTemplates.fi'],
-    ['a concurrency above 4', { ...drafting, concurrency: 5 }, 'drafting.concurrency'],
+    ['a zero timeout', { ...drafting, timeoutMs: 0 }, 'drafting.timeoutMs'],
   ])('%s is an exit-2 error naming the field', (_name, value, field) => {
     const path = writeConfig({ drafting: value })
 
@@ -209,7 +215,7 @@ describe('daily run', () => {
 
 describe('loadEngineConfig', () => {
   const price = { inputPerMTok: 1, outputPerMTok: 5, cacheWritePerMTok: 1.25, cacheReadPerMTok: 0.1 }
-  const allPrices = { 'claude-haiku-5-5': price, 'claude-sonnet-5-5': price, 'claude-opus-5-5': price }
+  const allPrices = { 'claude-haiku-5-5': price, 'claude-sonnet-5-5': price }
 
   test('no engine key is cli, with the default models, effort and cap', () => {
     const path = writeConfig({ corpus: [] })
@@ -217,8 +223,8 @@ describe('loadEngineConfig', () => {
     expect(loadEngineConfig(path)).toEqual({
       engine: 'cli',
       api: {
-        models: { prescreen: 'claude-haiku-5-5', evaluation: 'claude-sonnet-5-5', drafting: 'claude-opus-5-5' },
-        effort: { prescreen: 'low', evaluation: 'medium', drafting: 'high' },
+        models: { prescreen: 'claude-haiku-5-5', evaluation: 'claude-sonnet-5-5' },
+        effort: { prescreen: 'low', evaluation: 'medium' },
         perRunUsd: 3,
         monthlyUsd: 30,
         prices: {},
@@ -227,12 +233,12 @@ describe('loadEngineConfig', () => {
   })
 
   test('api with a price for every model loads', () => {
-    const path = writeConfig({ engine: 'api', api: { prices: allPrices, effort: { drafting: 'medium' } } })
+    const path = writeConfig({ engine: 'api', api: { prices: allPrices, effort: { prescreen: 'medium' } } })
 
     const config = loadEngineConfig(path)
 
     expect(config.engine).toBe('api')
-    expect(config.api.effort).toEqual({ prescreen: 'low', evaluation: 'medium', drafting: 'medium' })
+    expect(config.api.effort).toEqual({ prescreen: 'medium', evaluation: 'medium' })
   })
 
   test.each([
@@ -251,13 +257,13 @@ describe('loadEngineConfig', () => {
   })
 
   test('api with an unpriced model is an exit-2 error naming the model', () => {
-    const { 'claude-opus-5-5': _opus, ...prices } = allPrices
+    const { 'claude-sonnet-5-5': _sonnet, ...prices } = allPrices
     const path = writeConfig({ engine: 'api', api: { prices } })
 
     expect(() => loadEngineConfig(path)).toThrow(
       expect.objectContaining({
         exitCode: 2,
-        message: `${path}: api.prices.claude-opus-5-5: no price for a model api.models names`,
+        message: `${path}: api.prices.claude-sonnet-5-5: no price for a model api.models names`,
       }),
     )
   })

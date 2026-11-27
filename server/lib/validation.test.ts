@@ -6,7 +6,7 @@ import {
   validateInput,
   validatePassword,
   validateRole,
-  validateRunKind,
+  validateRunRequest,
   validateUserInput,
 } from './validation.ts'
 
@@ -34,7 +34,7 @@ test.each([undefined, null, 'text', 42, []])('%o is not a JSON object', (body) =
     validateUserInput,
     validateRole,
     validatePassword,
-    validateRunKind,
+    validateRunRequest,
     validateAgentAccess,
   ]
   for (const validate of validators) {
@@ -90,14 +90,27 @@ test('a role or a password on its own is checked the same way', () => {
 })
 
 test.each([{}, { kind: 'deploy' }, { kind: 1 }])('%o has no valid run kind', (body) => {
-  const error = rejectionOf(() => validateRunKind(body))
+  const error = rejectionOf(() => validateRunRequest(body))
   expect(error.status).toBe(400)
-  expect(error.message).toBe('kind must be one of: run, collect')
+  expect(error.message).toBe('kind must be one of: run, collect, draft')
 })
 
 test('a known run kind is returned', () => {
-  expect(validateRunKind({ kind: 'collect' })).toBe('collect')
+  expect(validateRunRequest({ kind: 'collect' })).toEqual({ kind: 'collect' })
 })
+
+test('a draft request carries its ad id', () => {
+  expect(validateRunRequest({ kind: 'draft', adId: 7 })).toEqual({ kind: 'draft', adId: 7 })
+})
+
+test.each([{}, { adId: '7' }, { adId: 1.5 }, { adId: 0 }, { adId: -1 }])(
+  'a draft request with %o has no valid ad id',
+  (fields) => {
+    const error = rejectionOf(() => validateRunRequest({ kind: 'draft', ...fields }))
+    expect(error.status).toBe(400)
+    expect(error.message).toBe('adId must be a positive integer')
+  },
+)
 
 test.each([true, false])('agentAccess %o is returned', (agentAccess) => {
   expect(validateAgentAccess({ agentAccess })).toBe(agentAccess)

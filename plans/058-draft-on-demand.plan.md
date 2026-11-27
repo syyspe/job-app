@@ -220,6 +220,22 @@ Docs:
 - Verification: `npm run build`, `npm run lint` and
   `npm test -- --maxWorkers=2` (all passed, no `failed` line).
 
+## Build notes
+
+Departures made while building:
+
+- `draftNamedAd` returns a union, `{ result: 'drafted', adId,
+  applicationId }` or `{ result: 'retrying' | 'failed', failure }`, rather
+  than one shape with nullable fields.
+- The hook's fetch and poll tests moved from `AgentRunPanel.test.tsx` to a
+  new `src/lib/useAgentRuns.test.tsx`, which renders the panel over the hook.
+  It also checks that a disabled hook fetches nothing.
+- `fakeClaude.ts` takes its mode from env that the sandbox's allowlist
+  strips, so it can't pass the probes or return a valid draft from inside
+  the command. `commands/draft.test.ts` therefore writes its own `claude` to
+  PATH for the drafted, `engine: "api"`, re-verified and failing-probe
+  cases. The fakeClaude symlink still covers the failed-step case.
+
 ## Risks / rollback
 
 - The `agent_runs` rebuild doesn't undo itself, but rolling back needs no

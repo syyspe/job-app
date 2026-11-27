@@ -2,14 +2,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { AdList } from './AdList.tsx'
 import type { AdActions } from './AdRow.tsx'
 import { AgentRunPanel } from './AgentRunPanel.tsx'
-import { AD_STATE_LABELS, AD_STATE_ORDER, retryTarget } from '../lib/adStates.ts'
+import { AD_STATE_LABELS, AD_STATE_ORDER, canDraft, retryTarget } from '../lib/adStates.ts'
+import type { DraftStatus } from '../lib/adStates.ts'
 import { handoverAd, listAds, requestFetch, transitionAd } from '../lib/api.ts'
 import { useApiAction } from '../lib/apiAction.ts'
-import type { AdState, AdSummary } from '../types.ts'
+import { useAgentRuns } from '../lib/useAgentRuns.ts'
+import type { AdState, AdSummary, AgentRun } from '../types.ts'
+
+type AdChanges = Omit<AdActions, 'onDraft'>
 
 interface UseAds {
   ads: AdSummary[]
-  actions: AdActions
+  actions: AdChanges
   refresh: () => void
 }
 
@@ -83,6 +87,13 @@ interface AdsViewProps {
   focusAdId?: number
 }
 
+/** Draft runs need agent access, and one run at a time. */
+function draftStatusOf(ad: AdSummary, canRunAgent: boolean, current: AgentRun | null): DraftStatus {
+  if (!canRunAgent || !canDraft(ad.state)) return 'none'
+  if (!current) return 'ready'
+  return current.kind === 'draft' && current.adId === ad.id ? 'running' : 'busy'
+}
+
 function useSelectedState(ads: AdSummary[], focusAdId: number | undefined) {
   const [selected, setSelected] = useState<AdState>('awaiting_handover')
   const [focused, setFocused] = useState(false)
@@ -97,17 +108,20 @@ function useSelectedState(ads: AdSummary[], focusAdId: number | undefined) {
 
 export function AdsView({ onUnauthorized, canRunAgent, focusAdId }: AdsViewProps) {
   const { ads, actions, refresh } = useAds(onUnauthorized)
+  const { runs, start } = useAgentRuns({ enabled: canRunAgent, onUnauthorized, onRunFinished: refresh })
   const [selected, setSelected] = useSelectedState(ads, focusAdId)
+  const onDraft = (id: number) => void start({ kind: 'draft', adId: id })
 
   return (
     <div className="ads-view">
       <h2>Ad inbox</h2>
-      {canRunAgent && <AgentRunPanel onUnauthorized={onUnauthorized} onRunFinished={refresh} />}
+      {canRunAgent && <AgentRunPanel runs={runs} onStart={(kind) => void start({ kind })} />}
       <AdStateFilter ads={ads} selected={selected} onSelect={setSelected} />
       <AdList
         ads={ads.filter((ad) => ad.state === selected)}
         stateLabel={AD_STATE_LABELS[selected]}
-        actions={actions}
+        actions={{ ...actions, onDraft }}
+        draftStatus={(ad) => draftStatusOf(ad, canRunAgent, runs.current)}
         currentId={focusAdId}
       />
     </div>

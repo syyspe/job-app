@@ -45,8 +45,8 @@ test('a lock held by a live run is refused naming its pid', () => {
   }
 })
 
-test('a lock held by a live agent:collect is refused naming its pid', () => {
-  const holder = startFakeRunHolder('agent/runner/commands/collect.ts')
+test.each(['collect', 'draft'])('a lock held by a live agent:%s is refused naming its pid', (command) => {
+  const holder = startFakeRunHolder(`agent/runner/commands/${command}.ts`)
   try {
     writeFileSync(join(dir.root, 'run.lock'), String(holder.pid))
 

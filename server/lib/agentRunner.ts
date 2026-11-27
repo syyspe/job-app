@@ -1,12 +1,13 @@
 import type { ChildProcess, SpawnOptions } from 'node:child_process'
 import { join } from 'node:path'
-import type { AgentRunKind } from '../types.ts'
+import type { AgentRunKind, RunRequest } from '../types.ts'
 
 // The only commands the API spawns, relative to the runner root. No request
-// value ever reaches argv.
+// value reaches argv except a draft's ad id, validated as a positive integer.
 export const RUNNER_ARGS: Record<AgentRunKind, readonly string[]> = {
   run: ['agent/runner/commands/run.ts'],
   collect: ['agent/runner/commands/collect.ts'],
+  draft: ['agent/runner/commands/draft.ts'],
 }
 
 export const REPO_ROOT = join(import.meta.dirname, '../..')
@@ -29,7 +30,7 @@ type Env = Record<string, string | undefined>
 
 export type SpawnFn = (command: string, args: readonly string[], options: SpawnOptions) => ChildProcess
 
-export type RunnerSpawner = (kind: AgentRunKind) => ChildProcess
+export type RunnerSpawner = (request: RunRequest) => ChildProcess
 
 export function runnerEnv(env: Env): Record<string, string> {
   const allowed: Record<string, string> = {}
@@ -40,9 +41,15 @@ export function runnerEnv(env: Env): Record<string, string> {
   return allowed
 }
 
+function runnerArgs(request: RunRequest): string[] {
+  const args = [...RUNNER_ARGS[request.kind]]
+  if (request.kind === 'draft') args.push(String(request.adId))
+  return args
+}
+
 export function createRunnerSpawner(spawn: SpawnFn, root: string, env: Env): RunnerSpawner {
-  return (kind) =>
-    spawn(process.execPath, [...RUNNER_ARGS[kind]], {
+  return (request) =>
+    spawn(process.execPath, runnerArgs(request), {
       cwd: root,
       env: runnerEnv(env),
       shell: false,

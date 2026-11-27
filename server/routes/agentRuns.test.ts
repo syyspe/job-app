@@ -15,7 +15,7 @@ import { setUserAgentAccess } from '../lib/users.ts'
 import { fakeChild } from '../test/fakeChild.ts'
 import type { FakeChild } from '../test/fakeChild.ts'
 import { loginAs } from '../test/auth.ts'
-import type { AgentRun, AgentRunKind, AgentRuns } from '../types.ts'
+import type { AgentRun, AgentRuns, RunRequest } from '../types.ts'
 
 let root: string
 let db: Db
@@ -23,11 +23,11 @@ let server: Server
 let baseUrl: string
 let adminCookie: string
 let basicCookie: string
-let started: AgentRunKind[]
+let started: RunRequest[]
 let children: FakeChild[]
 
-const recordingRunner: RunnerSpawner = (kind) => {
-  started.push(kind)
+const recordingRunner: RunnerSpawner = (request) => {
+  started.push(request)
   const fake = fakeChild()
   children.push(fake)
   return fake.child
@@ -73,6 +73,16 @@ async function list(): Promise<AgentRuns> {
   return (await res.json()) as AgentRuns
 }
 
+function insertAd(userId: number, state: string): number {
+  const result = db
+    .prepare(
+      `INSERT INTO ads (user_id, source, source_mode, external_id, url, canonical_url, state)
+       VALUES (?, 'testsource', 'automatic', ?, 'https://jobs.example.com/ad', 'https://jobs.example.com/ad', ?)`,
+    )
+    .run(userId, `ad-${userId}-${state}`, state)
+  return Number(result.lastInsertRowid)
+}
+
 const JSON_TYPE = { 'Content-Type': 'application/json' }
 const ROUTES = [
   { method: 'GET', headers: {}, body: undefined },
@@ -105,13 +115,13 @@ test('a basic user with agent access can start and list runs', async () => {
   expect(created.status).toBe(201)
   const listed = await fetch(`${baseUrl}/api/agent/runs`, { headers: { Cookie: basicCookie } })
   expect(listed.status).toBe(200)
-  expect(started).toEqual(['collect'])
+  expect(started).toEqual([{ kind: 'collect' }])
 })
 
 test.each([
-  ['{}', 'kind must be one of: run, collect'],
-  ['{"kind":"deploy"}', 'kind must be one of: run, collect'],
-  ['{"kind":["run"]}', 'kind must be one of: run, collect'],
+  ['{}', 'kind must be one of: run, collect, draft'],
+  ['{"kind":"deploy"}', 'kind must be one of: run, collect, draft'],
+  ['{"kind":["run"]}', 'kind must be one of: run, collect, draft'],
   ['["run"]', 'request body must be a JSON object'],
 ])('%s is 400 and starts nothing', async (body, error) => {
   const res = await post(body)
@@ -126,8 +136,8 @@ test('a POST starts the run and answers 201 with it; GET shows it as current', a
 
   expect(res.status).toBe(201)
   const run = (await res.json()) as AgentRun
-  expect(run).toEqual({ id: expect.any(Number), kind: 'run', startedAt: expect.any(String), finishedAt: null, exitCode: null, output: '' })
-  expect(started).toEqual(['run'])
+  expect(run).toEqual({ id: expect.any(Number), kind: 'run', adId: null, startedAt: expect.any(String), finishedAt: null, exitCode: null, output: '' })
+  expect(started).toEqual([{ kind: 'run' }])
   expect(await list()).toEqual({ current: run, recent: [] })
 })
 
@@ -138,7 +148,7 @@ test('a second POST while one runs is 409, and the runner was called once', asyn
 
   expect(res.status).toBe(409)
   expect(await res.json()).toEqual({ error: 'a run is already in progress', requestId: expect.any(String) })
-  expect(started).toEqual(['collect'])
+  expect(started).toEqual([{ kind: 'collect' }])
 })
 
 test('a finished run moves to recent, with its output and exit code', async () => {
@@ -209,4 +219,59 @@ test('a spawn that throws is a 500 and leaves no run open', async () => {
   expect(res.status).toBe(500)
   expect(await res.json()).toMatchObject({ error: 'internal server error' })
   expect(await list()).toEqual({ current: null, recent: [] })
+})
+
+test('a draft POST for a suitable ad is 201 with its ad id, and GET shows it', async () => {
+  const adId = insertAd(1, 'suitable')
+
+  const res = await post(JSON.stringify({ kind: 'draft', adId }))
+
+  expect(res.status).toBe(201)
+  const run = (await res.json()) as AgentRun
+  expect(run).toMatchObject({ kind: 'draft', adId })
+  expect(started).toEqual([{ kind: 'draft', adId }])
+  expect((await list()).current).toEqual(run)
+})
+
+test.each(['{"kind":"draft"}', '{"kind":"draft","adId":"3"}', '{"kind":"draft","adId":1.5}', '{"kind":"draft","adId":0}'])(
+  '%s is 400 and starts nothing',
+  async (body) => {
+    const res = await post(body)
+
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'adId must be a positive integer', requestId: expect.any(String) })
+    expect(started).toEqual([])
+  },
+)
+
+test("a draft of another user's ad, or an unknown one, is 404 and starts nothing", async () => {
+  const othersAd = insertAd(2, 'suitable')
+
+  for (const adId of [othersAd, othersAd + 100]) {
+    const res = await post(JSON.stringify({ kind: 'draft', adId }))
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: 'not found', requestId: expect.any(String) })
+  }
+  expect(started).toEqual([])
+})
+
+test('a draft of an ad that is not suitable is 409 and starts nothing', async () => {
+  const adId = insertAd(1, 'ready')
+
+  const res = await post(JSON.stringify({ kind: 'draft', adId }))
+
+  expect(res.status).toBe(409)
+  expect(await res.json()).toEqual({ error: 'ad is not suitable', requestId: expect.any(String) })
+  expect(started).toEqual([])
+})
+
+test('a draft POST while a run is open is 409', async () => {
+  const adId = insertAd(1, 'suitable')
+  await post('{"kind":"collect"}')
+
+  const res = await post(JSON.stringify({ kind: 'draft', adId }))
+
+  expect(res.status).toBe(409)
+  expect(await res.json()).toEqual({ error: 'a run is already in progress', requestId: expect.any(String) })
+  expect(started).toEqual([{ kind: 'collect' }])
 })

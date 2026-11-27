@@ -1,8 +1,8 @@
+import { CliError } from '../../lib/cliError.ts'
 import type { HealthResult } from '../../profile/lib/ollama.ts'
 import { buildDraft } from './draftApplication.ts'
 import type { DraftOutcome } from './draft.ts'
-import type { Ad, AdSummary, JobAppClient } from './jobApp.ts'
-import { mapLimit } from './mapLimit.ts'
+import type { Ad, JobAppClient } from './jobApp.ts'
 import type { DraftConfig } from './runnerConfig.ts'
 import { failedAttempt, formatFailedAttempt } from './stepFailure.ts'
 import type { FailedAttempt } from './stepFailure.ts'
@@ -14,75 +14,39 @@ export interface DraftRunOptions {
   write: (ad: Ad) => Promise<DraftOutcome>
   // The run's date, YYYY-MM-DD, for the saved ad's header.
   today: string
-  // Asked before each ad; an ad that doesn't start stays suitable, untouched.
-  canStart?: () => boolean
 }
 
-export interface DraftCounts {
-  drafted: number
-  // Attempts recorded on ads that stay suitable, and ads that reached failed.
-  retrying: number
-  failed: number
-}
-
-export interface DraftReport {
-  skipped: string | null
-  counts: DraftCounts
-  queued: number
-  // Every failed attempt this run, whether its ad retries or reached failed.
-  failedAttempts: FailedAttempt[]
-}
-
-type DraftResult = keyof DraftCounts
-
-interface Drafted {
-  result: DraftResult
-  failure: FailedAttempt | null
-}
+// A failed attempt leaves the ad suitable to retry, or fails it on the third.
+export type DraftReport =
+  | { result: 'drafted'; adId: number; applicationId: number }
+  | { result: 'retrying' | 'failed'; failure: FailedAttempt }
 
 // A failure is a same-state transition carrying its category: the server adds
 // the attempt and fails the ad on the third.
-async function draftOne(options: DraftRunOptions, summary: AdSummary): Promise<Drafted> {
+async function draftOne(options: DraftRunOptions, ad: Ad): Promise<DraftReport> {
   const { jobApp, config, today } = options
-  const ad = await jobApp.getAd(summary.id)
   const outcome = await options.write(ad)
   if (outcome.kind === 'failed') {
     const moved = await jobApp.transitionAd(ad.id, { to: 'suitable', error: outcome.category })
-    return { result: moved.state === 'failed' ? 'failed' : 'retrying', failure: failedAttempt(summary, outcome) }
+    const result = moved.state === 'failed' ? 'failed' : 'retrying'
+    return { result, failure: failedAttempt(ad, outcome) }
   }
-  await jobApp.draftAd(ad.id, buildDraft(ad, outcome.output, { filePrefix: config.filePrefix, savedOn: today }))
-  return { result: 'drafted', failure: null }
+  const draft = buildDraft(ad, outcome.output, { filePrefix: config.filePrefix, savedOn: today })
+  const { applicationId } = await jobApp.draftAd(ad.id, draft)
+  return { result: 'drafted', adId: ad.id, applicationId }
 }
 
-function countResults(results: DraftResult[]): DraftCounts {
-  const count = (result: DraftResult) => results.filter((candidate) => candidate === result).length
-  return { drafted: count('drafted'), retrying: count('retrying'), failed: count('failed') }
-}
-
-// With Ollama down no ad is touched and no attempt counted.
-export async function runDrafting(options: DraftRunOptions): Promise<DraftReport> {
-  const { jobApp, config } = options
+// With Ollama down, or the ad no longer suitable, the ad is untouched and no
+// attempt counted.
+export async function draftNamedAd(options: DraftRunOptions, adId: number): Promise<DraftReport> {
   const health = await options.checkHealth()
-  if (!health.ok) return { skipped: health.reason, counts: countResults([]), queued: 0, failedAttempts: [] }
-  // The API lists newest first; the oldest ads are drafted first.
-  const suitable = (await jobApp.listAds('suitable')).toReversed()
-  const batch = suitable.slice(0, config.perRunCap)
-  const limits = { limit: config.concurrency, canStart: options.canStart }
-  const drafted = await mapLimit(batch, limits, (ad) => draftOne(options, ad))
-  return {
-    skipped: null,
-    counts: countResults(drafted.map((one) => one.result)),
-    queued: suitable.length - drafted.length,
-    failedAttempts: drafted.flatMap((one) => (one.failure ? [one.failure] : [])),
-  }
+  if (!health.ok) throw new CliError(1, `drafting skipped: ${health.reason}`)
+  const ad = await options.jobApp.getAd(adId)
+  if (ad.state !== 'suitable') throw new CliError(1, `ad ${adId} is ${ad.state}, not suitable`)
+  return draftOne(options, ad)
 }
 
-export function formatDraftReport({ skipped, counts, queued, failedAttempts }: DraftReport): string[] {
-  if (skipped) return [`drafting skipped: ${skipped}`]
-  const { drafted, retrying, failed } = counts
-  return [
-    `drafted: ${drafted} drafted, ${retrying} retrying, ${failed} failed`,
-    `queued: ${queued} suitable ads over the per-run cap`,
-    ...failedAttempts.map((attempt) => formatFailedAttempt('drafting', attempt)),
-  ]
+export function formatDraftReport(report: DraftReport): string {
+  if (report.result === 'drafted') return `drafted: ad ${report.adId} as application ${report.applicationId}`
+  return `${formatFailedAttempt('drafting', report.failure)} (${report.result})`
 }

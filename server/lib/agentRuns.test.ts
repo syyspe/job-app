@@ -35,7 +35,7 @@ afterEach(() => {
 
 function start(kind: 'run' | 'collect' = 'collect'): AgentRun {
   const log = createLogger('info', (line) => logLines.push(line))
-  return startRun(db, { kind, userId, runner: () => fake.child, log })
+  return startRun(db, { request: { kind }, userId, runner: () => fake.child, log })
 }
 
 function storedRun(id: number): AgentRun {
@@ -45,7 +45,7 @@ function storedRun(id: number): AgentRun {
 test('a started run is current, with no finish and no output yet', () => {
   const run = start('run')
 
-  expect(run).toEqual({ id: run.id, kind: 'run', startedAt: expect.any(String), finishedAt: null, exitCode: null, output: '' })
+  expect(run).toEqual({ id: run.id, kind: 'run', adId: null, startedAt: expect.any(String), finishedAt: null, exitCode: null, output: '' })
   expect(new Date(run.startedAt).toISOString()).toBe(run.startedAt)
   expect(currentRun(db)).toEqual(run)
 })
@@ -89,7 +89,7 @@ test.each([
 test('a child that cannot start finishes with no exit code and says why', async () => {
   const runner = createRunnerSpawner(spawn, join(root, 'missing'), {})
   const log = createLogger('silent')
-  const run = startRun(db, { kind: 'collect', userId, runner, log })
+  const run = startRun(db, { request: { kind: 'collect' }, userId, runner, log })
 
   await expect.poll(() => currentRun(db)).toBeNull()
 
@@ -132,8 +132,8 @@ test('the log says a run started and finished, with ids and exit code but no out
 
   const entries = logLines.map((line) => JSON.parse(line))
   expect(entries).toEqual([
-    { time: expect.any(String), level: 'info', msg: 'agent run started', runId: run.id, kind: 'run', startedBy: userId },
-    { time: expect.any(String), level: 'info', msg: 'agent run finished', runId: run.id, kind: 'run', exitCode: 1, durationMs: expect.any(Number) },
+    { time: expect.any(String), level: 'info', msg: 'agent run started', runId: run.id, kind: 'run', adId: null, startedBy: userId },
+    { time: expect.any(String), level: 'info', msg: 'agent run finished', runId: run.id, kind: 'run', adId: null, exitCode: 1, durationMs: expect.any(Number) },
   ])
   expect(logLines.join('')).not.toContain('secret output line')
 })

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AdHandoverForm } from './AdHandoverForm.tsx'
 import { canDismiss, canHandOver } from '../lib/adStates.ts'
+import type { DraftStatus } from '../lib/adStates.ts'
 import { formatDay } from '../lib/dates.ts'
 import { sourceLabel } from '../lib/sources.ts'
 import type { AdHandoverInput, AdPrescreen, AdSummary } from '../types.ts'
@@ -17,6 +18,8 @@ export interface AdActions {
   /** Marks the ad for the next daily run to fetch. */
   onFetch: (id: number) => void
   onRetry: (ad: AdSummary) => void
+  /** Starts a draft run for a suitable ad. */
+  onDraft: (id: number) => void
   onDismiss: (id: number) => void
 }
 
@@ -78,8 +81,10 @@ function DismissConfirm({ onConfirm, onCancel }: DismissConfirmProps) {
 
 interface AdButtonsProps {
   ad: AdSummary
+  draft: DraftStatus
   onRetry: () => void
   onFetch: () => void
+  onDraft: () => void
   onModeChange: (mode: Mode) => void
 }
 
@@ -94,7 +99,7 @@ function FetchButton({ ad, onFetch }: Pick<AdButtonsProps, 'ad' | 'onFetch'>) {
   )
 }
 
-function AdButtons({ ad, onRetry, onFetch, onModeChange }: AdButtonsProps) {
+function AdButtons({ ad, draft, onRetry, onFetch, onDraft, onModeChange }: AdButtonsProps) {
   const fetchable = canFetch(ad)
   return (
     <div className="ad-actions">
@@ -113,6 +118,11 @@ function AdButtons({ ad, onRetry, onFetch, onModeChange }: AdButtonsProps) {
           Retry
         </button>
       )}
+      {draft !== 'none' && (
+        <button type="button" className="button button-primary" disabled={draft === 'busy'} onClick={onDraft}>
+          Draft
+        </button>
+      )}
       {canDismiss(ad.state) && (
         <button type="button" className="button" onClick={() => onModeChange('dismiss')}>
           Dismiss
@@ -125,6 +135,8 @@ function AdButtons({ ad, onRetry, onFetch, onModeChange }: AdButtonsProps) {
 interface AdRowProps {
   ad: AdSummary
   actions: AdActions
+  /** Whether the Draft button shows, and whether a run is holding it back. */
+  draft: DraftStatus
   /** The ad a summary link opened: marked, and scrolled into view. */
   current?: boolean
 }
@@ -151,7 +163,7 @@ function AdDetails({ ad }: { ad: AdSummary }) {
   )
 }
 
-export function AdRow({ ad, actions, current = false }: AdRowProps) {
+export function AdRow({ ad, actions, draft, current = false }: AdRowProps) {
   const [mode, setMode] = useState<Mode>('idle')
   const ref = useScrolledIntoView(current)
 
@@ -163,11 +175,14 @@ export function AdRow({ ad, actions, current = false }: AdRowProps) {
   return (
     <li ref={ref} className="ad-item" data-state={ad.state} aria-current={current || undefined}>
       <AdDetails ad={ad} />
-      {mode === 'idle' && (
+      {draft === 'running' && <p className="ad-drafting">Drafting…</p>}
+      {mode === 'idle' && draft !== 'running' && (
         <AdButtons
           ad={ad}
+          draft={draft}
           onRetry={() => actions.onRetry(ad)}
           onFetch={() => actions.onFetch(ad.id)}
+          onDraft={() => actions.onDraft(ad.id)}
           onModeChange={setMode}
         />
       )}

@@ -9,13 +9,16 @@ export interface User {
   agentAccess: boolean
 }
 
-export const AGENT_RUN_KINDS = ['run', 'collect'] as const
+export const AGENT_RUN_KINDS = ['run', 'collect', 'draft'] as const
 
 export type AgentRunKind = (typeof AGENT_RUN_KINDS)[number]
+
+export type RunRequest = { kind: 'run' | 'collect' } | { kind: 'draft'; adId: number }
 
 export interface AgentRun {
   id: number
   kind: AgentRunKind
+  adId: number | null
   startedAt: string
   finishedAt: string | null
   exitCode: number | null

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 import { AdsView } from './AdsView'
 import { ToastProvider } from './ToastProvider'
-import type { AdSummary } from '../types'
+import type { AdSummary, AgentRun } from '../types'
 
 function sampleAd(overrides: Partial<AdSummary>): AdSummary {
   return {
@@ -281,4 +281,67 @@ test('an expired session calls onUnauthorized', async () => {
   renderView(onUnauthorized)
 
   await waitFor(() => expect(onUnauthorized).toHaveBeenCalled())
+})
+
+const kept = sampleAd({ id: 3, title: 'Kept ad', state: 'suitable', sourceMode: 'automatic' })
+const otherKept = sampleAd({ id: 4, title: 'Other kept ad', state: 'suitable', sourceMode: 'automatic' })
+
+const draftRun: AgentRun = {
+  id: 9,
+  kind: 'draft',
+  adId: 3,
+  startedAt: '2026-11-27T08:00:00.000Z',
+  finishedAt: null,
+  exitCode: null,
+  output: '',
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), { status })
+}
+
+// The ads listing, an empty runs listing, and a POST that starts the draft run.
+function stubAgent(ads: AdSummary[]) {
+  return stubFetch((url, init) => {
+    if (url !== '/api/agent/runs') return json(ads)
+    if (init?.method === 'POST') return json(draftRun, 201)
+    return json({ current: null, recent: [] })
+  })
+}
+
+test('clicking Draft posts a draft run for that ad', async () => {
+  const user = userEvent.setup()
+  const fetchMock = stubAgent([kept])
+  renderView(vi.fn(), true, 3)
+  const row = await screen.findByRole('listitem', { current: true })
+
+  await user.click(within(row).getByRole('button', { name: 'Draft' }))
+
+  expect(fetchMock).toHaveBeenCalledWith(
+    '/api/agent/runs',
+    expect.objectContaining({ method: 'POST', body: JSON.stringify({ kind: 'draft', adId: 3 }) }),
+  )
+})
+
+test('while the draft runs its row shows Drafting…, and other suitable rows wait', async () => {
+  const user = userEvent.setup()
+  stubAgent([kept, otherKept])
+  renderView(vi.fn(), true, 3)
+  const row = await screen.findByRole('listitem', { current: true })
+
+  await user.click(within(row).getByRole('button', { name: 'Draft' }))
+
+  expect(await within(row).findByText('Drafting…')).toBeVisible()
+  expect(within(row).queryAllByRole('button')).toEqual([])
+  const other = screen.getByText('Other kept ad').closest('li') as HTMLElement
+  expect(within(other).getByRole('button', { name: 'Draft' })).toBeDisabled()
+})
+
+test('without agent access there is no Draft button and no runs request', async () => {
+  const fetchMock = stubAds([kept])
+  renderView(vi.fn(), false, 3)
+  await screen.findByText('Kept ad')
+
+  expect(screen.queryByRole('button', { name: 'Draft' })).toBeNull()
+  expect(fetchMock.mock.calls.map(([url]) => url)).not.toContain('/api/agent/runs')
 })

@@ -48,6 +48,17 @@ export function canDismiss(state: AdState): boolean {
   return DISMISSIBLE_STATES.includes(state)
 }
 
+/**
+ * The Draft button on one row: hidden (none), clickable (ready), held back by
+ * another run (busy), or replaced by its own run's progress (running).
+ */
+export type DraftStatus = 'none' | 'ready' | 'busy' | 'running'
+
+/** The kept ads a Draft click can turn into a draft application. */
+export function canDraft(state: AdState): boolean {
+  return state === 'suitable'
+}
+
 export function retryTarget(mode: SourceMode): AdState {
   return mode === 'handover' ? 'awaiting_handover' : 'new'
 }

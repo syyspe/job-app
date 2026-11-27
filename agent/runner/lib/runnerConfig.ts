@@ -23,8 +23,6 @@ const runnerConfigSchema = z.object({
 
 const draftConfigSchema = z.object({
   drafting: z.object({
-    concurrency: z.int().min(1).max(4).default(1),
-    perRunCap: z.int().min(1).default(3),
     timeoutMs: z.int().min(1).default(600000),
     filePrefix: z.string().min(1),
     cvTemplates: z.object({ fi: absolutePath, en: absolutePath }),
@@ -40,6 +38,7 @@ export function loadRunnerConfig(path: string): RunnerConfig {
 }
 
 // Only agent:draft reads the drafting key, so agent:evaluate runs without it.
+// Drafting always runs on claude -p, so the engine keys don't name it.
 export function loadDraftConfig(path: string): DraftConfig {
   return parseConfigFile(path, draftConfigSchema).drafting
 }
@@ -95,7 +94,7 @@ export function loadSourcesConfig(path: string, connectors: Pick<SourceConnector
   return config
 }
 
-const STEPS = ['prescreen', 'evaluation', 'drafting'] as const
+const STEPS = ['prescreen', 'evaluation'] as const
 const effort = z.enum(['low', 'medium', 'high'])
 
 const priceSchema = z.object({
@@ -105,8 +104,8 @@ const priceSchema = z.object({
   cacheReadPerMTok: z.number().min(0),
 })
 
-const DEFAULT_MODELS = { prescreen: 'claude-haiku-5-5', evaluation: 'claude-sonnet-5-5', drafting: 'claude-opus-5-5' }
-const DEFAULT_EFFORT = { prescreen: 'low', evaluation: 'medium', drafting: 'high' } as const
+const DEFAULT_MODELS = { prescreen: 'claude-haiku-5-5', evaluation: 'claude-sonnet-5-5' }
+const DEFAULT_EFFORT = { prescreen: 'low', evaluation: 'medium' } as const
 
 const engineConfigSchema = z.object({
   engine: z.enum(['cli', 'api']).default('cli'),
@@ -116,14 +115,12 @@ const engineConfigSchema = z.object({
         .object({
           prescreen: z.string().min(1).default(DEFAULT_MODELS.prescreen),
           evaluation: z.string().min(1).default(DEFAULT_MODELS.evaluation),
-          drafting: z.string().min(1).default(DEFAULT_MODELS.drafting),
         })
         .default(DEFAULT_MODELS),
       effort: z
         .object({
           prescreen: effort.default(DEFAULT_EFFORT.prescreen),
           evaluation: effort.default(DEFAULT_EFFORT.evaluation),
-          drafting: effort.default(DEFAULT_EFFORT.drafting),
         })
         .default(DEFAULT_EFFORT),
       perRunUsd: z.number().positive().default(3),

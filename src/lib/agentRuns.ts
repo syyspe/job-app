@@ -5,6 +5,7 @@ export type RunOutcome = 'succeeded' | 'failed' | 'interrupted'
 export const RUN_KIND_LABELS: Record<AgentRunKind, string> = {
   run: 'Daily run',
   collect: 'Mail check',
+  draft: 'Draft',
 }
 
 export const RUN_OUTCOME_LABELS: Record<RunOutcome, string> = {

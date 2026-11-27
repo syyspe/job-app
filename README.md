@@ -329,8 +329,9 @@ logged-in `claude` CLI on `PATH`.
 
 ### Engine
 
-The model steps (pre-screen, evaluation, drafting) run on one of two
-engines, picked by `engine` in `config.json`:
+The pre-screen and evaluation steps run on one of two engines, picked by
+`engine` in `config.json`. Drafting isn't one of them: it always runs on
+`claude -p` (see "Ad drafting").
 
 - `"cli"`, the default: each step is a sandboxed `claude -p`, as described
   above.
@@ -358,10 +359,9 @@ To use the API engine:
      "api": {
        "models": {
          "prescreen": "claude-haiku-5-5",
-         "evaluation": "claude-sonnet-5-5",
-         "drafting": "claude-opus-5-5"
+         "evaluation": "claude-sonnet-5-5"
        },
-       "effort": { "prescreen": "low", "evaluation": "medium", "drafting": "high" },
+       "effort": { "prescreen": "low", "evaluation": "medium" },
        "perRunUsd": 3,
        "monthlyUsd": 30,
        "prices": {
@@ -383,8 +383,8 @@ To use the API engine:
 Every API response's cost is also added to a monthly ledger,
 `~/.local/state/job-agent/api-spend.json`, shaped
 `{ "months": { "YYYY-MM": <usd> } }` by local month. Only the current and
-previous months are kept. `agent:evaluate` and `agent:draft` add to it too,
-since they share the engine. Once the month reaches `monthlyUsd`, no new
+previous months are kept. `agent:evaluate` adds to it too, since it shares
+the engine. Drafting never does. Once the month reaches `monthlyUsd`, no new
 step starts in any command, and the command prints `stopped: API monthly cap
 reached: $30.00 of $30.00` until the next month begins. A ledger that
 isn't valid JSON of that shape exits 2 naming the file: fix or delete it.
@@ -420,8 +420,11 @@ ledger and prints no such line.
 
 ## Ad drafting
 
-`agent:draft` turns each `suitable` ad into a job-app application with status
-`draft`. A sandboxed `claude -p` step writes a cover letter, a tailored CV, a
+`agent:draft` turns one `suitable` ad into a job-app application with status
+`draft`. You pick the ad with its **Draft** button in the ad inbox, or name
+its id from a terminal. Drafting always runs on the sandboxed `claude -p`,
+on your Claude subscription, whatever `engine` says, and spends no API
+credits. The step writes a cover letter, a tailored CV, a
 fit summary and the open questions as JSON. The runner checks them, builds
 three `.md` attachments (the saved ad, the cover letter and the CV) and
 creates the application in one call to `POST /api/ads/:id/draft`. Nothing in
@@ -445,15 +448,15 @@ including the sandbox check.
      "drafting": {
        "filePrefix": "Firstname_Lastname",
        "cvTemplates": { "fi": "/abs/path/cv-fi.md", "en": "/abs/path/cv-en.md" },
-       "concurrency": 1,
-       "perRunCap": 3,
        "timeoutMs": 600000
      }
    }
    ```
 
    Each step gets both templates whole and starts the CV from the one in the
-   draft's language. `concurrency` is 1–4.
+   draft's language. One draft runs at a time, so the older `concurrency`
+   and `perRunCap` keys are gone; a config that still has them loads, and
+   they are ignored.
 3. Export your work history, meaning the notes on your work experience and
    projects that you would otherwise give an assistant by hand, as `.md`
    files into a folder listed in `corpus` with the label `facts`, then run
@@ -462,17 +465,24 @@ including the sandbox check.
 
 ### Command
 
-- `npm run agent:draft` checks Ollama first. If Ollama is down, it prints
-  `drafting skipped: <reason>`, exits 0 and touches no ad. Otherwise it
-  drafts the oldest `perRunCap` suitable ads and leaves the rest queued. Each
-  draft's `notes` hold the fit summary, the open questions (`q1: …`) and the
+- `npm run agent:draft -- <ad id>` drafts that ad. A missing or malformed
+  id exits 2 with `usage: npm run agent:draft -- <ad id>`. It takes
+  `run.lock` like the daily run, so while another run holds it the command
+  exits 1 with `another run is in progress (pid N)`. If the sandbox check
+  hasn't passed for the installed `claude`, it runs the probes first and
+  prints `sandbox re-verified for claude X`; if they fail, it exits 1 and
+  touches no ad. If Ollama is down, it exits 1 with
+  `drafting skipped: <reason>` and counts no attempt. An ad that isn't
+  `suitable` by the time the runner reads it exits 1 untouched. A drafted ad
+  prints `drafted: ad <id> as application <id>`. Each draft's `notes` hold the fit summary, the open questions (`q1: …`) and the
   ad's source and URL. An ad that gives no company or title gets
   `Unknown company` / `Unknown role` and a fixed question asking for it. A
   failed step records an attempt with a fixed category (`timeout`,
   `model_failed`, `bad_output`, `invalid_result`, `ask_mismatch`), and the
-  third failed attempt moves the ad to `failed`. A draft the API refuses
-  (for example a 409 because the ad was drafted in the meantime) stops the
-  run with exit 1.
+  third failed attempt moves the ad to `failed`. A failed step prints its
+  attempt line ending `(retrying)` or `(failed)` and exits 1. A draft the API
+  refuses (for example a 409 because the ad was drafted in the meantime)
+  also exits 1.
 - To finish a draft, open it in the app. **Open questions** lists every
   `[[ASK:qN]]` marker still left in its `.md` attachments. Answer one by
   editing the `.md` as raw text with **Edit** and replacing its marker; the
@@ -684,17 +694,26 @@ the summary says why. Under `engine: "api"` there is no sandbox check.
 An admin can start a run from the top of the ad inbox, which works on a
 phone too. **Run now** starts the full `agent:run`, including its model
 steps and the summary email. **Check mail** starts `agent:collect`, which
-has no model cost. Basic users don't see the panel, and its endpoints answer
-them 403.
+has no model cost. **Draft**, on a `suitable` ad's row, starts
+`agent:draft` for that ad. While it runs, the row shows `Drafting…` instead
+of its buttons, and the panel shows the output. Basic users don't see the
+panel or the Draft button, and the endpoints answer them 403.
 
 - The server spawns the same command you would type: `node
-  agent/runner/commands/run.ts` or `collect.ts`, from the repository root,
-  with no shell. The runner still reads `~/.config/job-agent/` and its env
+  agent/runner/commands/run.ts`, `collect.ts`, or `draft.ts <ad id>`, from
+  the repository root, with no shell. The ad id is the only request value
+  that reaches the command line, and only after it is validated as a
+  positive integer. The server also checks that the ad is yours and
+  `suitable` (otherwise 404 or 409). The runner still reads `~/.config/job-agent/` and its env
   file as it does from a terminal. The server passes it only `PATH`, `HOME`,
   `LANG`, `LC_ALL`, `TZ`, the `XDG_*_HOME` variables and
   `NODE_EXTRA_CA_CERTS`, and none of its own `.env`.
-- Only one run at a time. While a run started here is going, both buttons
-  are disabled and a second start is refused with `409`. A run the
+- The runner logs in as the seed user. A Draft clicked by another user
+  with agent access on their own ad passes the server's check, but the
+  runner can't read that ad, so the run fails with its 404 as the output.
+- Only one run at a time. While a run started here is going, the panel's
+  buttons and every Draft button are disabled, and a second start is
+  refused with `409`. A run the
   scheduler started holds `run.lock`, so a start from the panel then fails
   with the lock's `another run is in progress` as its output.
 - The panel shows the running command's stdout and stderr, refreshed every
