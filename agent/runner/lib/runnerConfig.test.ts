@@ -106,9 +106,9 @@ describe('sources', () => {
 
   test('missing keys take their defaults and a missing source is disabled', () => {
     expect(load({ auto: { enabled: true, termsCheckedOn: '2026-11-20' } })).toEqual({
-      auto: { enabled: true, termsCheckedOn: '2026-11-20', dailyOpenCap: 20, minDelayMs: 15000, fetch: 'requested' },
-      manual: { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'requested' },
-      fetching: { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'requested' },
+      auto: { enabled: true, termsCheckedOn: '2026-11-20', dailyOpenCap: 20, minDelayMs: 15000, fetch: 'automatic' },
+      manual: { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'automatic' },
+      fetching: { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'automatic' },
     })
   })
 
@@ -123,9 +123,9 @@ describe('sources', () => {
   })
 
   test('fetch is read', () => {
-    const config = load({ fetching: { enabled: true, termsCheckedOn: '2026-11-23', fetch: 'automatic' } })
+    const config = load({ fetching: { enabled: true, termsCheckedOn: '2026-11-23', fetch: 'requested' } })
 
-    expect(config.fetching.fetch).toBe('automatic')
+    expect(config.fetching.fetch).toBe('requested')
   })
 
   test.each(['auto', 'fetching'])('%s cannot be enabled before its terms are checked', (id) => {

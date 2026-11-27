@@ -103,35 +103,15 @@ describe('reporting', () => {
   test.each<[AdState, Record<string, unknown>]>([
     ['title_rejected', { to: 'title_rejected' }],
     ['failed', { to: 'failed', error: 'gone' }],
-  ])('blanks a hand-over ad reported in %s', async (_state, body) => {
+  ])('a hand-over ad reported in %s keeps its title and company', async (_state, body) => {
     const ad = await ingest({ sourceMode: 'handover' })
     await moved(ad.id, body)
 
     await post('/ads/reported', { ids: [ad.id] })
 
     const result = await readAd(ad.id)
-    expect(result.title).toBe('')
-    expect(result.company).toBe('')
-  })
-
-  test('blanks a hand-over ad reported in drafted', async () => {
-    const ad = await ingest({ sourceMode: 'handover' })
-    db.prepare("UPDATE ads SET state = 'drafted' WHERE id = ?").run(ad.id)
-
-    await post('/ads/reported', { ids: [ad.id] })
-
-    expect((await readAd(ad.id)).title).toBe('')
-  })
-
-  test('leaves an automatic ad and a pending hand-over ad their title', async () => {
-    const automatic = await ingest()
-    await moved(automatic.id, { to: 'title_rejected' })
-    const pending = await ingest({ sourceMode: 'handover' })
-
-    await post('/ads/reported', { ids: [automatic.id, pending.id] })
-
-    expect((await readAd(automatic.id)).title).toBe(automatic.title)
-    expect((await readAd(pending.id)).title).toBe(pending.title)
+    expect(result.title).toBe(ad.title)
+    expect(result.company).toBe(ad.company)
   })
 
   test.each([

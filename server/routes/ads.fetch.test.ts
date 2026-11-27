@@ -38,6 +38,17 @@ describe('fetch request', () => {
     expect(((await res.json()) as Ad).fetchRequestedAt).toBe('2026-01-01 00:00:00')
   })
 
+  test('stores the verdict on a new automatic ad', async () => {
+    const ad = await ingest()
+
+    const res = await prescreen(ad.id, PROMISING)
+
+    expect(res.status).toBe(200)
+    const result = (await res.json()) as Ad
+    expect(result.prescreen).toEqual(PROMISING)
+    expect(result.state).toBe('new')
+  })
+
   test('from another state is 409', async () => {
     const ad = await readyAd({ sourceMode: 'handover' })
 
@@ -75,6 +86,17 @@ describe('pre-screen', () => {
     const result = (await res.json()) as Ad
     expect(result.prescreen).toEqual(PROMISING)
     expect(result.state).toBe('awaiting_handover')
+  })
+
+  test('stores the verdict on a new automatic ad', async () => {
+    const ad = await ingest()
+
+    const res = await prescreen(ad.id, PROMISING)
+
+    expect(res.status).toBe(200)
+    const result = (await res.json()) as Ad
+    expect(result.prescreen).toEqual(PROMISING)
+    expect(result.state).toBe('new')
   })
 
   test('from another state is 409', async () => {
@@ -137,35 +159,31 @@ describe('fetch failures from awaiting_handover', () => {
   })
 })
 
-describe('blanking', () => {
-  test('dismissing empties the reason and keeps the verdict and the click', async () => {
+describe('what a hand-over ad keeps', () => {
+  test('dismissing keeps the title, company, reason and click', async () => {
     const ad = await waiting()
     await prescreen(ad.id, PROMISING)
     await post(`/ads/${ad.id}/fetch-request`, undefined)
 
     const result = await moved(ad.id, { to: 'dismissed' })
 
-    expect(result.prescreen).toEqual({ verdict: 'promising', reason: '' })
+    expect(result.prescreen).toEqual(PROMISING)
     expect(result.fetchRequestedAt).not.toBeNull()
-    expect(result.title).toBe('')
+    expect(result.title).toBe(ad.title)
+    expect(result.company).toBe(ad.company)
   })
 
-  test('reporting a failed ad empties the reason', async () => {
+  test('reporting a failed ad keeps its title, company and reason', async () => {
     const ad = await waiting()
     await prescreen(ad.id, PROMISING)
     await moved(ad.id, { to: 'failed', error: 'gone' })
 
     await post('/ads/reported', { ids: [ad.id] })
 
-    expect((await readAd(ad.id)).prescreen).toEqual({ verdict: 'promising', reason: '' })
-  })
-
-  test('an automatic ad keeps its reason', async () => {
-    const ad = await ingest()
-    db.prepare('UPDATE ads SET prescreen = ? WHERE id = ?').run(JSON.stringify(PROMISING), ad.id)
-
-    const result = await moved(ad.id, { to: 'dismissed' })
-
+    const result = await readAd(ad.id)
     expect(result.prescreen).toEqual(PROMISING)
+    expect(result.title).toBe(ad.title)
+    expect(result.company).toBe(ad.company)
+    expect(result.body).toBeNull()
   })
 })

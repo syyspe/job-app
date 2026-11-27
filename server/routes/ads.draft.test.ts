@@ -169,7 +169,7 @@ describe('drafting an application from an ad', () => {
     expect(applicationCount()).toBe(0)
   })
 
-  test('a hand-over ad keeps its title and company until reported', async () => {
+  test('a hand-over ad keeps its title and company once reported', async () => {
     const handover = await ingest({ sourceMode: 'handover' })
     await moved(handover.id, { to: 'ready', body: 'The ad text.' })
     await moved(handover.id, { to: 'suitable', evaluation: evaluation('suitable') })
@@ -180,6 +180,6 @@ describe('drafting an application from an ad', () => {
     expect(drafted.title).toBe(handover.title)
     expect(drafted.company).toBe(handover.company)
     await post('/ads/reported', { ids: [handover.id] })
-    expect((await readAd(handover.id)).title).toBe('')
+    expect((await readAd(handover.id)).title).toBe(handover.title)
   })
 })

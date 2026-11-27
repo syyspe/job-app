@@ -65,9 +65,9 @@ const sourceSchema = z.object({
   termsCheckedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD').optional(),
   dailyOpenCap: z.int().min(1).default(20),
   minDelayMs: z.int().min(1000).default(15000),
-  // Read only for a hand-over connector with a fetchAd: fetch on the user's
-  // click alone, or also every ad the pre-screen calls promising.
-  fetch: z.enum(['requested', 'automatic']).default('requested'),
+  // Read only for a connector with a fetchAd: fetch on the user's click
+  // alone, or also every ad the pre-screen calls promising.
+  fetch: z.enum(['requested', 'automatic']).default('automatic'),
 })
 
 const sourcesConfigSchema = z.object({ sources: z.record(z.string(), sourceSchema).default({}) })
@@ -75,7 +75,7 @@ const sourcesConfigSchema = z.object({ sources: z.record(z.string(), sourceSchem
 export type SourceConfig = z.infer<typeof sourceSchema>
 export type SourcesConfig = Record<string, SourceConfig>
 
-const DISABLED: SourceConfig = { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'requested' }
+const DISABLED: SourceConfig = { enabled: false, dailyOpenCap: 20, minDelayMs: 15000, fetch: 'automatic' }
 
 // Every connector gets an entry; one missing from config is disabled.
 export function loadSourcesConfig(path: string, connectors: Pick<SourceConnector, 'id' | 'fetchAd'>[]): SourcesConfig {

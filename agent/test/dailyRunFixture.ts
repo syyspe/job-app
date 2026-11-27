@@ -1,6 +1,5 @@
 import type { HealthResult } from '../profile/lib/ollama.ts'
 import type { DailyRunOptions } from '../runner/lib/dailyRun.ts'
-import type { DraftOutcome } from '../runner/lib/draft.ts'
 import type { EvaluationOutcome } from '../runner/lib/evaluate.ts'
 import { createJobAppClient } from '../runner/lib/jobApp.ts'
 import type { PrescreenOutcome } from '../runner/lib/prescreen.ts'
@@ -19,26 +18,11 @@ export const suitable: EvaluationOutcome = {
   transition: { to: 'suitable', evaluation: { verdict: 'suitable', fitSummary: 'Fits.', reasons: [] } },
 }
 
-const written: DraftOutcome = {
-  kind: 'written',
-  output: {
-    language: 'en',
-    applicationType: 'portal',
-    company: '',
-    role: '',
-    applyTo: '',
-    fitSummary: 'Fits.',
-    coverLetter: 'Letter.',
-    cv: 'CV',
-    questions: [],
-  },
-}
-
 const NOW = new Date(2026, 10, 20, 20, 0)
 
 const promising: PrescreenOutcome = { kind: 'screened', prescreen: { verdict: 'promising', reason: 'Test work.' } }
 
-const FETCHING_ON = { enabled: true, termsCheckedOn: '2026-11-23', dailyOpenCap: 20, minDelayMs: 1000, fetch: 'requested' as const }
+const ON = { enabled: true, termsCheckedOn: '2026-11-23', dailyOpenCap: 20, minDelayMs: 1000 }
 
 export interface Overrides {
   health?: HealthResult
@@ -47,6 +31,7 @@ export interface Overrides {
   send?: DailyRunOptions['send']
   openMailbox?: DailyRunOptions['openMailbox']
   evaluate?: () => Promise<EvaluationOutcome>
+  prescreen?: () => Promise<PrescreenOutcome>
   alwaysSend?: boolean
   lanUrl?: string
 }
@@ -63,12 +48,14 @@ export interface DailyRunFixture {
   close: () => Promise<void>
 }
 
-// A hand-over source that fetches: every page holds the same ad text.
-function fetchingSource(steps: string[]): SourceConnector {
+// Sources that fetch: every page holds the same ad text. 'fetching' is a
+// hand-over source fetching on request, 'auto' an automatic one fetching what
+// the pre-screen calls promising.
+function fetchingSource(steps: string[], id: string, mode: SourceConnector['mode']): SourceConnector {
   return {
-    id: 'fetching',
-    mode: 'handover',
-    fetchHosts: ['fetching.example'],
+    id,
+    mode,
+    fetchHosts: [`${id}.example`],
     matches: () => false,
     parseAlert: () => [],
     fetchAd: async () => (steps.push('fetch'), { kind: 'ok', text: 'The fetched ad.' }),
@@ -79,12 +66,11 @@ function fixtureOptions(fixture: Omit<DailyRunFixture, 'options' | 'close'>, ove
   const { fake, state, mailbox, sent, steps } = fixture
   const jobApp = createJobAppClient({ baseUrl: fake.url, username: fake.username, password: fake.password, envPath: 'env' })
   const evaluation = { concurrency: 1, perRunCap: 1, timeoutMs: 1000 }
-  const drafting = { concurrency: 1, perRunCap: 1, timeoutMs: 1000, filePrefix: 'T', cvTemplates: { fi: '/fi', en: '/en' } }
   return {
     jobApp,
     state,
     openMailbox: overrides.openMailbox ?? (async () => (steps.push('collect'), mailbox)),
-    collect: { connectors: [], sources: {}, titleRules: [], today: '2026-11-20', httpFor: () => { throw new Error('no fetch') } },
+    collect: { connectors: [], sources: {}, titleRules: [], today: '2026-11-20' },
     handoverWaitDays: 7,
     checkHealth: async () => (steps.push('health'), overrides.health ?? { ok: true }),
     gate: overrides.gate ?? (async () => (steps.push('gate'), { version: '9.9.9', reverified: false })),
@@ -92,11 +78,11 @@ function fixtureOptions(fixture: Omit<DailyRunFixture, 'options' | 'close'>, ove
     sync: null,
     prescreen: {
       config: { concurrency: 1, perRunCap: 10, timeoutMs: 1000 },
-      prescreen: async () => (steps.push('prescreen'), promising),
+      prescreen: async () => (steps.push('prescreen'), await (overrides.prescreen ?? (async () => promising))()),
     },
-    handoverFetch: {
-      connectors: [fetchingSource(steps)],
-      sources: { fetching: FETCHING_ON },
+    fetch: {
+      connectors: [fetchingSource(steps, 'fetching', 'handover'), fetchingSource(steps, 'auto', 'automatic')],
+      sources: { fetching: { ...ON, fetch: 'requested' }, auto: { ...ON, fetch: 'automatic' } },
       today: '2026-11-20',
       httpFor: () => ({ dayEnded: false, get: async () => ({ kind: 'gone' }) }),
     },
@@ -104,7 +90,6 @@ function fixtureOptions(fixture: Omit<DailyRunFixture, 'options' | 'close'>, ove
       config: { titleRules: { reject: [] }, evaluation },
       evaluate: overrides.evaluate ?? (async () => (steps.push('evaluate'), suitable)),
     },
-    drafting: { config: drafting, write: async () => (steps.push('draft'), written), today: '2026-11-20' },
     summary: {
       recipient: 'me@mail.example',
       alwaysSend: overrides.alwaysSend ?? false,

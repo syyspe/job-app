@@ -3,8 +3,6 @@ import { describe, expect, test } from 'vitest'
 import { AD_STATES } from '../types.ts'
 import type { AdState } from '../types.ts'
 import {
-  blanksOnceReported,
-  blanksOnEntry,
   canTransition,
   clearsBody,
   recordsAttempts,
@@ -39,18 +37,6 @@ test('only the states that hold no ad text for later clear the body', () => {
   expect(clearing.sort()).toEqual(
     ['dismissed', 'drafted', 'duplicate', 'failed', 'title_rejected', 'unsuitable'].sort(),
   )
-})
-
-test('states no summary covers blank on entry', () => {
-  expect(AD_STATES.filter(blanksOnEntry).sort()).toEqual(['dismissed', 'duplicate', 'unsuitable'])
-})
-
-test('states a summary covers blank once reported', () => {
-  expect(AD_STATES.filter(blanksOnceReported).sort()).toEqual([
-    'drafted',
-    'failed',
-    'title_rejected',
-  ])
 })
 
 test('attempts are recorded only while work is pending', () => {

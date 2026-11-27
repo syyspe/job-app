@@ -2,87 +2,54 @@
 import { expect, test } from 'vitest'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import type { FakeAd } from '../../test/fakeJobAppAds.ts'
-import { composeSummary, isEmpty, prescreenTally } from './summary.ts'
 import type { AdSummary } from './jobApp.ts'
+import type { Story } from './story.ts'
+import { composeSummary } from './summary.ts'
 
-const appUrl = 'https://jobs.lan.example'
-const NO_TALLY = { promising: { total: 0, fetched: 0 }, notPromising: { total: 0, fetched: 0 } }
-const none = { prescreened: [], tally: NO_TALLY, failedAttempts: [] }
+const appUrl = 'https://jobs.lan.example/'
 
 function ad(fields: Partial<FakeAd> & { id: number }): AdSummary {
   const { body: _body, evaluation: _evaluation, ...summary } = fakeAd(fields)
   return summary
 }
 
-test('nothing to report composes the empty summary', () => {
-  expect(composeSummary({ ads: [], ...none, sourceFailures: [], problems: [], appUrl })).toEqual({
-    subject: 'job agent: 0 drafts, 0 title rejected, 0 failed, 0 source failures, 0 problems',
-    text: `Open job-app: ${appUrl}\n`,
+function story(fields: Partial<Story> = {}): Story {
+  return { opening: [], problems: [], promising: [], setAside: [], kept: [], ...fields }
+}
+
+const compose = (fields: Partial<Story>, apiSpend = null) => composeSummary({ story: story(fields), apiSpend, appUrl })
+
+test('nothing new: the opening sentences and the link', () => {
+  const summary = compose({ opening: ['Read 0 new emails.', 'No new job titles to pre-screen.'] })
+
+  expect(summary).toEqual({
+    subject: 'job agent: nothing new',
+    text: `Read 0 new emails. No new job titles to pre-screen.\n\nOpen job-app: ${appUrl}\n`,
   })
 })
 
-test('API spend adds its line just before the link', () => {
-  const apiSpend = { runUsd: 0.4234, monthUsd: 4.1, monthlyUsd: 30 }
-  const summary = composeSummary({ ads: [], ...none, sourceFailures: [], problems: [], apiSpend, appUrl })
+test('the subject counts kept, set aside and problems', () => {
+  const kept = [{ ad: ad({ id: 1 }), fitSummary: 'Fits.' }]
+  const setAside = [ad({ id: 2 }), ad({ id: 3 })]
 
-  expect(summary.text).toBe(`Claude API: $0.42 this run, $4.10 this month of $30.00\n\nOpen job-app: ${appUrl}\n`)
+  expect(compose({ kept, setAside }).subject).toBe('job agent: 1 kept, 2 set aside')
+  expect(compose({ kept, problems: ['a', 'b'] }).subject).toBe('job agent: 1 kept, 0 set aside, 2 problems')
+  expect(compose({ problems: ['a'] }).subject).toBe('job agent: nothing new, 1 problem')
 })
 
-test('no API spend adds no line', () => {
-  const summary = composeSummary({ ads: [], ...none, sourceFailures: [], problems: [], apiSpend: null, appUrl })
+test('a kept ad carries both links and its fit summary', () => {
+  const kept = [{ ad: ad({ id: 4, title: 'Test Lead', company: 'Acme Oy', url: 'https://jobs.example/4' }), fitSummary: 'Strong\nfit.' }]
 
-  expect(summary.text).not.toContain('Claude API')
-})
+  const { text } = compose({ opening: ['Evaluation kept 1 of 2.'], kept })
 
-test('a lanUrl adds a second link directly under the first', () => {
-  const lanUrl = 'https://192.0.2.1:3001'
-  const summary = composeSummary({ ads: [], ...none, sourceFailures: [], problems: [], appUrl, lanUrl })
-
-  expect(summary.text).toBe(`Open job-app: ${appUrl}\nOpen job-app (LAN): ${lanUrl}\n`)
-})
-
-test('isEmpty is true only when every list is empty', () => {
-  const empty = { ads: [], prescreened: [], sourceFailures: [], problems: [] }
-
-  expect(isEmpty(empty)).toBe(true)
-  expect(isEmpty({ ...empty, ads: [ad({ id: 1, state: 'failed' })] })).toBe(false)
-  expect(isEmpty({ ...empty, sourceFailures: [{ source: 'valtiolle', date: '2026-11-20', kind: 'blocked' }] })).toBe(false)
-  expect(isEmpty({ ...empty, problems: [{ step: 'evaluate', message: 'down' }] })).toBe(false)
-  expect(isEmpty({ ...empty, prescreened: [ad({ id: 1, state: 'awaiting_handover' })] })).toBe(false)
-})
-
-test('every non-empty list gets its own section, and the subject counts them', () => {
-  const summary = composeSummary({
-    ads: [
-      ad({ id: 1, state: 'drafted', title: 'Developer', company: 'Acme', applicationId: 101 }),
-      ad({ id: 2, state: 'drafted', title: 'Tester', company: 'Beta', applicationId: 102 }),
-      ad({ id: 3, state: 'title_rejected', title: 'Trainee', company: 'Gamma', source: 'duunitori', url: 'https://d.example/3' }),
-      ad({ id: 4, state: 'failed', title: 'Architect', source: 'nordea', lastError: 'gone' }),
-    ],
-    ...none,
-    sourceFailures: [{ source: 'valtiolle', date: '2026-11-20', kind: 'blocked' }],
-    problems: [{ step: 'evaluate', message: 'Ollama health check failed: unreachable' }],
-    appUrl,
-  })
-
-  expect(summary.subject).toBe('job agent: 2 drafts, 1 title rejected, 1 failed, 1 source failure, 1 problem')
-  expect(summary.text).toBe(
+  expect(text).toBe(
     [
-      'Drafts (2)',
-      '- Developer, Acme (application 101)',
-      '- Tester, Beta (application 102)',
+      'Evaluation kept 1 of 2.',
       '',
-      'Title rejected (1)',
-      '- Trainee, Gamma, duunitori: https://d.example/3',
-      '',
-      'Failed (1)',
-      '- Architect, nordea: gone',
-      '',
-      'Source failures (1)',
-      '- valtiolle 2026-11-20 blocked',
-      '',
-      'Problems (1)',
-      '- evaluate: Ollama health check failed: unreachable',
+      'Test Lead, Acme Oy',
+      'Ad: https://jobs.example/4',
+      'Strong fit.',
+      'In job-app: https://jobs.lan.example/#ad-4',
       '',
       `Open job-app: ${appUrl}`,
       '',
@@ -90,43 +57,15 @@ test('every non-empty list gets its own section, and the subject counts them', (
   )
 })
 
-test('only a problem still composes a summary with just that section', () => {
-  const summary = composeSummary({ ads: [], ...none, sourceFailures: [], problems: [{ step: 'collect', message: 'x' }], appUrl })
+test('a set-aside ad carries its reason and its job-site link', () => {
+  const prescreen = { verdict: 'not_promising' as const, reason: 'A sales role.' }
+  const setAside = [ad({ id: 5, title: 'Account Manager', company: 'Sell Oy', url: 'https://jobs.example/5', prescreen })]
 
-  expect(summary.subject).toBe('job agent: 0 drafts, 0 title rejected, 0 failed, 0 source failures, 1 problem')
-  expect(summary.text).toBe(`Problems (1)\n- collect: x\n\nOpen job-app: ${appUrl}\n`)
-})
-
-test('line breaks and control characters in ad text become spaces', () => {
-  const title = 'Developer\r\nSubject: forged\u0000 end'
-
-  const summary = composeSummary({
-    ads: [ad({ id: 1, state: 'title_rejected', title, company: 'Acme', source: 's', url: 'u' })],
-    ...none,
-    sourceFailures: [],
-    problems: [],
-    appUrl,
-  })
-
-  expect(summary.text.split('\n')[1]).toBe('- Developer  Subject: forged  end, Acme, s: u')
-})
-
-test('pre-screened ads get a section, then the 14-day tally', () => {
-  const prescreened = [
-    ad({ id: 1, state: 'awaiting_handover', title: 'Tester', company: 'Acme', prescreen: { verdict: 'promising', reason: 'Test work.' } }),
-    ad({ id: 2, state: 'awaiting_handover', title: 'Sales', company: 'Beta', prescreen: { verdict: 'not_promising', reason: 'Sales.' } }),
-  ]
-  const tally = { promising: { total: 3, fetched: 2 }, notPromising: { total: 4, fetched: 1 } }
-
-  const summary = composeSummary({ ads: [], prescreened, tally, sourceFailures: [], problems: [], failedAttempts: [], appUrl })
-
-  expect(summary.text).toBe(
+  expect(compose({ setAside }).text).toBe(
     [
-      'Pre-screened (2)',
-      '- Tester, Acme: promising — Test work.',
-      '- Sales, Beta: not promising — Sales.',
-      '',
-      'Pre-screen vs. Fetch, last 14 days: promising 3 (fetched 2), not promising 4 (fetched 1)',
+      'Set aside by the pre-screen:',
+      '- Account Manager, Sell Oy — A sales role.',
+      '  Ad: https://jobs.example/5',
       '',
       `Open job-app: ${appUrl}`,
       '',
@@ -134,50 +73,24 @@ test('pre-screened ads get a section, then the 14-day tally', () => {
   )
 })
 
-test('a pre-screen reason has its control characters cleaned', () => {
-  const prescreen = { verdict: 'promising' as const, reason: 'Fits.\nSubject: forged' }
-  const prescreened = [ad({ id: 1, state: 'awaiting_handover', title: 'Tester', company: 'Acme', prescreen })]
+test('problems and spend come before the links, the LAN link last', () => {
+  const apiSpend = { runUsd: 0.1234, monthUsd: 4.1, monthlyUsd: 30 }
+  const summary = composeSummary({
+    story: story({ problems: ['Fetching ads failed: x'] }),
+    apiSpend,
+    appUrl,
+    lanUrl: 'http://192.168.1.5:3001',
+  })
 
-  const summary = composeSummary({ ads: [], prescreened, tally: NO_TALLY, sourceFailures: [], problems: [], failedAttempts: [], appUrl })
-
-  expect(summary.text.split('\n')[1]).toBe('- Tester, Acme: promising — Fits. Subject: forged')
-})
-
-test('the tally counts hand-over ads first seen in the last 14 days, fetched meaning clicked', () => {
-  const now = new Date('2026-11-23T12:00:00Z')
-  const promising = { verdict: 'promising' as const, reason: '' }
-  const notPromising = { verdict: 'not_promising' as const, reason: '' }
-  const ads = [
-    ad({ id: 1, sourceMode: 'handover', prescreen: promising, fetchRequestedAt: '2026-11-20 08:00:00', firstSeenAt: '2026-11-20 08:00:00' }),
-    ad({ id: 2, sourceMode: 'handover', prescreen: promising, firstSeenAt: '2026-11-09 12:00:00' }),
-    ad({ id: 3, sourceMode: 'handover', prescreen: notPromising, fetchRequestedAt: '2026-11-21 08:00:00', firstSeenAt: '2026-11-21 08:00:00' }),
-    ad({ id: 4, sourceMode: 'handover', prescreen: promising, firstSeenAt: '2026-11-09 11:59:59' }),
-    ad({ id: 5, sourceMode: 'automatic', prescreen: promising, firstSeenAt: '2026-11-20 08:00:00' }),
-    ad({ id: 6, sourceMode: 'handover', firstSeenAt: '2026-11-20 08:00:00' }),
-  ]
-
-  expect(prescreenTally(ads, now)).toEqual({ promising: { total: 2, fetched: 1 }, notPromising: { total: 1, fetched: 1 } })
-})
-
-test('a failed ad with a failed attempt this run carries its detail', () => {
-  const failedAttempts = [
-    { adId: 4, title: 'Architect', source: 'nordea', category: 'model_failed', detail: '400: bad schema (request req_1)' },
-  ]
-  const ads = [
-    ad({ id: 4, state: 'failed', title: 'Architect', source: 'nordea', lastError: 'model_failed' }),
-    ad({ id: 5, state: 'failed', title: 'Tester', source: 'nordea', lastError: 'timeout' }),
-  ]
-
-  const summary = composeSummary({ ads, ...none, failedAttempts, sourceFailures: [], problems: [], appUrl })
-
-  expect(summary.text).toContain('- Architect, nordea: model_failed — 400: bad schema (request req_1)\n')
-  expect(summary.text).toContain('- Tester, nordea: timeout\n')
-})
-
-test('a stored cli_failed category still renders as it is', () => {
-  const ads = [ad({ id: 4, state: 'failed', title: 'Architect', source: 'nordea', lastError: 'cli_failed' })]
-
-  const summary = composeSummary({ ads, ...none, sourceFailures: [], problems: [], appUrl })
-
-  expect(summary.text).toContain('- Architect, nordea: cli_failed\n')
+  expect(summary.text).toBe(
+    [
+      'Fetching ads failed: x',
+      '',
+      'Claude API: $0.12 this run, $4.10 of $30.00 this month.',
+      '',
+      `Open job-app: ${appUrl}`,
+      'Open job-app (LAN): http://192.168.1.5:3001',
+      '',
+    ].join('\n'),
+  )
 })

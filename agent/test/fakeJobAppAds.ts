@@ -107,15 +107,16 @@ interface TransitionTarget {
 async function answerTransition({ fake, ad }: TransitionTarget, req: IncomingMessage, res: ServerResponse) {
   const transition = { id: ad.id, ...(await readJson(req)) } as FakeTransition
   fake.transitions.push(transition)
+  if (fake.transitionFailsFor === ad.id) return sendJson(res, 500, { error: 'internal server error' })
   applyTransition(ad, transition)
   sendJson(res, 200, summary(ad))
 }
 
-// Only an awaiting_handover ad takes a pre-screen, as on the server.
+// Only a new or awaiting_handover ad takes a pre-screen, as on the server.
 async function answerPrescreen({ fake, ad }: TransitionTarget, req: IncomingMessage, res: ServerResponse) {
   const prescreen = (await readJson(req)) as FakeAd['prescreen']
   fake.prescreens.push({ id: ad.id, prescreen })
-  if (ad.state !== 'awaiting_handover') return sendJson(res, 409, { error: `an ad cannot be pre-screened from ${ad.state}` })
+  if (ad.state !== 'new' && ad.state !== 'awaiting_handover') return sendJson(res, 409, { error: `an ad cannot be pre-screened from ${ad.state}` })
   ad.prescreen = prescreen
   sendJson(res, 200, summary(ad))
 }

@@ -6,9 +6,11 @@ interface AdListProps {
   ads: AdSummary[]
   stateLabel: string
   actions: AdActions
+  /** The ad a summary link opened, marked as the current row. */
+  currentId?: number
 }
 
-export function AdList({ ads, stateLabel, actions }: AdListProps) {
+export function AdList({ ads, stateLabel, actions, currentId }: AdListProps) {
   if (ads.length === 0) {
     return (
       <div className="empty-state">
@@ -21,7 +23,7 @@ export function AdList({ ads, stateLabel, actions }: AdListProps) {
   return (
     <ul className="ad-list">
       {ads.map((ad) => (
-        <AdRow key={ad.id} ad={ad} actions={actions} />
+        <AdRow key={ad.id} ad={ad} actions={actions} current={ad.id === currentId} />
       ))}
     </ul>
   )

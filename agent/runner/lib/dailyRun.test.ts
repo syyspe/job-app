@@ -7,6 +7,8 @@ import type { FakeJobApp } from '../../test/fakeJobApp.ts'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import type { FakeMailbox } from '../../test/fakeMailbox.ts'
 import { runDaily } from './dailyRun.ts'
+import type { PrescreenOutcome } from './prescreen.ts'
+import { storyLines, storyOf } from './story.ts'
 import type { EvaluationOutcome } from './evaluate.ts'
 import type { MailMessage } from './smtp.ts'
 import type { RunnerState } from './state.ts'
@@ -33,28 +35,31 @@ afterEach(async () => {
 
 const options = (overrides: Overrides = {}) => fixture.options(overrides)
 
-test('steps run in order and the drafted ad is reported once', async () => {
-  fake.ads.push(fakeAd({ id: 1, state: 'ready', firstSeenAt: '2026-11-20 08:00:00' }))
+const appUrl = 'https://jobs.lan.example'
+
+test('steps run in order, nothing is drafted, and the kept ad is in the summary', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'ready', title: 'Tester', url: 'https://jobs.example/1', firstSeenAt: '2026-11-20 08:00:00' }))
 
   const report = await runDaily(options())
 
-  expect(steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'draft', 'send'])
+  expect(steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'send'])
   expect(report.sent).toBe(true)
   expect(report.failures).toEqual([])
-  expect(sent[0].subject).toBe('job agent: 1 draft, 0 title rejected, 0 failed, 0 source failures, 0 problems')
-  expect(fake.ads[0]).toMatchObject({ state: 'drafted', reportedAt: '2026-12-01 20:00:00' })
+  expect(fake.ads[0].state).toBe('suitable')
+  expect(fake.drafts).toEqual([])
+  expect(sent[0].subject).toBe('job agent: 1 kept, 0 set aside')
+  expect(sent[0].text).toContain('Evaluation kept 1 of 1.')
+  expect(sent[0].text).toContain('Tester, Example Oy\nAd: https://jobs.example/1\nFits.\nIn job-app: https://jobs.lan.example/#ad-1\n')
   expect(mailbox.closed).toBe(true)
 })
 
-test('a waiting hand-over is pre-screened, then fetched on request, then evaluated and drafted', async () => {
+test('a waiting hand-over is pre-screened, then fetched on request, then evaluated', async () => {
   fake.ads.push(
     fakeAd({
       id: 1,
       source: 'fetching',
       sourceMode: 'handover',
       state: 'awaiting_handover',
-      title: 'Tester',
-      company: 'Acme',
       fetchRequestedAt: '2026-11-20 09:00:00',
       firstSeenAt: '2026-11-20 08:00:00',
     }),
@@ -62,14 +67,50 @@ test('a waiting hand-over is pre-screened, then fetched on request, then evaluat
 
   const report = await runDaily(options())
 
-  expect(steps).toEqual(['collect', 'health', 'gate', 'prescreen', 'fetch', 'evaluate', 'draft', 'send'])
-  expect(report.prescreen?.screened).toEqual({ promising: 1, notPromising: 0 })
-  expect(report.handoverFetch).toEqual({
-    fetching: { ready: 1, duplicate: 0, gone: 0, retrying: 0, failed: 0, blocked: 0 },
-  })
-  expect(fake.ads[0]).toMatchObject({ state: 'drafted', prescreen: { verdict: 'promising', reason: 'Test work.' } })
-  expect(sent[0].text).toContain('Pre-screened (1)\n- Tester, Acme: promising — Test work.\n')
-  expect(sent[0].text).toContain('Pre-screen vs. Fetch, last 14 days: promising 1 (fetched 1), not promising 0 (fetched 0)')
+  expect(steps).toEqual(['collect', 'health', 'gate', 'prescreen', 'fetch', 'evaluate', 'send'])
+  expect(report.fetch?.fetching).toEqual({ ready: 1, duplicate: 0, gone: 0, retrying: 0, failed: 0, blocked: 0 })
+  expect(fake.ads[0]).toMatchObject({ state: 'suitable', prescreen: { verdict: 'promising', reason: 'Test work.' } })
+  expect(sent[0].text).toContain('Pre-screening found 1 interesting job title and set aside 0. Evaluation kept 1 of 1.')
+})
+
+test('a new automatic ad is pre-screened, fetched because it is promising, then evaluated', async () => {
+  fake.ads.push(fakeAd({ id: 1, source: 'auto', sourceMode: 'automatic', state: 'new', firstSeenAt: '2026-11-20 08:00:00' }))
+
+  const report = await runDaily(options())
+
+  expect(steps).toEqual(['collect', 'health', 'gate', 'prescreen', 'fetch', 'evaluate', 'send'])
+  expect(report.fetch?.auto.ready).toBe(1)
+  expect(fake.ads[0]).toMatchObject({ state: 'suitable', body: 'The fetched ad.' })
+})
+
+const notPromising: PrescreenOutcome = { kind: 'screened', prescreen: { verdict: 'not_promising', reason: 'A sales role.' } }
+
+test('a not-promising ad is dismissed, not fetched, and listed with its job-site link', async () => {
+  fake.ads.push(
+    fakeAd({ id: 1, source: 'auto', sourceMode: 'automatic', title: 'Seller', url: 'https://auto.example/1', firstSeenAt: '2026-11-20 08:00:00' }),
+  )
+
+  await runDaily(options({ prescreen: async () => notPromising }))
+
+  expect(steps).toEqual(['collect', 'health', 'gate', 'prescreen', 'send'])
+  expect(fake.ads[0].state).toBe('dismissed')
+  expect(sent[0].subject).toBe('job agent: 0 kept, 1 set aside')
+  expect(sent[0].text).toContain('Set aside by the pre-screen:\n- Seller, Example Oy — A sales role.\n  Ad: https://auto.example/1\n')
+})
+
+test('a failed dismissal is a pre-screen failure, and the later steps still run', async () => {
+  fake.ads.push(
+    fakeAd({ id: 1, source: 'auto', sourceMode: 'automatic', firstSeenAt: '2026-11-20 08:00:00' }),
+    fakeAd({ id: 2, state: 'ready', firstSeenAt: '2026-11-20 09:00:00' }),
+  )
+  fake.transitionFailsFor = 1
+
+  const report = await runDaily(options({ prescreen: async () => notPromising }))
+
+  expect(report.failures).toEqual([{ step: 'pre-screen', message: 'job-app POST /api/ads/1/transition: 500 internal server error' }])
+  expect(steps).toEqual(['collect', 'health', 'gate', 'prescreen', 'evaluate', 'send'])
+  expect(fake.ads[0]).toMatchObject({ state: 'new', prescreen: { verdict: 'not_promising' } })
+  expect(sent[0].text).toContain('Pre-screening failed: job-app POST /api/ads/1/transition: 500 internal server error')
 })
 
 test('a pre-screen alone makes the summary worth sending', async () => {
@@ -90,13 +131,16 @@ test('nothing to report sends no mail', async () => {
   expect(sent).toEqual([])
 })
 
-test('nothing to report with alwaysSend sends the empty summary', async () => {
+test('nothing to report with alwaysSend sends the opening sentences and the link', async () => {
   const report = await runDaily(options({ alwaysSend: true }))
 
   expect(report.sent).toBe(true)
-  expect(sent).toHaveLength(1)
-  expect(sent[0].subject).toBe('job agent: 0 drafts, 0 title rejected, 0 failed, 0 source failures, 0 problems')
-  expect(sent[0].text).toContain('Open job-app:')
+  expect(sent).toEqual([
+    expect.objectContaining({
+      subject: 'job agent: nothing new',
+      text: `Read 0 new emails. No new job titles to pre-screen.\n\nOpen job-app: ${appUrl}\n`,
+    }),
+  ])
 })
 
 test('a configured lanUrl reaches the summary', async () => {
@@ -105,12 +149,35 @@ test('a configured lanUrl reaches the summary', async () => {
   expect(sent[0].text).toContain('Open job-app (LAN): https://192.0.2.1:3001\n')
 })
 
+test('a failed ad is listed once, read once, and marked reported', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'failed', title: 'Architect', lastError: 'gone' }))
+
+  const report = await runDaily(options())
+
+  expect(report.news?.failedAds.map((ad) => ad.id)).toEqual([1])
+  expect(fake.requests.filter((request) => request.includes('state=failed'))).toHaveLength(1)
+  expect(sent[0].text).toContain('Architect, Example Oy failed three times (gone). Retry or dismiss it in job-app: https://jobs.lan.example/#ad-1')
+  expect(fake.ads[0].reportedAt).not.toBeNull()
+})
+
 test('ads already reported are not reported again', async () => {
-  fake.ads.push(fakeAd({ id: 1, state: 'title_rejected', reportedAt: '2026-11-19 20:00:00' }))
+  fake.ads.push(fakeAd({ id: 1, state: 'failed', lastError: 'gone', reportedAt: '2026-11-19 20:00:00' }))
 
   await runDaily(options())
 
   expect(sent).toEqual([])
+})
+
+test('the email and the run output tell the same story', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'failed', lastError: 'gone' }), fakeAd({ id: 2, state: 'ready' }))
+  state.addFailure({ source: 'nordea', date: '2026-11-20', kind: 'empty_alert' })
+
+  const report = await runDaily(options())
+
+  const story = storyOf(report, appUrl)
+  expect(story.problems).toHaveLength(2)
+  expect(sent[0].text).toContain(story.opening.join(' '))
+  for (const line of storyLines(story)) expect(sent[0].text).toContain(line)
 })
 
 test('per-run caps leave the rest queued', async () => {
@@ -122,7 +189,8 @@ test('per-run caps leave the rest queued', async () => {
   const report = await runDaily(options())
 
   expect(report.evaluation?.queued).toBe(1)
-  expect(fake.ads.map((ad) => ad.state)).toEqual(['drafted', 'ready'])
+  expect(fake.ads.map((ad) => ad.state)).toEqual(['suitable', 'ready'])
+  expect(sent[0].text).toContain('Evaluation kept 1 of 1. 1 more ad waits for the next run.')
 })
 
 test('a hand-over past its wait or deadline day is dismissed, one inside both is not', async () => {
@@ -151,7 +219,7 @@ test('Ollama down still collects and expires, skips the model steps and reports 
   expect(report.failures).toEqual([])
   expect(report.dismissed).toBe(1)
   expect(fake.ads[0].state).toBe('ready')
-  expect(sent[0].text).toContain('- model steps: Ollama health check failed: unreachable')
+  expect(sent[0].text).toContain('Pre-screening and evaluation were skipped: Ollama health check failed: unreachable')
 })
 
 test('a gate failure skips the model steps with its message', async () => {
@@ -176,9 +244,9 @@ test('a gate failure skips the model steps with its message', async () => {
   expect(report.failures).toEqual([])
   expect(steps).toEqual(['collect', 'health', 'send'])
   expect(report.prescreen).toBeNull()
-  expect(report.handoverFetch).toBeNull()
+  expect(report.fetch).toBeNull()
   expect(fake.ads.map((ad) => ad.state)).toEqual(['ready', 'awaiting_handover'])
-  expect(sent[0].text).toContain('- model steps: sandbox check failed for claude 9.9.9: no Bash')
+  expect(sent[0].text).toContain('Pre-screening and evaluation were skipped: sandbox check failed for claude 9.9.9: no Bash')
 })
 
 test('an unreachable mailbox is a failure, and later steps still run', async () => {
@@ -190,8 +258,9 @@ test('an unreachable mailbox is a failure, and later steps still run', async () 
   const report = await runDaily(options({ openMailbox }))
 
   expect(report.failures).toEqual([{ step: 'collect', message: 'cannot reach mailbox at imap.mail.example' }])
-  expect(steps).toEqual(['health', 'gate', 'evaluate', 'draft', 'send'])
-  expect(sent[0].text).toContain('- collect: cannot reach mailbox at imap.mail.example')
+  expect(steps).toEqual(['health', 'gate', 'evaluate', 'send'])
+  expect(sent[0].text).toContain('Reading the alert emails failed: cannot reach mailbox at imap.mail.example')
+  expect(sent[0].text).not.toContain('new email')
 })
 
 test('a failed send marks nothing reported and keeps the source failures', async () => {
@@ -214,7 +283,7 @@ test('an accepted send clears the source failures it reported', async () => {
 
   await runDaily(options())
 
-  expect(sent[0].text).toContain('- nordea 2026-11-20 blocked')
+  expect(sent[0].text).toContain('Nordea blocked fetching on 2026-11-20; fetching resumes the next day.')
   expect(state.readFailures()).toEqual([])
 })
 
@@ -246,12 +315,12 @@ test('a gate resolving null runs the model steps with no sandbox recorded', asyn
 
   const report = await runDaily(options({ gate: async () => (steps.push('gate'), null) }))
 
-  expect(steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'draft', 'send'])
+  expect(steps).toEqual(['collect', 'health', 'gate', 'evaluate', 'send'])
   expect(report.sandbox).toBeNull()
   expect(report.stopped).toBeNull()
 })
 
-test("an evaluation that fails an ad into failed puts its detail on the summary's Failed line", async () => {
+test('an evaluation that fails an ad into failed puts its detail on its sentence', async () => {
   fake.ads.push(fakeAd({ id: 1, state: 'ready', title: 'Architect', attempts: 2 }))
   const evaluate = async (): Promise<EvaluationOutcome> => ({
     kind: 'failed',
@@ -262,5 +331,7 @@ test("an evaluation that fails an ad into failed puts its detail on the summary'
   await runDaily(options({ evaluate }))
 
   expect(fake.ads[0]).toMatchObject({ state: 'failed', lastError: 'model_failed' })
-  expect(sent[0].text).toContain('- Architect, testsource: model_failed — 400: maxItems is not supported (request req_9)\n')
+  expect(sent[0].text).toContain(
+    'Architect, Example Oy failed three times (model_failed — 400: maxItems is not supported (request req_9)). Retry or dismiss it in job-app: https://jobs.lan.example/#ad-1',
+  )
 })

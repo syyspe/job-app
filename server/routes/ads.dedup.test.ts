@@ -51,17 +51,20 @@ describe('deduplication by url', () => {
     expect((await ingest()).state).toBe('new')
   })
 
-  test('a hand-over repeat is blanked as it enters duplicate', async () => {
+  test('a hand-over repeat keeps its title and company as it enters duplicate', async () => {
     await ingest({ url: 'https://example.com/job/4' })
 
     const repeat = await ingest({
       source: 'duunitori',
       sourceMode: 'handover',
       url: 'https://example.com/job/4',
+      title: 'Test Lead',
+      company: 'Acme Oy',
     })
 
-    expect(repeat.title).toBe('')
-    expect(repeat.company).toBe('')
+    expect(repeat.state).toBe('duplicate')
+    expect(repeat.title).toBe('Test Lead')
+    expect(repeat.company).toBe('Acme Oy')
   })
 })
 

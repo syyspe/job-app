@@ -57,6 +57,12 @@
   border-radius: var(--r-md);
 }
 
+/* The ad a summary link opened; the spine keeps showing its state. */
+.ad-item[aria-current='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* The spine the application rows use, carrying what the ad needs next. */
 .ad-item::before {
   content: '';

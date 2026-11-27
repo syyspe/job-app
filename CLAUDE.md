@@ -47,15 +47,16 @@
   `npm run agent:draft` turns suitable ads into draft applications under the
   same gate. It needs `prompts/draft.md` and config's `drafting` key — see
   README's "Ad drafting" section.
-  `npm run agent:collect` reads the alert mailbox, ingests and screens ads
-  and fetches automatic sources' pages; no `claude -p`, so no gate. It needs
+  `npm run agent:collect` reads the alert mailbox, ingests ads and screens
+  their titles; it fetches no page and runs no `claude -p`, so no gate. It needs
   the `MAIL_*` keys in `~/.config/job-agent/env` and config's `sources` key —
   see README's "Alert sources" section.
-  `npm run agent:run` is the daily run: every step above in order under
-  `run.lock`, then one summary email over SMTP. It needs everything the
-  steps need plus `MAIL_SMTP_HOST`, config's `summary.recipient` and the
-  private prompt `prompts/prescreen.md` (the pre-screen of hand-over ads),
-  and re-runs the sandbox check itself after a `claude` update. Task Scheduler
+  `npm run agent:run` is the daily run under `run.lock`: collect, expire
+  hand-overs, sync, pre-screen every source's new ads, fetch the promising
+  ones, evaluate, then one summary email over SMTP. It never drafts. It
+  needs what collect and evaluation need plus `MAIL_SMTP_HOST`, config's
+  `summary.recipient` and the private prompt `prompts/prescreen.md`, and
+  re-runs the sandbox check itself after a `claude` update. Task Scheduler
   starts it through `agent/runner/daily-run.sh` — see README's "Daily run"
   section.
 

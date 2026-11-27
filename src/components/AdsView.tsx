@@ -79,11 +79,25 @@ function AdStateFilter({ ads, selected, onSelect }: AdStateFilterProps) {
 interface AdsViewProps {
   onUnauthorized: () => void
   canRunAgent: boolean
+  /** The ad a summary link opened; its state is selected once the ads load. */
+  focusAdId?: number
 }
 
-export function AdsView({ onUnauthorized, canRunAgent }: AdsViewProps) {
-  const { ads, actions, refresh } = useAds(onUnauthorized)
+function useSelectedState(ads: AdSummary[], focusAdId: number | undefined) {
   const [selected, setSelected] = useState<AdState>('awaiting_handover')
+  const [focused, setFocused] = useState(false)
+  const focusAd = focused ? undefined : ads.find((ad) => ad.id === focusAdId)
+  // Set during render, React's pattern for state that follows loaded data.
+  if (focusAd) {
+    setFocused(true)
+    setSelected(focusAd.state)
+  }
+  return [selected, setSelected] as const
+}
+
+export function AdsView({ onUnauthorized, canRunAgent, focusAdId }: AdsViewProps) {
+  const { ads, actions, refresh } = useAds(onUnauthorized)
+  const [selected, setSelected] = useSelectedState(ads, focusAdId)
 
   return (
     <div className="ads-view">
@@ -94,6 +108,7 @@ export function AdsView({ onUnauthorized, canRunAgent }: AdsViewProps) {
         ads={ads.filter((ad) => ad.state === selected)}
         stateLabel={AD_STATE_LABELS[selected]}
         actions={actions}
+        currentId={focusAdId}
       />
     </div>
   )

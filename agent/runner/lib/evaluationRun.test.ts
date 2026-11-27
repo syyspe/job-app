@@ -111,6 +111,19 @@ test('a failure records an attempt with its category, and the others still run',
   expect(report.evaluated).toEqual({ suitable: 1, unsuitable: 0, retrying: 1, failed: 0 })
 })
 
+test('the kept ads are the ones moved to suitable, with their fit summary', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'ready', body: 'text' }), fakeAd({ id: 2, state: 'ready', body: 'text' }))
+  const unsuitable: EvaluationOutcome = {
+    kind: 'evaluated',
+    transition: { to: 'unsuitable', evaluation: { verdict: 'unsuitable', fitSummary: 'No.', reasons: [] } },
+  }
+  const evaluate = (ad: Ad) => Promise.resolve(ad.id === 1 ? suitable : unsuitable)
+
+  const report = await run({ evaluate })
+
+  expect(report.kept.map(({ ad, fitSummary }) => [ad.id, ad.state, fitSummary])).toEqual([[1, 'suitable', 'Fits.']])
+})
+
 test('the third failure is counted as failed', async () => {
   fake.ads.push(fakeAd({ id: 1, state: 'ready', body: 'text', attempts: 2 }))
 
