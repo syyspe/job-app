@@ -1,5 +1,5 @@
 import { AGENT_RUN_KINDS, ROLES, STATUSES } from '../types.ts'
-import type { AgentRunKind, Role } from '../types.ts'
+import type { AgentRunKind, Role, RunRequest } from '../types.ts'
 import { HttpError } from './httpError.ts'
 
 export interface ApplicationInput {
@@ -95,10 +95,16 @@ function isRunKind(value: unknown): value is AgentRunKind {
   return AGENT_RUN_KINDS.includes(value as AgentRunKind)
 }
 
-export function validateRunKind(body: unknown): AgentRunKind {
-  const { kind } = fieldsOf(body)
+function isPositiveInteger(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) > 0
+}
+
+export function validateRunRequest(body: unknown): RunRequest {
+  const { kind, adId } = fieldsOf(body)
   if (!isRunKind(kind)) {
     throw new HttpError(400, `kind must be one of: ${AGENT_RUN_KINDS.join(', ')}`)
   }
-  return kind
+  if (kind !== 'draft') return { kind }
+  if (!isPositiveInteger(adId)) throw new HttpError(400, 'adId must be a positive integer')
+  return { kind, adId }
 }

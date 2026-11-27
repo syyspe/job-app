@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 import { AdRow } from './AdRow'
 import type { AdActions } from './AdRow'
+import type { DraftStatus } from '../lib/adStates'
 import type { AdState, AdSummary } from '../types'
 
 function sampleAd(overrides: Partial<AdSummary> = {}): AdSummary {
@@ -31,16 +32,17 @@ function sampleAd(overrides: Partial<AdSummary> = {}): AdSummary {
   }
 }
 
-function renderRow(ad: AdSummary, handedOver = true) {
+function renderRow(ad: AdSummary, handedOver = true, draft: DraftStatus = 'none') {
   const actions: AdActions = {
     onHandOver: vi.fn().mockResolvedValue(handedOver),
     onRetry: vi.fn(),
+    onDraft: vi.fn(),
     onDismiss: vi.fn(),
     onFetch: vi.fn(),
   }
   render(
     <ul>
-      <AdRow ad={ad} actions={actions} />
+      <AdRow ad={ad} actions={actions} draft={draft} />
     </ul>,
   )
   return actions
@@ -230,4 +232,37 @@ test('the verdict and the click stay visible after the ad moves on', () => {
   )
 
   expect(screen.getByText('Pre-screen: Promising · Fetch requested')).toBeVisible()
+})
+
+const suitable = sampleAd({ state: 'suitable', sourceMode: 'automatic' })
+
+test('a ready suitable ad offers Draft before Dismiss, and clicking it calls onDraft', async () => {
+  const user = userEvent.setup()
+  const actions = renderRow(suitable, true, 'ready')
+
+  const buttons = screen.getAllByRole('button').map((button) => button.textContent)
+  expect(buttons).toEqual(['Draft', 'Dismiss'])
+  await user.click(screen.getByRole('button', { name: 'Draft' }))
+
+  expect(actions.onDraft).toHaveBeenCalledWith(7)
+})
+
+test('while another run is current, Draft is disabled', () => {
+  renderRow(suitable, true, 'busy')
+
+  expect(screen.getByRole('button', { name: 'Draft' })).toBeDisabled()
+})
+
+test('with draft none there is no Draft button', () => {
+  renderRow(suitable)
+
+  expect(screen.queryByRole('button', { name: 'Draft' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Dismiss' })).toBeVisible()
+})
+
+test('while its own draft runs, the row shows Drafting… and no buttons', () => {
+  renderRow(suitable, true, 'running')
+
+  expect(screen.getByText('Drafting…')).toBeVisible()
+  expect(screen.queryAllByRole('button')).toEqual([])
 })

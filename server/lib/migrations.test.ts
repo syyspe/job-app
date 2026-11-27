@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   migrateAdFetch,
+  migrateAgentRunsDraft,
   migrateApplicationArchived,
   migrateApplicationDates,
   migrateAttachmentEditedFrom,
@@ -281,4 +282,47 @@ test('deleting an original after the migration turns its copy into an original',
     edited_from: number | null
   }
   expect(copy.edited_from).toBeNull()
+})
+
+function createLegacyAgentRuns(): void {
+  db.exec(`
+    CREATE TABLE agent_runs (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind        TEXT NOT NULL CHECK (kind IN ('run', 'collect')),
+      started_by  INTEGER NOT NULL REFERENCES users(id),
+      started_at  TEXT NOT NULL,
+      finished_at TEXT,
+      exit_code   INTEGER,
+      output      TEXT NOT NULL DEFAULT ''
+    );
+    INSERT INTO agent_runs (id, kind, started_by, started_at, finished_at, exit_code, output)
+      VALUES (1, 'collect', 1, '2026-01-01 00:00:00', '2026-01-01 00:01:00', 0, 'collected 3');
+  `)
+}
+
+const INSERT_DRAFT_RUN = `INSERT INTO agent_runs (kind, ad_id, started_by, started_at)
+  VALUES ('draft', 1, 1, '2026-01-02 00:00:00')`
+
+test('migrating agent_runs keeps the old rows with no ad and accepts draft runs afterwards', () => {
+  createLegacyAgentRuns()
+  migrateAgentRunsDraft(db)
+
+  const run = db.prepare('SELECT * FROM agent_runs WHERE id = 1').get() as {
+    kind: string
+    output: string
+    exit_code: number
+    ad_id: number | null
+  }
+  expect(run).toMatchObject({ kind: 'collect', output: 'collected 3', exit_code: 0, ad_id: null })
+  expect(() => db.prepare(INSERT_DRAFT_RUN).run()).not.toThrow()
+})
+
+test('migrating agent_runs twice is a no-op the second time', () => {
+  createLegacyAgentRuns()
+  migrateAgentRunsDraft(db)
+  db.prepare(INSERT_DRAFT_RUN).run()
+
+  expect(() => migrateAgentRunsDraft(db)).not.toThrow()
+  const count = db.prepare('SELECT COUNT(*) AS n FROM agent_runs').get() as { n: number }
+  expect(count.n).toBe(2)
 })

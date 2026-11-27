@@ -1,11 +1,11 @@
 // @vitest-environment node
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { startFakeJobApp } from '../../test/fakeJobApp.ts'
 import type { FakeJobApp } from '../../test/fakeJobApp.ts'
 import { fakeAd } from '../../test/fakeJobAppAds.ts'
 import type { HealthResult } from '../../profile/lib/ollama.ts'
 import type { DraftOutcome } from './draft.ts'
-import { formatDraftReport, runDrafting } from './draftRun.ts'
+import { draftNamedAd, formatDraftReport } from './draftRun.ts'
 import { createJobAppClient } from './jobApp.ts'
 import type { Ad } from './jobApp.ts'
 
@@ -37,151 +37,85 @@ const written: DraftOutcome = {
 interface RunOverrides {
   health?: HealthResult
   write?: (ad: Ad) => Promise<DraftOutcome>
-  perRunCap?: number
-  concurrency?: number
-  canStart?: () => boolean
 }
 
-function run(overrides: RunOverrides = {}) {
+function run(adId: number, overrides: RunOverrides = {}) {
   const jobApp = createJobAppClient({ baseUrl: fake.url, username: fake.username, password: fake.password, envPath: 'env' })
-  const config = {
-    concurrency: overrides.concurrency ?? 1,
-    perRunCap: overrides.perRunCap ?? 3,
-    timeoutMs: 1000,
-    filePrefix: 'Tester',
-    cvTemplates: { fi: '/cv/fi.md', en: '/cv/en.md' },
-  }
-  return runDrafting({
-    jobApp,
-    config,
-    checkHealth: () => Promise.resolve(overrides.health ?? { ok: true }),
-    canStart: overrides.canStart,
-    write: overrides.write ?? (() => Promise.resolve(written)),
-    today: '2026-11-19',
-  })
+  const config = { timeoutMs: 1000, filePrefix: 'Tester', cvTemplates: { fi: '/cv/fi.md', en: '/cv/en.md' } }
+  return draftNamedAd(
+    {
+      jobApp,
+      config,
+      checkHealth: () => Promise.resolve(overrides.health ?? { ok: true }),
+      write: overrides.write ?? (() => Promise.resolve(written)),
+      today: '2026-11-19',
+    },
+    adId,
+  )
 }
 
 function suitableAds(...ids: number[]) {
   fake.ads.push(...ids.map((id) => fakeAd({ id, state: 'suitable', body: 'Ad text' })))
 }
 
-test('Ollama down: skipped, nothing moved', async () => {
+test('Ollama down throws skipped, and no ad is touched', async () => {
   suitableAds(1)
 
-  const report = await run({ health: { ok: false, reason: 'unreachable' } })
+  await expect(run(1, { health: { ok: false, reason: 'unreachable' } })).rejects.toThrow('drafting skipped: unreachable')
 
-  expect(report.skipped).toBe('unreachable')
   expect(fake.drafts).toEqual([])
   expect(fake.transitions).toEqual([])
 })
 
-test('a written draft is posted with its fields and files', async () => {
-  suitableAds(1)
+test('an ad that is not suitable throws, and is not touched', async () => {
+  fake.ads.push(fakeAd({ id: 1, state: 'drafted', body: 'Ad text' }))
+  const write = vi.fn(() => Promise.resolve(written))
 
-  const report = await run()
+  await expect(run(1, { write })).rejects.toThrow('ad 1 is drafted, not suitable')
 
-  expect(report.counts).toEqual({ drafted: 1, retrying: 0, failed: 0 })
-  expect(fake.drafts).toHaveLength(1)
-  expect(fake.drafts[0].fields).toMatchObject({ company: 'Example Oy', role: 'Developer 1', link: 'https://jobs.example/1' })
-  expect(Object.keys(fake.drafts[0].files)).toEqual(['coverLetter', 'cv', 'ad'])
-  expect(fake.ads[0].state).toBe('drafted')
+  expect(write).not.toHaveBeenCalled()
+  expect(fake.transitions).toEqual([])
 })
 
-test('the cap drafts the oldest ads and leaves the rest suitable', async () => {
-  suitableAds(1, 2, 3)
-
-  const report = await run({ perRunCap: 2 })
-
-  expect(report.queued).toBe(1)
-  expect(fake.ads.map((ad) => ad.state)).toEqual(['drafted', 'drafted', 'suitable'])
-})
-
-test('the concurrency limit is never exceeded', async () => {
-  suitableAds(1, 2, 3, 4)
-  let inFlight = 0
-  let peak = 0
-  async function write(): Promise<DraftOutcome> {
-    inFlight += 1
-    peak = Math.max(peak, inFlight)
-    await new Promise((resolve) => setTimeout(resolve, 20))
-    inFlight -= 1
-    return written
-  }
-
-  await run({ write, concurrency: 2, perRunCap: 4 })
-
-  expect(peak).toBe(2)
-})
-
-test('a failure records a same-state attempt, and the others still run', async () => {
+test('a written draft of the named ad is posted with its fields and files', async () => {
   suitableAds(1, 2)
-  const write = (ad: Ad): Promise<DraftOutcome> =>
-    Promise.resolve(ad.id === 1 ? { kind: 'failed', category: 'ask_mismatch' } : written)
 
-  const report = await run({ write })
+  const report = await run(2)
 
-  expect(fake.transitions).toEqual([{ id: 1, to: 'suitable', error: 'ask_mismatch' }])
-  expect(fake.ads[0]).toMatchObject({ state: 'suitable', attempts: 1 })
-  expect(fake.ads[1].state).toBe('drafted')
-  expect(report.counts).toEqual({ drafted: 1, retrying: 1, failed: 0 })
+  expect(report).toEqual({ result: 'drafted', adId: 2, applicationId: 101 })
+  expect(formatDraftReport(report)).toBe('drafted: ad 2 as application 101')
+  expect(fake.drafts).toHaveLength(1)
+  expect(fake.drafts[0].fields).toMatchObject({ company: 'Example Oy', role: 'Developer 2', link: 'https://jobs.example/2' })
+  expect(Object.keys(fake.drafts[0].files)).toEqual(['coverLetter', 'cv', 'ad'])
+  expect(fake.ads.map((ad) => ad.state)).toEqual(['suitable', 'drafted'])
 })
 
-test('the third failure is counted as failed', async () => {
+test('a failure records a same-state attempt and reports it retrying', async () => {
+  suitableAds(1)
+  const write = (): Promise<DraftOutcome> =>
+    Promise.resolve({ kind: 'failed', category: 'model_failed', detail: '500: overloaded' })
+
+  const report = await run(1, { write })
+
+  expect(fake.transitions).toEqual([{ id: 1, to: 'suitable', error: 'model_failed' }])
+  expect(fake.ads[0]).toMatchObject({ state: 'suitable', attempts: 1 })
+  expect(formatDraftReport(report)).toBe('drafting failed: Developer 1, testsource: model_failed — 500: overloaded (retrying)')
+})
+
+test('the third failure fails the ad and reports it failed', async () => {
   fake.ads.push(fakeAd({ id: 1, state: 'suitable', body: 'Ad text', attempts: 2 }))
 
-  const report = await run({ write: () => Promise.resolve({ kind: 'failed', category: 'timeout' }) })
+  const report = await run(1, { write: () => Promise.resolve({ kind: 'failed', category: 'timeout' }) })
 
-  expect(report.counts.failed).toBe(1)
+  expect(report.result).toBe('failed')
   expect(fake.ads[0].state).toBe('failed')
+  expect(formatDraftReport(report)).toBe('drafting failed: Developer 1, testsource: timeout (failed)')
 })
 
 test('no request ever touches the applications routes', async () => {
-  suitableAds(1, 2)
-  const write = (ad: Ad): Promise<DraftOutcome> =>
-    Promise.resolve(ad.id === 1 ? { kind: 'failed', category: 'model_failed' } : written)
-
-  await run({ write })
-
-  expect(fake.requests.filter((request) => request.includes('/api/applications'))).toEqual([])
-})
-
-test('once canStart turns false no further ad is drafted, and the rest stay queued with no attempt', async () => {
-  fake.ads.push(fakeAd({ id: 1, state: 'suitable' }), fakeAd({ id: 2, state: 'suitable' }))
-  const seen: number[] = []
-
-  const report = await run({ canStart: () => seen.length < 1, write: async (ad) => (seen.push(ad.id), written) })
-
-  expect(seen).toEqual([1])
-  expect(report.counts).toEqual({ drafted: 1, retrying: 0, failed: 0 })
-  expect(report.queued).toBe(1)
-  expect(fake.ads.map((ad) => [ad.state, ad.attempts])).toEqual([['drafted', 0], ['suitable', 0]])
-})
-
-test('every failed attempt is reported with its ad and detail, retrying or failed', async () => {
-  fake.ads.push(
-    fakeAd({ id: 1, state: 'suitable', body: 'Ad text', attempts: 2 }),
-    fakeAd({ id: 2, state: 'suitable', body: 'Ad text' }),
-  )
-  const write = (ad: Ad): Promise<DraftOutcome> =>
-    Promise.resolve(ad.id === 1 ? { kind: 'failed', category: 'model_failed', detail: '500: overloaded' } : written)
-
-  const report = await run({ write })
-
-  expect(report.failedAttempts).toEqual([
-    { adId: 1, title: 'Developer 1', source: 'testsource', category: 'model_failed', detail: '500: overloaded' },
-  ])
-  expect(formatDraftReport(report)).toEqual([
-    'drafted: 1 drafted, 0 retrying, 1 failed',
-    'queued: 0 suitable ads over the per-run cap',
-    'drafting failed: Developer 1, testsource: model_failed — 500: overloaded',
-  ])
-})
-
-test('a run with no failure reports no failed line', async () => {
   suitableAds(1)
 
-  const report = await run()
+  await run(1)
 
-  expect(report.failedAttempts).toEqual([])
-  expect(formatDraftReport(report)).toHaveLength(2)
+  expect(fake.requests.filter((request) => request.includes('/api/applications'))).toEqual([])
 })

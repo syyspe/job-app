@@ -2,11 +2,15 @@ import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeSync } from 
 import { join } from 'node:path'
 import { CliError } from '../../lib/cliError.ts'
 
-const RUN_SCRIPTS = ['agent/runner/commands/run.ts', 'agent/runner/commands/collect.ts']
+const RUN_SCRIPTS = [
+  'agent/runner/commands/run.ts',
+  'agent/runner/commands/collect.ts',
+  'agent/runner/commands/draft.ts',
+]
 
 // A pid alone isn't enough: after a reboot a stale lock's pid can belong to
-// an unrelated process. The holder counts only while it still runs agent:run
-// or agent:collect.
+// an unrelated process. The holder counts only while it still runs agent:run,
+// agent:collect or agent:draft.
 function isRun(pid: number): boolean {
   try {
     const args = readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')
@@ -35,9 +39,8 @@ function createLockFile(path: string): boolean {
   }
 }
 
-// One run at a time. A lock whose holder is no longer agent:run or
-// agent:collect is stale:
-// removed and taken once more.
+// One run at a time. A lock whose holder is no longer agent:run,
+// agent:collect or agent:draft is stale: removed and taken once more.
 export function acquireRunLock(stateDir: string): () => void {
   mkdirSync(stateDir, { recursive: true })
   const path = join(stateDir, 'run.lock')

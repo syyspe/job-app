@@ -1,16 +1,18 @@
 import { AdRow } from './AdRow.tsx'
 import type { AdActions } from './AdRow.tsx'
+import type { DraftStatus } from '../lib/adStates.ts'
 import type { AdSummary } from '../types.ts'
 
 interface AdListProps {
   ads: AdSummary[]
   stateLabel: string
   actions: AdActions
+  draftStatus: (ad: AdSummary) => DraftStatus
   /** The ad a summary link opened, marked as the current row. */
   currentId?: number
 }
 
-export function AdList({ ads, stateLabel, actions, currentId }: AdListProps) {
+export function AdList({ ads, stateLabel, actions, draftStatus, currentId }: AdListProps) {
   if (ads.length === 0) {
     return (
       <div className="empty-state">
@@ -23,7 +25,13 @@ export function AdList({ ads, stateLabel, actions, currentId }: AdListProps) {
   return (
     <ul className="ad-list">
       {ads.map((ad) => (
-        <AdRow key={ad.id} ad={ad} actions={actions} current={ad.id === currentId} />
+        <AdRow
+          key={ad.id}
+          ad={ad}
+          actions={actions}
+          draft={draftStatus(ad)}
+          current={ad.id === currentId}
+        />
       ))}
     </ul>
   )

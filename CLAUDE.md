@@ -44,9 +44,11 @@
   `~/.config/job-agent/env` — see README's "Engine" section.
   Both read `~/.config/job-agent/` and need the private prompt
   `prompts/evaluate.md` — see README's "Ad evaluation" section.
-  `npm run agent:draft` turns suitable ads into draft applications under the
-  same gate. It needs `prompts/draft.md` and config's `drafting` key — see
-  README's "Ad drafting" section.
+  `npm run agent:draft -- <ad id>` turns one suitable ad into a draft
+  application, always on `claude -p` whatever `engine` says, under
+  `run.lock`, and re-runs the sandbox check itself after a `claude` update.
+  The UI's Draft button spawns it. It needs `prompts/draft.md` and config's
+  `drafting` key — see README's "Ad drafting" section.
   `npm run agent:collect` reads the alert mailbox, ingests ads and screens
   their titles; it fetches no page and runs no `claude -p`, so no gate. It needs
   the `MAIL_*` keys in `~/.config/job-agent/env` and config's `sources` key —

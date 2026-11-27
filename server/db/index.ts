@@ -75,7 +75,8 @@ const SCHEMA = `
 
   CREATE TABLE IF NOT EXISTS agent_runs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind        TEXT NOT NULL CHECK (kind IN ('run', 'collect')),
+    kind        TEXT NOT NULL CHECK (kind IN ('run', 'collect', 'draft')),
+    ad_id       INTEGER REFERENCES ads(id) ON DELETE SET NULL,
     started_by  INTEGER NOT NULL REFERENCES users(id),
     started_at  TEXT NOT NULL,
     finished_at TEXT,

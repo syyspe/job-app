@@ -48,14 +48,17 @@ Presentational components, each with a test beside it. By surface:
   `UserList` and `UserRow`.
 - **Ad inbox** — `AdsView` (with its local `useAds` hook and the state filter)
   over `AdList`, `AdRow` and `AdHandoverForm`. `AdRow` offers Fetch on a
-  waiting hand-over ad and shows its pre-screen verdict. A summary email's
+  waiting hand-over ad and shows its pre-screen verdict. For users with
+  agent access, a suitable ad's row offers Draft; `AdsView` passes each row
+  its `DraftStatus` (`none`, `ready`, `busy` while another run is current,
+  `running` — `Drafting…` in place of the buttons — while its own is). A summary email's
   `#ad-<id>` link opens the inbox (`App` reads the hash once, so it outlives
   the in-page login); `AdsView`'s `focusAdId` selects that ad's state once
   the ads load, and its row is `aria-current` and scrolled into view. Above the filter,
-  for users with agent access only, `AgentRunPanel`: Run now and Check mail, the current
-  run's output (polled every 3 s while it runs) and the last ten runs, each
-  with its Claude API spend when its output ends with the `api:` line; a
-  run finishing refreshes the inbox.
+  for users with agent access only, `AgentRunPanel`, presentational over
+  `AdsView`'s `useAgentRuns`: Run now and Check mail, the current run's
+  output and the last ten runs, each with its Claude API spend when its
+  output ends with the `api:` line.
 - **Frame** — `NavBar`, which switches between the views and shows the Admin
   control to admins only; `ToastProvider` and `ToastHost`.
 
@@ -67,11 +70,15 @@ Presentational components, each with a test beside it. By surface:
 - `apiAction.ts` — `useApiAction(onUnauthorized)`, the `run` wrapper both
   data hooks share: it shows the success toast, and on `UnauthorizedError`
   shows the session-expired toast and calls `onUnauthorized`.
+- `useAgentRuns.ts` — `useAgentRuns({ enabled, onUnauthorized,
+  onRunFinished })`: the runs listing, polled every 3 s while a run is
+  current, and `start(request)`; a run finishing calls `onRunFinished`,
+  which refreshes the inbox. Disabled, it fetches nothing.
 - `agentRuns.ts` — `RUN_KIND_LABELS`, `runOutcome` (exit 0 succeeded,
   non-zero failed, none interrupted), `RUN_OUTCOME_LABELS`, and `runSpend`,
   which reads the last `api: $x run, $y month` line from a run's output.
-- `adStates.ts` — `AD_STATE_LABELS`, the filter's display order, and which
-  actions each ad state offers.
+- `adStates.ts` — `AD_STATE_LABELS`, the filter's display order, which
+  actions each ad state offers (`canDraft` for Draft), and `DraftStatus`.
 - `adLink.ts` — `adIdFromHash(hash)`: the ad id of a `#ad-<id>` hash, or null.
 - `paging.ts` — `paginate`, the pure one-page-at-a-time slice. The page size
   comes from `GET /api/config`; a null size means one page holding
@@ -120,7 +127,8 @@ row no longer has is a 409 that keeps the mark; and
 `questions.ts` (`GET /applications/:id/questions` and
 `POST /applications/:id/answers`, the draft's open questions),
 `agentRuns.ts` (`GET`/`POST /agent/runs`, agent access only: list the current and
-last ten runs, or start one, 409 while one is running), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
+last ten runs, or start one, 409 while one is running; a draft run names a
+`suitable` ad of the caller's, or is 404/409), `auth.ts` (`/login`, `/logout`, `/me`), `config.ts`
 (`/config`, the page size the client pages the list by) and `users.ts`
 (admin-only account management, including `PUT /users/:id/agent-access`).
 
@@ -168,7 +176,8 @@ Helpers with no Express dependency:
   `migrateApplicationArchived`, `migrateUserRole`, `migrateUserAgentAccess`,
   `migrateAttachmentUploadedAt`,
   `migrateAttachmentProfileSync`, `migrateAttachmentEditedFrom`,
-  `migrateAdFetch`) behind one `migrate`.
+  `migrateAdFetch`, and `migrateAgentRunsDraft`, which rebuilds
+  `agent_runs` because SQLite can't alter its CHECK) behind one `migrate`.
 - `seed.ts` — `createUser`; `seedUser`, which every run grants admin and
   agent access, so the seeded user is how an admin comes into being; and
   `migrateApplicationsToUser`, the table rebuild that gives a pre-auth
@@ -180,8 +189,10 @@ Helpers with no Express dependency:
   `parseLogLevel`, which does the same for `LOG_LEVEL`.
 - `logger.ts` — `createLogger`, the no-dependency JSON-lines logger.
 - `agentRunner.ts` — `createRunnerSpawner(spawn, root, env)`: the only place
-  the API spawns anything. `RUNNER_ARGS` is the constant argv per run kind,
-  `runnerEnv` the env allowlist, `REPO_ROOT` the default cwd.
+  the API spawns anything. `RUNNER_ARGS` is the constant argv per run kind
+  (`run`, `collect`, `draft`); a draft appends its validated ad id, the one
+  request value that reaches argv. `runnerEnv` is the env allowlist,
+  `REPO_ROOT` the default cwd.
 - `agentRuns.ts` — the `agent_runs` operations: `currentRun`, `recentRuns`,
   `startRun` (spawns, inserts the row, appends each stdout/stderr line
   capped to the last 64 KiB, and finishes it on `close`) and
@@ -202,7 +213,8 @@ Helpers with no Express dependency:
 
 - `db/index.ts` — `openDatabase`: connection plus schema. `attachments.profile_sync`
   (0/1) is the "Add to profile" mark the runner clears. `agent_runs` holds the
-  runs started from the UI; it isn't scoped by user.
+  runs started from the UI, with `ad_id` set for a draft run; it isn't
+  scoped by user.
 - `seed.ts` — the `npm run seed` CLI entry point.
 - `test/auth.ts` — `loginAs`, a test helper that logs in and returns a cookie
   header string for route tests to pass by hand.
@@ -310,9 +322,11 @@ summary. `commands/sandboxCheck.ts` is `npm run agent:sandbox-check`: it runs
 the probes, prints pass or fail per property and records the CLI version only
 when all pass. `commands/evaluate.ts` is `npm run agent:evaluate`: config,
 runner config, private prompt and env, then the version gate, then
-`runEvaluation`. `commands/draft.ts` is `npm run agent:draft`: config, the
-`drafting` key, the private prompt and both CV templates, env, the version
-gate, then `runDrafting`. `commands/collect.ts` is `npm run agent:collect`:
+`runEvaluation`. `commands/draft.ts` is `npm run agent:draft -- <ad id>`:
+the id, then config, the `drafting` key, the private prompt and both CV
+templates and env, then `run.lock`, then `ensureSandboxVerified` (the
+probes, if the installed `claude` hasn't passed), then `draftNamedAd`. Its
+step is always `cliStep`, whatever `engine` says. `commands/collect.ts` is `npm run agent:collect`:
 the `sources` key, runner config and the mail and job-app env, then
 `openMailbox` and `runCollect`, closing the mailbox whatever happens. It runs
 no `claude -p`, so it has no version gate. `commands/run.ts` is
@@ -360,7 +374,9 @@ criteria that follow it. `prompts/draft.framing.md` and
 - `mapLimit.ts` — `mapLimit(items, {limit, canStart}, fn)`, order-keeping
   bounded concurrency for the runs; once `canStart` is false no further item
   starts, and only the started items are returned.
-- `engine.ts` — `createEngine(config, deps)` and `loadEngine(env, profile)`:
+- `engine.ts` — `cliStep(env, spec)`, a sandboxed `claude -p` step, which
+  drafting uses directly; `createEngine(config, deps)` and
+  `loadEngine(env, profile)` for the pre-screen and evaluation:
   `stepFor(spec)` gives a step's `RunStep`, a sandboxed `claude -p` under
   `"cli"` (with the `UNLIMITED` budget) or the API step under `"api"` (with a
   run budget charging `<stateDir>/api-spend.json`). It builds objects only,
@@ -398,7 +414,7 @@ criteria that follow it. `prompts/draft.framing.md` and
   the spend ledger reuses.
 - `lock.ts` — `acquireRunLock(stateDir)` → `release`: `run.lock` created
   exclusively with the pid; a holder whose `/proc/<pid>/cmdline` still names
-  `agent/runner/commands/run.ts` or `collect.ts` is `CliError(1, …)`; any other holder (gone,
+  `agent/runner/commands/run.ts`, `collect.ts` or `draft.ts` is `CliError(1, …)`; any other holder (gone,
   reused by an unrelated process, or unreadable) is removed and the lock
   taken once more.
 - `handoverExpiry.ts` — `handoverExpired(ad, { waitDays, now })` (UTC
@@ -496,9 +512,10 @@ criteria that follow it. `prompts/draft.framing.md` and
   and both CV templates as JSON on stdin, the output checked again.
 - `draftApplication.ts` — `buildDraft(ad, output, naming)`: company and role
   fallbacks, `notes`, the file names (`fileComponent`) and the saved ad.
-- `draftRun.ts` — `runDrafting`: check Ollama, then draft the oldest
-  `perRunCap` suitable ads through `mapLimit`; a failure is a same-state
-  transition with its category.
+- `draftRun.ts` — `draftNamedAd(options, adId)`: check Ollama, read the ad
+  and require `suitable` (either refusal is `CliError(1, …)`, touching no
+  ad), then draft it; a failure is a same-state transition with its
+  category. `formatDraftReport` is the one result line.
 - `sync.ts` — `syncProfile({ jobApp, config, store, ollama })`: copies the
   marked attachments into `syncFolder` as `<id>-<safe name>`, rebuilds the
   index, then clears each mark with the `storedName` it listed, so a file

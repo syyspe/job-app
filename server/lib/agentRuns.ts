@@ -3,7 +3,7 @@ import type { Readable } from 'node:stream'
 import { createInterface } from 'node:readline'
 import { toAgentRun } from '../models/agentRun.ts'
 import type { AgentRunRow } from '../models/agentRun.ts'
-import type { AgentRun, AgentRunKind } from '../types.ts'
+import type { AgentRun, RunRequest } from '../types.ts'
 import type { RunnerSpawner } from './agentRunner.ts'
 import type { Logger } from './logger.ts'
 
@@ -12,7 +12,7 @@ const OUTPUT_CAP = 65536
 const RECENT_LIMIT = 10
 
 export interface StartRun {
-  kind: AgentRunKind
+  request: RunRequest
   userId: number
   runner: RunnerSpawner
   log: Logger
@@ -43,10 +43,14 @@ function finishRun(db: Database.Database, id: number, exitCode: number | null): 
   db.prepare('UPDATE agent_runs SET finished_at = ?, exit_code = ? WHERE id = ?').run(new Date().toISOString(), exitCode, id)
 }
 
-function insertRun(db: Database.Database, kind: AgentRunKind, userId: number): number {
+function adIdOf(request: RunRequest): number | null {
+  return request.kind === 'draft' ? request.adId : null
+}
+
+function insertRun(db: Database.Database, request: RunRequest, userId: number): number {
   const result = db
-    .prepare('INSERT INTO agent_runs (kind, started_by, started_at) VALUES (?, ?, ?)')
-    .run(kind, userId, new Date().toISOString())
+    .prepare('INSERT INTO agent_runs (kind, ad_id, started_by, started_at) VALUES (?, ?, ?, ?)')
+    .run(request.kind, adIdOf(request), userId, new Date().toISOString())
   return Number(result.lastInsertRowid)
 }
 
@@ -54,13 +58,14 @@ function appendLines(db: Database.Database, id: number, stream: Readable): void 
   createInterface({ input: stream }).on('line', (line) => appendLine(db, id, line))
 }
 
-export function startRun(db: Database.Database, { kind, userId, runner, log }: StartRun): AgentRun {
+export function startRun(db: Database.Database, { request, userId, runner, log }: StartRun): AgentRun {
   // Spawned before the insert, so a spawn that throws leaves no open row. Its
   // events fire no earlier than the next tick, after the listeners below.
-  const child = runner(kind)
-  const id = insertRun(db, kind, userId)
+  const child = runner(request)
+  const id = insertRun(db, request, userId)
   const startedMs = Date.now()
-  log.info('agent run started', { runId: id, kind, startedBy: userId })
+  const fields = { runId: id, kind: request.kind, adId: adIdOf(request) }
+  log.info('agent run started', { ...fields, startedBy: userId })
   appendLines(db, id, child.stdout as Readable)
   appendLines(db, id, child.stderr as Readable)
   // A child that never started still closes, with a negative errno as its code.
@@ -72,7 +77,7 @@ export function startRun(db: Database.Database, { kind, userId, runner, log }: S
   child.on('close', (code: number | null) => {
     const exitCode = started ? code : null
     finishRun(db, id, exitCode)
-    log.info('agent run finished', { runId: id, kind, exitCode, durationMs: Date.now() - startedMs })
+    log.info('agent run finished', { ...fields, exitCode, durationMs: Date.now() - startedMs })
   })
   return runById(db, id)
 }

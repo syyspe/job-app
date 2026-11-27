@@ -1,7 +1,6 @@
 import type {
   AdHandoverInput,
   AgentRun,
-  AgentRunKind,
   AgentRuns,
   AdState,
   AdSummary,
@@ -11,6 +10,7 @@ import type {
   Attachment,
   OpenQuestion,
   Role,
+  RunRequest,
   User,
   UserInput,
 } from '../types.ts'
@@ -265,12 +265,12 @@ export async function listAgentRuns(): Promise<AgentRuns> {
   return parseJson(response)
 }
 
-export async function startAgentRun(kind: AgentRunKind): Promise<AgentRun> {
+export async function startAgentRun(request: RunRequest): Promise<AgentRun> {
   const response = await fetch('/api/agent/runs', {
     method: 'POST',
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kind }),
+    body: JSON.stringify(request),
   })
   return parseJson(response)
 }

@@ -119,7 +119,8 @@
 }
 
 .ad-prescreen,
-.ad-fetch-requested {
+.ad-fetch-requested,
+.ad-drafting {
   font-size: var(--fs-sm);
   color: var(--ink-muted);
 }

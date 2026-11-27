@@ -23,7 +23,7 @@ function recordingSpawn(): { spawn: SpawnFn; calls: SpawnCall[] } {
 test.each(['run', 'collect'] as const)('a %s spawns node on its fixed script', (kind) => {
   const { spawn, calls } = recordingSpawn()
 
-  createRunnerSpawner(spawn, '/repo', {})(kind)
+  createRunnerSpawner(spawn, '/repo', {})({ kind })
 
   expect(calls).toHaveLength(1)
   expect(calls[0].command).toBe(process.execPath)
@@ -33,9 +33,18 @@ test.each(['run', 'collect'] as const)('a %s spawns node on its fixed script', (
 test('the child runs in the given root, without a shell, stdout and stderr piped', () => {
   const { spawn, calls } = recordingSpawn()
 
-  createRunnerSpawner(spawn, '/repo', {})('run')
+  createRunnerSpawner(spawn, '/repo', {})({ kind: 'run' })
 
   expect(calls[0].options).toMatchObject({ cwd: '/repo', shell: false, stdio: ['ignore', 'pipe', 'pipe'] })
+})
+
+test('a draft spawns its fixed script with the ad id as the one argument, without a shell', () => {
+  const { spawn, calls } = recordingSpawn()
+
+  createRunnerSpawner(spawn, '/repo', {})({ kind: 'draft', adId: 42 })
+
+  expect(calls[0].args).toEqual(['agent/runner/commands/draft.ts', '42'])
+  expect(calls[0].options.shell).toBe(false)
 })
 
 test('the child env carries only the allowlisted variables that are set', () => {
@@ -55,7 +64,7 @@ test('the child env carries only the allowlisted variables that are set', () => 
 test('the spawner passes the allowlisted env to the child', () => {
   const { spawn, calls } = recordingSpawn()
 
-  createRunnerSpawner(spawn, '/repo', { PATH: '/bin', DB_PATH: '/data/app.db' })('collect')
+  createRunnerSpawner(spawn, '/repo', { PATH: '/bin', DB_PATH: '/data/app.db' })({ kind: 'collect' })
 
   expect(calls[0].options.env).toEqual({ PATH: '/bin' })
 })
