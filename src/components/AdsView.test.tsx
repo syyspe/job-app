@@ -32,6 +32,8 @@ function sampleAd(overrides: Partial<AdSummary>): AdSummary {
 }
 
 const waiting = sampleAd({})
+const kept = sampleAd({ id: 3, title: 'Kept ad', state: 'suitable', sourceMode: 'automatic' })
+const otherKept = sampleAd({ id: 4, title: 'Other kept ad', state: 'suitable', sourceMode: 'automatic' })
 const failed = sampleAd({
   id: 2,
   title: 'Failed ad',
@@ -39,6 +41,7 @@ const failed = sampleAd({
   sourceMode: 'automatic',
   lastError: 'gone',
 })
+const otherFailed = sampleAd({ id: 5, title: 'Other failed ad', state: 'failed', sourceMode: 'automatic' })
 
 function stubFetch(handler: (url: string, init?: RequestInit) => Response) {
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
@@ -69,55 +72,60 @@ afterEach(() => {
   scrolled.mockClear()
 })
 
-test('opens on the ads waiting for a hand-over', async () => {
-  stubAds([waiting, failed])
+test('opens on the kept ads', async () => {
+  stubAds([kept, failed, waiting])
   renderView()
 
-  expect(await screen.findByText('Waiting ad')).toBeVisible()
+  expect(await screen.findByText('Kept ad')).toBeVisible()
   expect(screen.queryByText('Failed ad')).not.toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Awaiting hand-over 1' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  )
+  expect(screen.queryByText('Waiting ad')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Kept 1' })).toHaveAttribute('aria-pressed', 'true')
 })
 
-test('a linked ad selects its state and is the current, scrolled-to row', async () => {
-  const suitable = sampleAd({ id: 3, title: 'Kept ad', state: 'suitable', sourceMode: 'automatic' })
-  const other = sampleAd({ id: 4, title: 'Other kept ad', state: 'suitable', sourceMode: 'automatic' })
-  stubAds([waiting, suitable, other])
-  renderView(vi.fn(), false, 3)
+test('a linked ad selects its group and is the current, scrolled-to row', async () => {
+  stubAds([kept, failed, otherFailed])
+  renderView(vi.fn(), false, 2)
 
   const row = await screen.findByRole('listitem', { current: true })
-  expect(within(row).getByText('Kept ad')).toBeVisible()
+  expect(within(row).getByText('Failed ad')).toBeVisible()
   expect(screen.getAllByRole('listitem')).toHaveLength(2)
-  expect(screen.getByRole('button', { name: /^Suitable/ })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.getByRole('button', { name: 'Failed 2' })).toHaveAttribute('aria-pressed', 'true')
   expect(scrolled).toHaveBeenCalledTimes(1)
 })
 
-test('the linked state is chosen once; the user can still change the filter', async () => {
+test('the linked group is chosen once; the user can still change the filter', async () => {
   const user = userEvent.setup()
-  stubAds([waiting, sampleAd({ id: 3, title: 'Kept ad', state: 'suitable', sourceMode: 'automatic' })])
-  renderView(vi.fn(), false, 3)
-  await screen.findByText('Kept ad')
+  stubAds([kept, failed])
+  renderView(vi.fn(), false, 2)
+  await screen.findByText('Failed ad')
 
-  await user.click(screen.getByRole('button', { name: 'Awaiting hand-over 1' }))
+  await user.click(screen.getByRole('button', { name: 'Kept 1' }))
 
-  expect(await screen.findByText('Waiting ad')).toBeVisible()
+  expect(await screen.findByText('Kept ad')).toBeVisible()
   expect(screen.queryByRole('listitem', { current: true })).not.toBeInTheDocument()
 })
 
-test('a link to an ad that is not listed leaves the default state', async () => {
-  stubAds([waiting])
+test('a link to an ad that is not loaded leaves the default group', async () => {
+  stubAds([kept])
   renderView(vi.fn(), false, 99)
 
-  expect(await screen.findByText('Waiting ad')).toBeVisible()
+  expect(await screen.findByText('Kept ad')).toBeVisible()
   expect(screen.queryByRole('listitem', { current: true })).not.toBeInTheDocument()
+})
+
+test('a link to an ad still in progress leaves Kept selected', async () => {
+  stubAds([kept, waiting])
+  renderView(vi.fn(), false, 1)
+
+  expect(await screen.findByText('Kept ad')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Kept 1' })).toHaveAttribute('aria-pressed', 'true')
+  expect(screen.queryByText('Waiting ad')).not.toBeInTheDocument()
 })
 
 test('a user without agent access sees no run panel', async () => {
-  stubAds([waiting])
+  stubAds([kept])
   renderView()
-  await screen.findByText('Waiting ad')
+  await screen.findByText('Kept ad')
 
   expect(screen.queryByRole('region', { name: 'Runs' })).not.toBeInTheDocument()
 })
@@ -126,7 +134,7 @@ test('a user with agent access sees the run panel above the filter', async () =>
   stubFetch((url) =>
     url === '/api/agent/runs'
       ? new Response(JSON.stringify({ current: null, recent: [] }), { status: 200 })
-      : new Response(JSON.stringify([waiting]), { status: 200 }),
+      : new Response(JSON.stringify([kept]), { status: 200 }),
   )
   renderView(vi.fn(), true)
 
@@ -136,55 +144,58 @@ test('a user with agent access sees the run panel above the filter', async () =>
   expect(panel.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
-test('orders the state filters by urgency', async () => {
+test('orders the group filters by urgency', async () => {
   stubAds([])
   renderView()
-  await screen.findByText('No ads in Awaiting hand-over')
+  await screen.findByText('No ads in Kept')
 
   const filters = within(screen.getByRole('group', { name: 'Filter ads by state' }))
     .getAllByRole('button')
     .map((button) => button.textContent)
-  expect(filters).toEqual([
-    'Awaiting hand-over 0',
-    'Failed 0',
-    'Suitable 0',
-    'Ready 0',
-    'New 0',
-    'Drafted 0',
-    'Title rejected 0',
-    'Unsuitable 0',
-  ])
+  expect(filters).toEqual(['Kept 0', 'Failed 0', 'Drafted 0', 'Set aside 0'])
 })
 
-test('dismissed and duplicate ads are never listed', async () => {
+test('an ad the pre-screen dismissed counts under Set aside', async () => {
+  const user = userEvent.setup()
+  const prescreen = { verdict: 'not_promising', reason: 'Mainly sales.' } as const
+  stubAds([sampleAd({ id: 6, title: 'Sales ad', state: 'dismissed', prescreen })])
+  renderView()
+  await screen.findByText('No ads in Kept')
+
+  await user.click(screen.getByRole('button', { name: 'Set aside 1' }))
+
+  expect(screen.getByText('Sales ad')).toBeVisible()
+})
+
+test('in-progress, dismissed and duplicate ads are never listed', async () => {
   const user = userEvent.setup()
   stubAds([
-    sampleAd({ id: 3, title: 'Dismissed ad', state: 'dismissed' }),
-    sampleAd({ id: 4, title: 'Duplicate ad', state: 'duplicate', duplicateOf: 1 }),
+    waiting,
+    sampleAd({ id: 6, title: 'New ad', state: 'new' }),
+    sampleAd({ id: 7, title: 'Ready ad', state: 'ready' }),
+    sampleAd({ id: 8, title: 'Dismissed ad', state: 'dismissed' }),
+    sampleAd({ id: 9, title: 'Duplicate ad', state: 'duplicate', duplicateOf: 1 }),
   ])
   renderView()
-  await screen.findByText('No ads in Awaiting hand-over')
+  await screen.findByText('No ads in Kept')
 
   const group = within(screen.getByRole('group', { name: 'Filter ads by state' }))
-  expect(group.queryByRole('button', { name: /^Dismissed/ })).not.toBeInTheDocument()
-  expect(group.queryByRole('button', { name: /^Duplicate/ })).not.toBeInTheDocument()
   for (const button of group.getAllByRole('button')) {
     await user.click(button)
-    expect(screen.queryByText('Dismissed ad')).not.toBeInTheDocument()
-    expect(screen.queryByText('Duplicate ad')).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('listitem')).toEqual([])
   }
 })
 
-test('a state filter shows that state', async () => {
+test('a group filter shows that group', async () => {
   const user = userEvent.setup()
-  stubAds([waiting, failed])
+  stubAds([kept, failed])
   renderView()
-  await screen.findByText('Waiting ad')
+  await screen.findByText('Kept ad')
 
   await user.click(screen.getByRole('button', { name: 'Failed 1' }))
 
   expect(screen.getByText('Failed ad')).toBeVisible()
-  expect(screen.queryByText('Waiting ad')).not.toBeInTheDocument()
+  expect(screen.queryByText('Kept ad')).not.toBeInTheDocument()
 })
 
 test('retrying posts the target for the ad mode and reloads', async () => {
@@ -210,51 +221,17 @@ test('retrying posts the target for the ad mode and reloads', async () => {
 
 test('dismissing posts the transition', async () => {
   const user = userEvent.setup()
-  const fetchMock = stubAds([waiting])
+  const fetchMock = stubAds([kept])
   renderView()
-  await screen.findByText('Waiting ad')
+  await screen.findByText('Kept ad')
 
   await user.click(screen.getByRole('button', { name: 'Dismiss' }))
   await user.click(screen.getByRole('button', { name: 'Confirm dismiss' }))
 
   await waitFor(() =>
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/ads/1/transition',
+      '/api/ads/3/transition',
       expect.objectContaining({ body: JSON.stringify({ to: 'dismissed' }) }),
-    ),
-  )
-})
-
-test('Fetch posts the request and confirms it', async () => {
-  const user = userEvent.setup()
-  const fetchMock = stubAds([waiting])
-  renderView()
-  await screen.findByText('Waiting ad')
-
-  await user.click(screen.getByRole('button', { name: 'Fetch' }))
-
-  await waitFor(() =>
-    expect(fetchMock).toHaveBeenCalledWith('/api/ads/1/fetch-request', expect.objectContaining({ method: 'POST' })),
-  )
-  expect(await screen.findByText('Fetch requested')).toBeVisible()
-})
-
-test('handing over posts the text', async () => {
-  const user = userEvent.setup()
-  const fetchMock = stubAds([waiting])
-  renderView()
-  await screen.findByText('Waiting ad')
-
-  await user.click(screen.getByRole('button', { name: 'Hand over' }))
-  await user.type(screen.getByRole('textbox', { name: 'Ad text' }), 'The full ad.')
-  await user.click(screen.getByRole('button', { name: 'Hand over ad' }))
-
-  await waitFor(() =>
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/ads/1/handover',
-      expect.objectContaining({
-        body: JSON.stringify({ text: 'The full ad.', title: 'Waiting ad', company: 'Acme' }),
-      }),
     ),
   )
 })
@@ -264,10 +241,10 @@ test('a refused change shows the error from the API', async () => {
   stubFetch((_url, init) =>
     init?.method === 'POST'
       ? new Response(JSON.stringify({ error: 'an ad cannot move' }), { status: 409 })
-      : new Response(JSON.stringify([waiting]), { status: 200 }),
+      : new Response(JSON.stringify([kept]), { status: 200 }),
   )
   renderView()
-  await screen.findByText('Waiting ad')
+  await screen.findByText('Kept ad')
 
   await user.click(screen.getByRole('button', { name: 'Dismiss' }))
   await user.click(screen.getByRole('button', { name: 'Confirm dismiss' }))
@@ -282,9 +259,6 @@ test('an expired session calls onUnauthorized', async () => {
 
   await waitFor(() => expect(onUnauthorized).toHaveBeenCalled())
 })
-
-const kept = sampleAd({ id: 3, title: 'Kept ad', state: 'suitable', sourceMode: 'automatic' })
-const otherKept = sampleAd({ id: 4, title: 'Other kept ad', state: 'suitable', sourceMode: 'automatic' })
 
 const draftRun: AgentRun = {
   id: 9,

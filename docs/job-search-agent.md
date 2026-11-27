@@ -379,6 +379,22 @@ Allowed transitions; the server answers anything else with 409:
 `drafted` is reached only through `POST /api/ads/:id/draft`. The transition
 route answers 409 for it, so no ad is marked drafted without an application.
 
+The inbox doesn't list these states one by one (059). It groups them under
+the summary email's words, on the client only:
+
+| Group | Stored states | Row actions |
+|---|---|---|
+| Kept | `suitable` | Draft, Dismiss |
+| Failed | `failed` | Retry, Dismiss |
+| Drafted | `drafted` | — |
+| Set aside | `title_rejected`, `unsuitable`, `dismissed` with a `not_promising` pre-screen | — |
+
+`new`, `awaiting_handover` and `ready` are in progress, and `duplicate` and
+any other `dismissed` ad are closed; the inbox lists neither. A set-aside
+row says which step dropped it: the title rules, the pre-screen (with its
+reason) or the evaluation (with its fit summary). The API, the MCP tools
+and the runner keep the stored states.
+
 What a transition must carry:
 
 - **`failed`** requires `error`, so `gone` and other direct failures always
@@ -802,7 +818,8 @@ and the agent's pre-screen of each ad.
 - With `sources.duunitori.fetch: "automatic"`, the run also fetches the ads
   the pre-screen calls promising. Since 057 `"automatic"` is the default and
   the user's config sets it for Duunitori: the pre-screen had proven itself.
-- The inbox shows each verdict next to whether the user clicked Fetch.
+- A set-aside ad's inbox row says the pre-screen dropped it, with the
+  verdict's reason (059).
 
 **Retention.** Entering `dismissed`, `unsuitable`, `duplicate`, `failed` or
 `title_rejected` clears `body`. Title, company and the pre-screen reason are
@@ -814,4 +831,6 @@ became an application, whose saved ad is the user's own record.
 
 **Rollback.** `sources.duunitori.fetch: "requested"` stops automatic
 fetching; the pre-screen and its set-aside listing still run, and only
-clicked ads are fetched. Disabling the source stops all of it.
+requested ads are fetched. Since 059 the inbox has no Fetch or Hand over
+button, so under the rollback the user hands an ad over through MCP's
+`handover_ad`. Disabling the source stops all of it.

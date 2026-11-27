@@ -20,7 +20,7 @@ async function ingestAd(page: Page, sourceMode: string): Promise<{ id: number; t
   return { id, title }
 }
 
-async function moveAd(page: Page, id: number, data: Record<string, string>): Promise<void> {
+async function moveAd(page: Page, id: number, data: Record<string, unknown>): Promise<void> {
   const response = await page.request.post(`/api/ads/${id}/transition`, { data })
   expect(response.status()).toBe(200)
 }
@@ -30,7 +30,7 @@ async function openInbox(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Ad inbox' })).toBeVisible()
 }
 
-async function showState(page: Page, label: string): Promise<void> {
+async function showGroup(page: Page, label: string): Promise<void> {
   await page
     .getByRole('group', { name: 'Filter ads by state' })
     .getByRole('button', { name: new RegExp(`^${label} \\d+$`) })
@@ -41,29 +41,22 @@ function adRow(page: Page, title: string): Locator {
   return page.getByRole('listitem').filter({ hasText: title })
 }
 
-test('an ad waiting for its text is handed over and becomes ready', async ({ page }) => {
-  await logIn(page)
-  const { id, title } = await ingestAd(page, 'handover')
-  await moveAd(page, id, { to: 'awaiting_handover' })
-
-  await openInbox(page)
-  const row = adRow(page, title)
-  await row.getByRole('button', { name: 'Hand over', exact: true }).click()
-  await row.getByRole('textbox', { name: 'Ad text' }).fill('The full text of the ad.')
-  await row.getByRole('button', { name: 'Hand over ad' }).click()
-
-  await expect(row).toHaveCount(0)
-  await showState(page, 'Ready')
-  await expect(adRow(page, title)).toBeVisible()
-})
+// Ingested, fetched and evaluated as a kept ad, the way a daily run leaves it.
+async function keptAd(page: Page): Promise<{ id: number; title: string }> {
+  const ad = await ingestAd(page, 'automatic')
+  await moveAd(page, ad.id, { to: 'ready', body: 'The full text of the ad.' })
+  const evaluation = { verdict: 'suitable', fitSummary: 'Strong match.', reasons: [] }
+  await moveAd(page, ad.id, { to: 'suitable', evaluation })
+  return ad
+}
 
 test('dismissing an ad takes a confirmation and hides it from the inbox', async ({ page }) => {
   await logIn(page)
-  const { id, title } = await ingestAd(page, 'automatic')
-  await moveAd(page, id, { to: 'awaiting_handover' })
+  const { id, title } = await keptAd(page)
 
   await openInbox(page)
   const row = adRow(page, title)
+  await expect(row.getByText('Strong match.')).toBeVisible()
   await row.getByRole('button', { name: 'Dismiss' }).click()
   await row.getByRole('button', { name: 'Confirm dismiss' }).click()
 
@@ -84,12 +77,26 @@ test('retrying a failed ad sends it back to new', async ({ page }) => {
   await moveAd(page, id, { to: 'failed', error: 'fetch_failed' })
 
   await openInbox(page)
-  await showState(page, 'Failed')
+  await showGroup(page, 'Failed')
   const row = adRow(page, title)
   await expect(row.getByText('Failed with fetch_failed')).toBeVisible()
   await row.getByRole('button', { name: 'Retry' }).click()
 
   await expect(row).toHaveCount(0)
-  await showState(page, 'New')
-  await expect(adRow(page, title)).toBeVisible()
+  const response = await page.request.get('/api/ads')
+  const ads = (await response.json()) as { id: number; state: string }[]
+  expect(ads.find((ad) => ad.id === id)?.state).toBe('new')
+})
+
+test('an ad the title rules dropped shows under Set aside, saying so, with no buttons', async ({ page }) => {
+  await logIn(page)
+  const { id, title } = await ingestAd(page, 'automatic')
+  await moveAd(page, id, { to: 'title_rejected' })
+
+  await openInbox(page)
+  await showGroup(page, 'Set aside')
+  const row = adRow(page, title)
+  await expect(row.getByText('Set aside by the title rules.')).toBeVisible()
+  await expect(row.getByRole('link', { name: 'Open ad' })).toBeVisible()
+  await expect(row.getByRole('button')).toHaveCount(0)
 })

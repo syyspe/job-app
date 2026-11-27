@@ -1,5 +1,4 @@
 import type {
-  AdHandoverInput,
   AgentRun,
   AgentRuns,
   AdState,
@@ -237,25 +236,6 @@ export async function transitionAd(id: number, to: AdState): Promise<AdSummary> 
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ to }),
-  })
-  return parseJson(response)
-}
-
-export async function handoverAd(id: number, input: AdHandoverInput): Promise<AdSummary> {
-  const response = await fetch(`/api/ads/${id}/handover`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  })
-  return parseJson(response)
-}
-
-/** Marks the ad for the next daily run to fetch; the ad stays awaiting hand-over. */
-export async function requestFetch(id: number): Promise<AdSummary> {
-  const response = await fetch(`/api/ads/${id}/fetch-request`, {
-    method: 'POST',
-    credentials: 'same-origin',
   })
   return parseJson(response)
 }

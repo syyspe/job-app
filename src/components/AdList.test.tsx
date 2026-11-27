@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vitest'
 import { AdList } from './AdList'
 import type { AdSummary } from '../types'
 
-const actions = { onHandOver: vi.fn(), onFetch: vi.fn(), onRetry: vi.fn(), onDraft: vi.fn(), onDismiss: vi.fn() }
+const actions = { onRetry: vi.fn(), onDraft: vi.fn(), onDismiss: vi.fn() }
 const draftStatus = () => 'none' as const
 
 const ad: AdSummary = {
@@ -30,15 +30,15 @@ const ad: AdSummary = {
 }
 
 test('renders a row per ad', () => {
-  render(<AdList ads={[ad]} stateLabel="Failed" actions={actions} draftStatus={draftStatus} />)
+  render(<AdList ads={[ad]} groupLabel="Failed" actions={actions} draftStatus={draftStatus} />)
 
   expect(screen.getAllByRole('listitem')).toHaveLength(1)
   expect(screen.getByText('Test Lead')).toBeVisible()
 })
 
-test('says so when the state holds no ads', () => {
-  render(<AdList ads={[]} stateLabel="Failed" actions={actions} draftStatus={draftStatus} />)
+test('says so when the group holds no ads', () => {
+  render(<AdList ads={[]} groupLabel="Kept" actions={actions} draftStatus={draftStatus} />)
 
-  expect(screen.getByText('No ads in Failed')).toBeVisible()
+  expect(screen.getByText('No ads in Kept')).toBeVisible()
   expect(screen.queryByRole('list')).not.toBeInTheDocument()
 })

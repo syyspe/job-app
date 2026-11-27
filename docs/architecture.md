@@ -26,7 +26,7 @@ The CSS splits by scope, and a value belongs to exactly one file:
 | `App.css` | The app frame — nav, `main`, the layout grid, panels, forms, the sort bar, toasts |
 | `applications.css` | The list surface — rows, the status spine, the chip, detail, attachments, empty state, the pager |
 | `admin.css` | The admin surface — user rows, the role spine and control, the confirm clusters |
-| `ads.css` | The ad inbox surface — the run panel and its run rows, the state filter, ad rows and their spine, the hand-over form |
+| `ads.css` | The ad inbox surface — the run panel and its run rows, the group filter, ad rows and their spine |
 
 New rules read tokens from `index.css` rather than inventing values.
 
@@ -46,15 +46,18 @@ Presentational components, each with a test beside it. By surface:
   edited copy says "Original, kept unchanged" instead.
 - **Admin** — `AdminView` (with its local `useUsers` hook) plus `UserForm`,
   `UserList` and `UserRow`.
-- **Ad inbox** — `AdsView` (with its local `useAds` hook and the state filter)
-  over `AdList`, `AdRow` and `AdHandoverForm`. `AdRow` offers Fetch on a
-  waiting hand-over ad and shows its pre-screen verdict. For users with
+- **Ad inbox** — `AdsView` (with its local `useAds` hook and the group filter)
+  over `AdList` and `AdRow`. The filter lists four groups of the stored
+  states (Kept, Failed, Drafted, Set aside; see `adStates.ts`), and ads in
+  progress or closed belong to none and aren't listed. A kept row offers
+  Draft and Dismiss, a failed one Retry and Dismiss; a set-aside row says
+  which step dropped it and why, and offers no buttons. For users with
   agent access, a suitable ad's row offers Draft; `AdsView` passes each row
   its `DraftStatus` (`none`, `ready`, `busy` while another run is current,
   `running` — `Drafting…` in place of the buttons — while its own is). A summary email's
   `#ad-<id>` link opens the inbox (`App` reads the hash once, so it outlives
-  the in-page login); `AdsView`'s `focusAdId` selects that ad's state once
-  the ads load, and its row is `aria-current` and scrolled into view. Above the filter,
+  the in-page login); `AdsView`'s `focusAdId` selects that ad's group once
+  the ads load (an ad in no group leaves Kept selected), and its row is `aria-current` and scrolled into view. Above the filter,
   for users with agent access only, `AgentRunPanel`, presentational over
   `AdsView`'s `useAgentRuns`: Run now and Check mail, the current run's
   output and the last ten runs, each with its Claude API spend when its
@@ -77,8 +80,11 @@ Presentational components, each with a test beside it. By surface:
 - `agentRuns.ts` — `RUN_KIND_LABELS`, `runOutcome` (exit 0 succeeded,
   non-zero failed, none interrupted), `RUN_OUTCOME_LABELS`, and `runSpend`,
   which reads the last `api: $x run, $y month` line from a run's output.
-- `adStates.ts` — `AD_STATE_LABELS`, the filter's display order, which
-  actions each ad state offers (`canDraft` for Draft), and `DraftStatus`.
+- `adStates.ts` — the inbox's groups: `AD_GROUPS` (the filter's order),
+  `AD_GROUP_LABELS` (the summary email's words), `adGroup` (stored state,
+  plus the pre-screen verdict for a dismissed ad, → group or none),
+  `setAsideBy` (which step dropped a set-aside ad, and why), which actions a
+  group offers (`canDismiss`, `canDraft` for Draft), and `DraftStatus`.
 - `adLink.ts` — `adIdFromHash(hash)`: the ad id of a `#ad-<id>` hash, or null.
 - `paging.ts` — `paginate`, the pure one-page-at-a-time slice. The page size
   comes from `GET /api/config`; a null size means one page holding

@@ -17,7 +17,7 @@ function sampleAd(overrides: Partial<AdSummary> = {}): AdSummary {
     company: 'Acme',
     location: 'Helsinki',
     deadline: 'end of May',
-    state: 'awaiting_handover',
+    state: 'suitable',
     evaluation: null,
     prescreen: null,
     fetchRequestedAt: null,
@@ -32,13 +32,11 @@ function sampleAd(overrides: Partial<AdSummary> = {}): AdSummary {
   }
 }
 
-function renderRow(ad: AdSummary, handedOver = true, draft: DraftStatus = 'none') {
+function renderRow(ad: AdSummary, draft: DraftStatus = 'none') {
   const actions: AdActions = {
-    onHandOver: vi.fn().mockResolvedValue(handedOver),
     onRetry: vi.fn(),
     onDraft: vi.fn(),
     onDismiss: vi.fn(),
-    onFetch: vi.fn(),
   }
   render(
     <ul>
@@ -67,15 +65,6 @@ test('links to the ad without sending a referrer', () => {
   expect(link).toHaveAttribute('rel', 'noreferrer')
 })
 
-test('the link stays available while handing over, where the text is copied from', async () => {
-  const user = userEvent.setup()
-  renderRow(sampleAd())
-
-  await user.click(screen.getByRole('button', { name: 'Hand over' }))
-
-  expect(screen.getByRole('link', { name: 'Open ad' })).toBeVisible()
-})
-
 test('a blanked ad reads its source and first-seen date', () => {
   renderRow(sampleAd({ title: '', company: '' }))
 
@@ -101,59 +90,15 @@ test('shows the error category on a failed ad', () => {
 })
 
 test.each<[AdState, boolean]>([
-  ['awaiting_handover', true],
-  ['title_rejected', true],
-  ['new', false],
-  ['ready', false],
-  ['failed', false],
-])('in %s, offering hand over is %s', (state, offered) => {
-  renderRow(sampleAd({ state }))
-
-  expect(screen.queryAllByRole('button', { name: 'Hand over' })).toHaveLength(offered ? 1 : 0)
-})
-
-test.each<[AdState, boolean]>([
-  ['new', true],
-  ['awaiting_handover', true],
-  ['title_rejected', true],
-  ['ready', true],
   ['suitable', true],
   ['failed', true],
   ['drafted', false],
+  ['title_rejected', false],
   ['unsuitable', false],
-  ['duplicate', false],
-  ['dismissed', false],
 ])('in %s, offering dismiss is %s', (state, offered) => {
   renderRow(sampleAd({ state }))
 
   expect(screen.queryAllByRole('button', { name: 'Dismiss' })).toHaveLength(offered ? 1 : 0)
-})
-
-test('handing over submits the form and closes it', async () => {
-  const user = userEvent.setup()
-  const actions = renderRow(sampleAd())
-
-  await user.click(screen.getByRole('button', { name: 'Hand over' }))
-  await user.type(screen.getByRole('textbox', { name: 'Ad text' }), 'The full ad.')
-  await user.click(screen.getByRole('button', { name: 'Hand over ad' }))
-
-  expect(actions.onHandOver).toHaveBeenCalledWith(7, {
-    text: 'The full ad.',
-    title: 'Test Lead',
-    company: 'Acme',
-  })
-  expect(screen.queryByRole('textbox', { name: 'Ad text' })).not.toBeInTheDocument()
-})
-
-test('a failed hand-over keeps the form and the pasted text', async () => {
-  const user = userEvent.setup()
-  renderRow(sampleAd(), false)
-
-  await user.click(screen.getByRole('button', { name: 'Hand over' }))
-  await user.type(screen.getByRole('textbox', { name: 'Ad text' }), 'The full ad.')
-  await user.click(screen.getByRole('button', { name: 'Hand over ad' }))
-
-  expect(await screen.findByRole('textbox', { name: 'Ad text' })).toHaveValue('The full ad.')
 })
 
 test('retry is offered on a failed ad only', async () => {
@@ -188,57 +133,50 @@ test('cancelling the confirmation keeps the ad', async () => {
   expect(screen.getByRole('button', { name: 'Dismiss' })).toBeVisible()
 })
 
-test('a waiting hand-over ad offers Fetch beside Hand over, and clicking it calls onFetch', async () => {
-  const user = userEvent.setup()
-  const actions = renderRow(sampleAd())
+test('a kept ad keeps its pre-screen verdict and reason', () => {
+  renderRow(sampleAd({ prescreen: { verdict: 'promising', reason: 'Lead role.' } }))
 
-  expect(screen.getByRole('button', { name: 'Hand over' })).toBeVisible()
-  await user.click(screen.getByRole('button', { name: 'Fetch' }))
-
-  expect(actions.onFetch).toHaveBeenCalledWith(7)
+  expect(screen.getByText('Pre-screen: Promising — Lead role.')).toBeVisible()
 })
 
-test.each<[string, Partial<AdSummary>]>([
-  ['an automatic ad', { sourceMode: 'automatic' }],
-  ['a title-rejected ad', { state: 'title_rejected' }],
-])('%s offers no Fetch', (_name, overrides) => {
+test.each<[string, Partial<AdSummary>, string]>([
+  ['the title rules', { state: 'title_rejected' }, 'Set aside by the title rules.'],
+  [
+    'the pre-screen',
+    { state: 'dismissed', prescreen: { verdict: 'not_promising', reason: 'Mainly sales.' } },
+    'Set aside by the pre-screen — Mainly sales.',
+  ],
+  [
+    'the evaluation',
+    { state: 'unsuitable', evaluation: { verdict: 'unsuitable', fitSummary: 'Too junior.', reasons: [] } },
+    'Set aside by the evaluation — Too junior.',
+  ],
+])('an ad set aside by %s says so, and offers no buttons', (_step, overrides, sentence) => {
   renderRow(sampleAd(overrides))
 
-  expect(screen.queryByRole('button', { name: 'Fetch' })).toBeNull()
+  expect(screen.getByText(sentence)).toBeVisible()
+  expect(screen.queryByText(/^Pre-screen:/)).toBeNull()
+  expect(screen.queryAllByRole('button')).toEqual([])
 })
 
-test('a requested ad says the next run fetches it instead of offering Fetch', () => {
-  renderRow(sampleAd({ fetchRequestedAt: '2026-11-23 09:00:00' }))
+test('a drafted ad offers no buttons', () => {
+  renderRow(sampleAd({ state: 'drafted' }))
 
-  expect(screen.queryByRole('button', { name: 'Fetch' })).toBeNull()
-  expect(screen.getByText('Fetch requested — the next run fetches it')).toBeVisible()
-  expect(screen.getByRole('button', { name: 'Hand over' })).toBeVisible()
+  expect(screen.queryAllByRole('button')).toEqual([])
 })
 
-test('shows the pre-screen verdict with its reason', () => {
-  renderRow(sampleAd({ prescreen: { verdict: 'not_promising', reason: 'Mainly sales.' } }))
+test('a failed ad offers Retry and Dismiss', () => {
+  renderRow(sampleAd({ state: 'failed', lastError: 'gone' }))
 
-  expect(screen.getByText('Pre-screen: Not promising — Mainly sales.')).toBeVisible()
-})
-
-test('the verdict and the click stay visible after the ad moves on', () => {
-  renderRow(
-    sampleAd({
-      state: 'dismissed',
-      title: '',
-      prescreen: { verdict: 'promising', reason: '' },
-      fetchRequestedAt: '2026-11-23 09:00:00',
-    }),
-  )
-
-  expect(screen.getByText('Pre-screen: Promising · Fetch requested')).toBeVisible()
+  const buttons = screen.getAllByRole('button').map((button) => button.textContent)
+  expect(buttons).toEqual(['Retry', 'Dismiss'])
 })
 
 const suitable = sampleAd({ state: 'suitable', sourceMode: 'automatic' })
 
 test('a ready suitable ad offers Draft before Dismiss, and clicking it calls onDraft', async () => {
   const user = userEvent.setup()
-  const actions = renderRow(suitable, true, 'ready')
+  const actions = renderRow(suitable, 'ready')
 
   const buttons = screen.getAllByRole('button').map((button) => button.textContent)
   expect(buttons).toEqual(['Draft', 'Dismiss'])
@@ -248,7 +186,7 @@ test('a ready suitable ad offers Draft before Dismiss, and clicking it calls onD
 })
 
 test('while another run is current, Draft is disabled', () => {
-  renderRow(suitable, true, 'busy')
+  renderRow(suitable, 'busy')
 
   expect(screen.getByRole('button', { name: 'Draft' })).toBeDisabled()
 })
@@ -261,7 +199,7 @@ test('with draft none there is no Draft button', () => {
 })
 
 test('while its own draft runs, the row shows Drafting… and no buttons', () => {
-  renderRow(suitable, true, 'running')
+  renderRow(suitable, 'running')
 
   expect(screen.getByText('Drafting…')).toBeVisible()
   expect(screen.queryAllByRole('button')).toEqual([])
