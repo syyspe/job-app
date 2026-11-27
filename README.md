@@ -507,11 +507,12 @@ no ad page: `agent:run` does that after the pre-screen. It runs no
 | `academicwork` | Academic Work | automatic: the ad waits in `new` |
 | `valtiolle` | Valtiolle.fi | automatic |
 | `nordea` | Nordea careers | automatic |
-| `duunitori` | Duunitori | hand-over: the ad waits in `awaiting_handover`, and can also be handed over by hand |
+| `duunitori` | Duunitori | hand-over: the ad waits in `awaiting_handover`, and can also be handed over by hand through MCP's `handover_ad` |
 
 `agent:run` pre-screens every source's new ads by title and fetches the
-promising ones (with `fetch: "automatic"`, the default), and any hand-over ad
-you clicked Fetch on.
+promising ones (with `fetch: "automatic"`, the default). The inbox lists
+the results under Kept, Failed, Drafted and Set aside, the summary email's
+words; ads still in progress aren't listed.
 
 ### Setup
 
@@ -550,7 +551,8 @@ you clicked Fetch on.
    `mode` to `handover` is a one-line change. `fetch` is read for every
    source with a fetcher: `"automatic"` (the default) fetches every ad the
    pre-screen calls promising, `"requested"` fetches a hand-over ad only
-   after you click Fetch on it. Set Duunitori's to `"automatic"` as above;
+   once a Fetch request marks it (the inbox no longer has a Fetch button, so
+   under `"requested"` hand ads over through MCP's `handover_ad`). Set Duunitori's to `"automatic"` as above;
    `"requested"` is the rollback if its terms ever rule automatic fetching
    out. Why Duunitori is fetched at all, and the limits on it, are in
    `docs/job-search-agent.md` §10.
@@ -625,8 +627,8 @@ and alert sources must already be set up. Drafting is not needed: no
    for reading it on the phone. It must be an http or https URL.
 
    An ad waiting for hand-over is dismissed `handoverWaitDays` days after it
-   was first seen, or after its deadline day if that comes sooner. An ad you
-   clicked Fetch on waits until its deadline instead. A hand-over ad still
+   was first seen, or after its deadline day if that comes sooner. An ad
+   with a Fetch request waits until its deadline instead. A hand-over ad still
    in `ready` or `suitable` after its deadline is dismissed, which clears its
    text.
 4. In Windows, open Task Scheduler and create a task:
@@ -652,7 +654,7 @@ the summary says why. Under `engine: "api"` there is no sandbox check.
   unscreened ads (hand-over ads in `awaiting_handover`, automatic ones in
   `new`, oldest first, up to `prescreen.perRunCap`). An ad the pre-screen
   calls not promising is dismissed at once, with its verdict kept. Then it
-  fetches the promising ones and those you clicked Fetch on, within each
+  fetches the promising ones and any with a Fetch request, within each
   source's daily cap and delay. A fetched ad goes to `ready`, or to
   `duplicate` when it matches an earlier ad or application. A page that is
   gone fails the ad, any other fetch failure records an attempt, and a 401,

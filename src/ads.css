@@ -1,4 +1,4 @@
-/* The ad inbox surface: the run panel, the state filter and the ad rows.
+/* The ad inbox surface: the run panel, the group filter and the ad rows.
    Colour shows what needs the user. Every value is a token from index.css. */
 
 .ads-view {
@@ -72,32 +72,33 @@
   background: var(--spine);
 }
 
-.ad-item[data-state='awaiting_handover'] {
+.ad-item[data-group='kept'] {
   --spine: var(--st-interview);
 }
 
-.ad-item[data-state='failed'] {
+.ad-item[data-group='failed'] {
   --spine: var(--danger);
 }
 
-.ad-item[data-state='drafted'] {
+.ad-item[data-group='drafted'] {
   --spine: var(--st-screening);
 }
 
-/* Closed ads recede with a thinner neutral spine and muted text, never
+/* Set-aside ads recede with a thinner neutral spine and muted text, never
    opacity, which would drop the row below AA. */
-.ad-item[data-state='title_rejected'],
-.ad-item[data-state='unsuitable'] {
+.ad-item[data-group='set_aside'] {
   --spine: var(--st-rejected);
 }
 
-.ad-item[data-state='title_rejected']::before,
-.ad-item[data-state='unsuitable']::before {
+.ad-item[data-group='set_aside']::before {
   width: 2px;
 }
 
-.ad-item[data-state='title_rejected'] .ad-title,
-.ad-item[data-state='unsuitable'] .ad-title {
+.ad-item[data-group='set_aside'] .ad-title {
+  color: var(--ink-muted);
+}
+
+.ad-title {
   color: var(--ink-muted);
 }
 
@@ -119,7 +120,6 @@
 }
 
 .ad-prescreen,
-.ad-fetch-requested,
 .ad-drafting {
   font-size: var(--fs-sm);
   color: var(--ink-muted);
@@ -141,11 +141,6 @@
 .ad-confirm {
   font-size: var(--fs-sm);
   color: var(--ink-muted);
-}
-
-.ad-handover {
-  padding-top: var(--s-3);
-  border-top: 1px solid var(--line);
 }
 
 /* The run panel: start a run, follow it, read the last ones. Its rows use the

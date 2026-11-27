@@ -17,15 +17,15 @@ async function expectNoSideways(page: Page): Promise<void> {
   expect(widths.scroll).toBeLessThanOrEqual(widths.client)
 }
 
-async function ingestHandoverAd(page: Page): Promise<string> {
+async function ingestFailedAd(page: Page): Promise<string> {
   const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`
   const title = `Phone Width Lead ${key}`
   const created = await page.request.post('/api/ads', {
-    data: { source: 'e2e', sourceMode: 'handover', externalId: key, url: `https://jobs.example.com/ad/${key}`, title, company: `Company ${key}` },
+    data: { source: 'e2e', sourceMode: 'automatic', externalId: key, url: `https://jobs.example.com/ad/${key}`, title, company: `Company ${key}` },
   })
   expect(created.status()).toBe(201)
   const { id } = (await created.json()) as { id: number }
-  const moved = await page.request.post(`/api/ads/${id}/transition`, { data: { to: 'awaiting_handover' } })
+  const moved = await page.request.post(`/api/ads/${id}/transition`, { data: { to: 'failed', error: 'fetch_failed' } })
   expect(moved.status()).toBe(200)
   return title
 }
@@ -63,17 +63,18 @@ test('Check mail starts a run, shows it running, then lists it as succeeded with
   await expect(panel.getByRole('button', { name: 'Check mail' })).toBeEnabled()
 })
 
-test('the inbox with its run panel and a hand-over form fits a 360 px phone', async ({ page }) => {
+test('the inbox with its run panel and a failed ad with its buttons fits a 360 px phone', async ({ page }) => {
   await page.setViewportSize(PHONE)
   await logIn(page)
-  const title = await ingestHandoverAd(page)
+  const title = await ingestFailedAd(page)
   await openInbox(page)
   await expect(page.getByRole('region', { name: 'Runs' })).toBeVisible()
   await expectNoSideways(page)
 
+  await page.getByRole('group', { name: 'Filter ads by state' }).getByRole('button', { name: /^Failed \d+$/ }).click()
   const row = page.getByRole('listitem').filter({ hasText: title })
-  await row.getByRole('button', { name: 'Hand over', exact: true }).click()
-  await expect(row.getByRole('textbox', { name: 'Ad text' })).toBeVisible()
+  await expect(row.getByRole('button', { name: 'Retry' })).toBeVisible()
+  await expect(row.getByRole('button', { name: 'Dismiss' })).toBeVisible()
   await expectNoSideways(page)
 })
 

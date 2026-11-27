@@ -1,51 +1,48 @@
-import type { AdState, SourceMode } from '../types.ts'
-
-export const AD_STATE_LABELS: Record<AdState, string> = {
-  new: 'New',
-  awaiting_handover: 'Awaiting hand-over',
-  ready: 'Ready',
-  suitable: 'Suitable',
-  drafted: 'Drafted',
-  title_rejected: 'Title rejected',
-  unsuitable: 'Unsuitable',
-  duplicate: 'Duplicate',
-  dismissed: 'Dismissed',
-  failed: 'Failed',
-}
+import type { AdState, AdSummary, SourceMode } from '../types.ts'
 
 /**
- * Most urgent first: what waits for the user leads. Duplicate and dismissed
- * are left out on purpose: the inbox lists only the selected state, so those
- * closed ads are never shown there.
+ * What the inbox lists: the stored states grouped under the summary email's
+ * words. In-progress and closed ads belong to no group and aren't listed.
  */
-export const AD_STATE_ORDER: readonly AdState[] = [
-  'awaiting_handover',
-  'failed',
-  'suitable',
-  'ready',
-  'new',
-  'drafted',
-  'title_rejected',
-  'unsuitable',
-]
+export type AdGroup = 'kept' | 'failed' | 'drafted' | 'set_aside'
 
-const HAND_OVER_STATES: readonly AdState[] = ['awaiting_handover', 'title_rejected']
+/** Most urgent first: what waits for the user leads. */
+export const AD_GROUPS: readonly AdGroup[] = ['kept', 'failed', 'drafted', 'set_aside']
 
-const DISMISSIBLE_STATES: readonly AdState[] = [
-  'new',
-  'awaiting_handover',
-  'title_rejected',
-  'ready',
-  'suitable',
-  'failed',
-]
-
-export function canHandOver(state: AdState): boolean {
-  return HAND_OVER_STATES.includes(state)
+export const AD_GROUP_LABELS: Record<AdGroup, string> = {
+  kept: 'Kept',
+  failed: 'Failed',
+  drafted: 'Drafted',
+  set_aside: 'Set aside',
 }
 
-export function canDismiss(state: AdState): boolean {
-  return DISMISSIBLE_STATES.includes(state)
+const STATE_GROUPS: Partial<Record<AdState, AdGroup>> = {
+  suitable: 'kept',
+  failed: 'failed',
+  drafted: 'drafted',
+  title_rejected: 'set_aside',
+  unsuitable: 'set_aside',
+}
+
+function prescreenDismissed(ad: AdSummary): boolean {
+  return ad.state === 'dismissed' && ad.prescreen?.verdict === 'not_promising'
+}
+
+export function adGroup(ad: AdSummary): AdGroup | null {
+  if (prescreenDismissed(ad)) return 'set_aside'
+  return STATE_GROUPS[ad.state] ?? null
+}
+
+/** Which step dropped a set-aside ad, and why. */
+export function setAsideBy(ad: AdSummary): string | null {
+  if (ad.state === 'title_rejected') return 'Set aside by the title rules.'
+  if (prescreenDismissed(ad)) return `Set aside by the pre-screen — ${ad.prescreen?.reason}`
+  if (ad.state === 'unsuitable') return `Set aside by the evaluation — ${ad.evaluation?.fitSummary}`
+  return null
+}
+
+export function canDismiss(group: AdGroup | null): boolean {
+  return group === 'kept' || group === 'failed'
 }
 
 /**

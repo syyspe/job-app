@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { AdList } from './AdList.tsx'
 import type { AdActions } from './AdRow.tsx'
 import { AgentRunPanel } from './AgentRunPanel.tsx'
-import { AD_STATE_LABELS, AD_STATE_ORDER, canDraft, retryTarget } from '../lib/adStates.ts'
-import type { DraftStatus } from '../lib/adStates.ts'
-import { handoverAd, listAds, requestFetch, transitionAd } from '../lib/api.ts'
+import { AD_GROUP_LABELS, AD_GROUPS, adGroup, canDraft, retryTarget } from '../lib/adStates.ts'
+import type { AdGroup, DraftStatus } from '../lib/adStates.ts'
+import { listAds, transitionAd } from '../lib/api.ts'
 import { useApiAction } from '../lib/apiAction.ts'
 import { useAgentRuns } from '../lib/useAgentRuns.ts'
-import type { AdState, AdSummary, AgentRun } from '../types.ts'
+import type { AdSummary, AgentRun } from '../types.ts'
 
 type AdChanges = Omit<AdActions, 'onDraft'>
 
@@ -41,8 +41,6 @@ function useAds(onUnauthorized: () => void): UseAds {
     ads,
     refresh,
     actions: {
-      onHandOver: (id, input) => change(() => handoverAd(id, input), 'Ad handed over'),
-      onFetch: (id) => change(() => requestFetch(id), 'Fetch requested'),
       onRetry: (ad) =>
         change(
           () => transitionAd(ad.id, retryTarget(ad.sourceMode)),
@@ -55,24 +53,24 @@ function useAds(onUnauthorized: () => void): UseAds {
 
 interface AdStateFilterProps {
   ads: AdSummary[]
-  selected: AdState
-  onSelect: (state: AdState) => void
+  selected: AdGroup
+  onSelect: (group: AdGroup) => void
 }
 
 function AdStateFilter({ ads, selected, onSelect }: AdStateFilterProps) {
   return (
     <div className="ad-filter" role="group" aria-label="Filter ads by state">
-      {AD_STATE_ORDER.map((state) => (
+      {AD_GROUPS.map((group) => (
         <button
-          key={state}
+          key={group}
           type="button"
           className="button"
-          aria-pressed={state === selected}
-          onClick={() => onSelect(state)}
+          aria-pressed={group === selected}
+          onClick={() => onSelect(group)}
         >
-          {AD_STATE_LABELS[state]}{' '}
+          {AD_GROUP_LABELS[group]}{' '}
           <span className="ad-filter-count">
-            {ads.filter((ad) => ad.state === state).length}
+            {ads.filter((ad) => adGroup(ad) === group).length}
           </span>
         </button>
       ))}
@@ -83,7 +81,7 @@ function AdStateFilter({ ads, selected, onSelect }: AdStateFilterProps) {
 interface AdsViewProps {
   onUnauthorized: () => void
   canRunAgent: boolean
-  /** The ad a summary link opened; its state is selected once the ads load. */
+  /** The ad a summary link opened; its group is selected once the ads load. */
   focusAdId?: number
 }
 
@@ -95,13 +93,14 @@ function draftStatusOf(ad: AdSummary, canRunAgent: boolean, current: AgentRun | 
 }
 
 function useSelectedState(ads: AdSummary[], focusAdId: number | undefined) {
-  const [selected, setSelected] = useState<AdState>('awaiting_handover')
+  const [selected, setSelected] = useState<AdGroup>('kept')
   const [focused, setFocused] = useState(false)
   const focusAd = focused ? undefined : ads.find((ad) => ad.id === focusAdId)
   // Set during render, React's pattern for state that follows loaded data.
+  // An ad in no group (still in progress, or closed) leaves the default.
   if (focusAd) {
     setFocused(true)
-    setSelected(focusAd.state)
+    setSelected(adGroup(focusAd) ?? selected)
   }
   return [selected, setSelected] as const
 }
@@ -118,8 +117,8 @@ export function AdsView({ onUnauthorized, canRunAgent, focusAdId }: AdsViewProps
       {canRunAgent && <AgentRunPanel runs={runs} onStart={(kind) => void start({ kind })} />}
       <AdStateFilter ads={ads} selected={selected} onSelect={setSelected} />
       <AdList
-        ads={ads.filter((ad) => ad.state === selected)}
-        stateLabel={AD_STATE_LABELS[selected]}
+        ads={ads.filter((ad) => adGroup(ad) === selected)}
+        groupLabel={AD_GROUP_LABELS[selected]}
         actions={{ ...actions, onDraft }}
         draftStatus={(ad) => draftStatusOf(ad, canRunAgent, runs.current)}
         currentId={focusAdId}

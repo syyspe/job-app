@@ -87,7 +87,7 @@ The groups (decided with the user):
 - `src/ads.css` — spine selectors move to `data-group`: `failed` danger,
   `drafted` screening, `kept` the accent `awaiting_handover` used
   (`--st-interview`), `set_aside` the 2px neutral spine with muted title.
-  Delete `.ad-handover`.
+  Delete `.ad-handover` and `.ad-fetch-requested` (no element left).
 - Tests: `src/components/AdsView.test.tsx`, `AdRow.test.tsx`,
   `AdList.test.tsx`, `e2e/ads.spec.ts`, `e2e/agentRuns.spec.ts` (see Tests).
 - Docs: `docs/architecture.md` (the Ad inbox paragraph, `adStates.ts` line,
@@ -98,7 +98,7 @@ The groups (decided with the user):
 
 Unchanged on purpose: `server/` (states, transitions, the handover and
 `fetch-request` routes), `mcp/`, `agent/`. `fetch-request` stays as the API
-of the `fetch: "handover"` rollback recorded in `docs/job-search-agent.md`;
+of the `fetch: "requested"` rollback recorded in `docs/job-search-agent.md`;
 the docs note that under that rollback the user hands ads over through MCP.
 
 ## Work order

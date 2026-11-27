@@ -5,18 +5,18 @@ import type { AdSummary } from '../types.ts'
 
 interface AdListProps {
   ads: AdSummary[]
-  stateLabel: string
+  groupLabel: string
   actions: AdActions
   draftStatus: (ad: AdSummary) => DraftStatus
   /** The ad a summary link opened, marked as the current row. */
   currentId?: number
 }
 
-export function AdList({ ads, stateLabel, actions, draftStatus, currentId }: AdListProps) {
+export function AdList({ ads, groupLabel, actions, draftStatus, currentId }: AdListProps) {
   if (ads.length === 0) {
     return (
       <div className="empty-state">
-        <p className="empty-state-title">No ads in {stateLabel}</p>
+        <p className="empty-state-title">No ads in {groupLabel}</p>
         <p>Choose another state to see its ads.</p>
       </div>
     )

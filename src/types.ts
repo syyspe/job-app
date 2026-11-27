@@ -145,8 +145,3 @@ export interface AdSummary {
   reportedAt: string | null
 }
 
-export interface AdHandoverInput {
-  text: string
-  title: string
-  company: string
-}
