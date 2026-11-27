@@ -443,7 +443,8 @@ criteria that follow it. `prompts/draft.framing.md` and
   `#ad-<id>` link and `adName` "title, company".
 - `summary.ts` — `composeSummary({ story, apiSpend, appUrl, lanUrl })`:
   subject and plain-text body from the story: the opening, each kept ad with
-  both links and its fit summary, the set-aside ads with reason and job-site
+  its job-site link, fit summary and job-app link (plus a LAN one when
+  `lanUrl` is set), the set-aside ads with reason and job-site
   link, the problems and a `Claude API:` spend line. Ad text goes through
   `oneLine`.
 - `runOutput.ts` — `runOutputLines(report, appUrl)`: `agent:run`'s stdout,

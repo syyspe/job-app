@@ -624,7 +624,7 @@ and alert sources must already be set up. Drafting is not needed: no
    pre-screen.") and the job-app link.
 
    When `lanUrl` is set, the summary carries a second link, to that address,
-   for reading it on the phone. It must be an http or https URL.
+   for reading it on the phone, and each kept ad a second job-app link too. It must be an http or https URL.
 
    An ad waiting for hand-over is dismissed `handoverWaitDays` days after it
    was first seen, or after its deadline day if that comes sooner. An ad

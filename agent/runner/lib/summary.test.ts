@@ -57,6 +57,16 @@ test('a kept ad carries both links and its fit summary', () => {
   )
 })
 
+test('a configured lanUrl adds a LAN link to each kept ad', () => {
+  const kept = [{ ad: ad({ id: 4, title: 'Test Lead', company: 'Acme Oy', url: 'https://jobs.example/4' }), fitSummary: 'Fits.' }]
+
+  const { text } = composeSummary({ story: story({ kept }), apiSpend: null, appUrl, lanUrl: 'http://192.168.1.5:3001' })
+
+  expect(text).toContain(
+    'In job-app: https://jobs.lan.example/#ad-4\nIn job-app (LAN): http://192.168.1.5:3001/#ad-4\n',
+  )
+})
+
 test('a set-aside ad carries its reason and its job-site link', () => {
   const prescreen = { verdict: 'not_promising' as const, reason: 'A sales role.' }
   const setAside = [ad({ id: 5, title: 'Account Manager', company: 'Sell Oy', url: 'https://jobs.example/5', prescreen })]

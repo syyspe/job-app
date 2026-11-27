@@ -24,8 +24,15 @@ function block(lines: string[]): string[] {
   return lines.length === 0 ? [] : [...lines, '']
 }
 
-function keptBlock({ ad, fitSummary }: KeptAd, appUrl: string): string[] {
-  return [oneLine(adName(ad)), `Ad: ${oneLine(ad.url)}`, oneLine(fitSummary), `In job-app: ${adLink(appUrl, ad.id)}`, '']
+function keptBlock({ ad, fitSummary }: KeptAd, appUrl: string, lanUrl?: string): string[] {
+  return [
+    oneLine(adName(ad)),
+    `Ad: ${oneLine(ad.url)}`,
+    oneLine(fitSummary),
+    `In job-app: ${adLink(appUrl, ad.id)}`,
+    ...(lanUrl ? [`In job-app (LAN): ${adLink(lanUrl, ad.id)}`] : []),
+    '',
+  ]
 }
 
 function setAsideLines(ads: AdSummary[]): string[] {
@@ -49,7 +56,7 @@ function subjectOf({ kept, setAside, problems }: Story): string {
 function bodyOf({ story, apiSpend, appUrl, lanUrl }: SummaryInput): string {
   return [
     ...block(story.opening.length === 0 ? [] : [story.opening.join(' ')]),
-    ...story.kept.flatMap((kept) => keptBlock(kept, appUrl)),
+    ...story.kept.flatMap((kept) => keptBlock(kept, appUrl, lanUrl)),
     ...block(setAsideLines(story.setAside)),
     ...block(story.problems),
     ...block(spendLines(apiSpend)),
